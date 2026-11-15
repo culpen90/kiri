@@ -286,6 +286,23 @@ fn shared_agent() -> ureq::Agent {
 /// token lasts (`expires_in`, 60 s if it doesn't; Docker Hub gives 300 s).
 static TOKENS: std::sync::LazyLock<Mutex<HashMap<String, (String, Instant)>>> = std::sync::LazyLock::new(Default::default);
 
+/// Authenticated cache keys are private to this process. If the OS cannot
+/// supply a key, requests still authenticate but skip the authenticated caches.
+static CREDENTIAL_CACHE_KEY: std::sync::LazyLock<Option<ring::hmac::Key>> = std::sync::LazyLock::new(|| {
+    ring::hmac::Key::generate(ring::hmac::HMAC_SHA256, &ring::rand::SystemRandom::new()).ok()
+});
+
+/// An opaque identity for in-memory registry caches. `None` means the
+/// caller must keep this operation separate from other credentials.
+pub fn credential_cache_identity(fields: &[&str]) -> Option<String> {
+    let mut mac = ring::hmac::Context::with_key(CREDENTIAL_CACHE_KEY.as_ref()?);
+    for field in fields {
+        mac.update(&(field.len() as u64).to_le_bytes());
+        mac.update(field.as_bytes());
+    }
+    Some(crate::b64::encode(mac.sign().as_ref()))
+}
+
 /// Each registry's last bearer challenge without its scope, so a pull from
 /// a registry seen before asks for its token straight away instead of
 /// first sending a request only to be told where the token server is.
@@ -406,19 +423,17 @@ impl Client {
 
     /// Who the tokens are for: a fingerprint of the credentials, so one
     /// user's token is never sent for another, or for an anonymous pull.
-    fn who(&self) -> String {
-        match &self.credentials {
-            None => "-".into(),
-            Some(c) => sha256_digest(format!("{}\0{}\0{}\0{}", c.username, c.password, c.identity_token, c.registry_token).as_bytes()),
-        }
+    fn who(&self) -> Option<String> {
+        let Some(c) = &self.credentials else { return Some("-".into()) };
+        credential_cache_identity(&[&c.username, &c.password, &c.identity_token, &c.registry_token])
     }
 
-    fn token_key(&self, r: &Reference, actions: &str) -> String {
-        format!("{}/{} {actions} {}", r.registry, r.repository, self.who())
+    fn token_key(&self, r: &Reference, actions: &str) -> Option<String> {
+        Some(format!("{}/{} {actions} {}", r.registry, r.repository, self.who()?))
     }
 
-    fn manifest_key(&self, r: &Reference, reference: &str) -> String {
-        format!("{}/{}@{reference} {}", r.registry, r.repository, self.who())
+    fn manifest_key(&self, r: &Reference, reference: &str) -> Option<String> {
+        Some(format!("{}/{}@{reference} {}", r.registry, r.repository, self.who()?))
     }
 
     fn cached_token(key: &str) -> Option<String> {
@@ -449,7 +464,7 @@ impl Client {
     /// it; a registry that cannot be reached at all is reported at once,
     /// rather than waiting out the connect timeout a second time.
     fn warm_up(&self, r: &Reference, actions: &str) -> Result<(), Error> {
-        let key = self.token_key(r, actions);
+        let Some(key) = self.token_key(r, actions) else { return Ok(()) };
         if self.credentials.as_ref().is_some_and(|c| !c.registry_token.is_empty()) || Self::cached_token(&key).is_some() {
             return Ok(());
         }
@@ -650,9 +665,8 @@ impl Client {
     }
 
     fn manifest(&self, r: &Reference, reference: &str) -> Result<(Vec<u8>, String), Error> {
-        let by_digest = reference.starts_with("sha256:");
-        let key = self.manifest_key(r, reference);
-        if by_digest && let Some(hit) = MANIFESTS.lock().unwrap_or_else(|e| e.into_inner()).get(&key) {
+        let key = reference.starts_with("sha256:").then(|| self.manifest_key(r, reference)).flatten();
+        if let Some(key) = &key && let Some(hit) = MANIFESTS.lock().unwrap_or_else(|e| e.into_inner()).get(key) {
             return Ok(hit);
         }
         let url = format!("{}/v2/{}/manifests/{reference}", r.api_base(), r.repository);
@@ -664,7 +678,7 @@ impl Client {
             .unwrap_or_default()
             .to_owned();
         let bytes = resp.body_mut().with_config().limit(4 << 20).read_to_vec()?;
-        if by_digest {
+        if let Some(key) = key {
             MANIFESTS.lock().unwrap_or_else(|e| e.into_inner()).put(&key, reference, &bytes, &media_type);
         }
         Ok((bytes, media_type))
@@ -780,29 +794,26 @@ impl Client {
         call: impl Fn(Option<&str>) -> Result<ureq::http::Response<ureq::Body>, ureq::Error>,
     ) -> Result<ureq::http::Response<ureq::Body>, Error> {
         let key = self.token_key(r, actions);
-        let mut resp = None;
-        for attempt in 0..2 {
-            let header = Self::cached_token(&key).or_else(|| {
-                self.credentials.as_ref().filter(|c| !c.registry_token.is_empty()).map(|c| format!("Bearer {}", c.registry_token))
-            });
-            let rsp = call(header.as_deref())?;
-            if rsp.status().as_u16() == 401 && attempt == 0 {
-                let challenge = rsp.headers().get("www-authenticate").and_then(|v| v.to_str().ok()).unwrap_or_default().to_owned();
-                drain(rsp);
-                let (answer, ttl) = self.answer(&challenge, &format!("repository:{}:{actions}", r.repository), &r.registry).map_err(|e| match e {
-                    Error::Status { url, status, body } if url.is_empty() => Error::Status { url: r.api_base(), status, body },
-                    e => e,
-                })?;
-                if let Some(c) = without_scope(&challenge) {
-                    CHALLENGES.lock().unwrap_or_else(|e| e.into_inner()).insert(r.registry.clone(), c);
-                }
-                Self::remember_token(key.clone(), answer, ttl);
-                continue;
-            }
-            resp = Some(rsp);
-            break;
+        let header = key.as_deref().and_then(Self::cached_token).or_else(|| {
+            self.credentials.as_ref().filter(|c| !c.registry_token.is_empty()).map(|c| format!("Bearer {}", c.registry_token))
+        });
+        let rsp = call(header.as_deref())?;
+        if rsp.status().as_u16() != 401 {
+            return Ok(rsp);
         }
-        resp.ok_or_else(|| Error::Status { url: r.api_base(), status: 401, body: "unauthorized after token refresh".into() })
+        let challenge = rsp.headers().get("www-authenticate").and_then(|v| v.to_str().ok()).unwrap_or_default().to_owned();
+        drain(rsp);
+        let (answer, ttl) = self.answer(&challenge, &format!("repository:{}:{actions}", r.repository), &r.registry).map_err(|e| match e {
+            Error::Status { url, status, body } if url.is_empty() => Error::Status { url: r.api_base(), status, body },
+            e => e,
+        })?;
+        if let Some(c) = without_scope(&challenge) {
+            CHALLENGES.lock().unwrap_or_else(|e| e.into_inner()).insert(r.registry.clone(), c);
+        }
+        if let Some(key) = key {
+            Self::remember_token(key, answer.clone(), ttl);
+        }
+        Ok(call(Some(&answer))?)
     }
 
     /// The `Authorization` header that answers a `WWW-Authenticate` challenge
@@ -1173,7 +1184,8 @@ mod tests {
                 assert_ne!(a, b);
             }
         }
-        assert!(!alice.token_key(&r, "pull").contains("alice"), "the key holds a fingerprint, not the name");
+        let same = Client::new().with_credentials(alice.credentials.clone());
+        assert_eq!(alice.token_key(&r, "pull"), same.token_key(&r, "pull"));
         assert_eq!(anon.token_key(&r, "pull"), Client::new().token_key(&r, "pull"));
         // Cached manifests too: one fetched with credentials is not an
         // anonymous pull's, nor another account's.

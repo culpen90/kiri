@@ -722,6 +722,7 @@ dependencies = [
 name = "kiri-image"
 version = "0.0.0"
 dependencies = [
+ "ring",
  "serde",
  "serde_json",
  "sha2",

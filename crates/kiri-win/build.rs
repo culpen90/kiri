@@ -7,13 +7,7 @@
 
 use std::path::Path;
 
-// The Kiri Share build key, as crates/kiri/build.rs compiles it: stowlark-win
-// carries share.rs too, for the window's Share.
-include!("../kiri/build_share_key.rs");
-
 fn main() {
-    println!("cargo:rerun-if-changed=../kiri/build_share_key.rs");
-    write_share_build_key();
     // The bundle files' SHA-256s, set by `cargo xtask windows`.
     println!("cargo:rerun-if-env-changed=STOWLARK_BUNDLE_SHA256");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_VERSION");
