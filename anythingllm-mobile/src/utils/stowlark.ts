@@ -3,7 +3,7 @@ import { Alert, Linking, NativeModules, PermissionsAndroid, Platform } from 'rea
 import i18n from '@/i18n';
 
 const TERMUX_PERMISSION = 'com.termux.permission.RUN_COMMAND' as Parameters<typeof PermissionsAndroid.request>[0];
-const SETUP_URL = 'https://github.com/stowlark/stowlark/blob/9c096a37d594f669fab3d2efdf3e56df32786dab/docs/android.md';
+const SETUP_URL = 'https://github.com/stowlark/stowlark/blob/main/anythingllm-mobile/docs/stowlark-android.md';
 
 export const MAX_STOWLARK_SCRIPT_BYTES = 64 * 1024;
 

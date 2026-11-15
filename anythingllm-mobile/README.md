@@ -16,20 +16,20 @@
   <a href="https://www.reddit.com/r/anythingllm/" target="_blank">
       <img src="https://img.shields.io/badge/reddit-r%2Fanythingllm-FF4500?style=flat&logo=reddit&logoColor=white" alt="r/anythingllm">
   </a> |
-  <a href="https://github.com/Mintplex-Labs/anythingllm-mobile/blob/main/LICENSE" target="_blank">
+  <a href="./LICENSE">
       <img src="https://img.shields.io/static/v1?label=license&message=GPLv3&color=white" alt="License">
   </a> |
   <a href="https://docs.anythingllm.com/mobile/overview" target="_blank">
     Docs
   </a> |
   <a href="https://play.google.com/store/apps/details?id=com.anythingllm" target="_blank">
-    Download
+    Upstream Google Play
   </a>
 </p>
 
-<p align="center">
-👉 Download on Google Play! <a href="https://play.google.com/store/apps/details?id=com.anythingllm" target="_blank">Download Now</a>
-</p>
+This copy of AnythingLLM Mobile is maintained in the [Stowlark repository](../README.md) and derived from [Mintplex Labs' AnythingLLM Mobile](https://github.com/Mintplex-Labs/anythingllm-mobile).
+
+On November 15, 2026, Stowlark added a chat tool for running shell and Python scripts in its Android Linux VM. Use a [build from this source](./DEVELOPMENT.md) and follow the [Stowlark setup guide](./docs/stowlark-android.md) to enable the tool.
 
 ---
 
@@ -188,7 +188,7 @@ Setup, on-device runtime notes, release builds and the project layout live in [D
 Copyright © 2025 [Mintplex Labs][profile-link]. <br />
 This project is licensed under the [GNU General Public License v3.0 or later](./LICENSE). <br />
 _Releases prior to 1.2.0 were published under the MIT License and remain available under those terms._ <br />
-Contributors must sign our [Contributor License Agreement](./CLA.md) - a bot will prompt you on your first pull request.
+Contributions directed to upstream Mintplex Labs are subject to [its Contributor License Agreement](./CLA.md).
 
 <!-- LINK GROUP -->
 

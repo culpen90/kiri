@@ -11,7 +11,7 @@ The **Linux (Stowlark)** chat tool runs reviewed shell and Python scripts in a s
    pkg install qemu-system-aarch64-headless
    ```
 
-3. Get a trusted `stowlark-android-aarch64.tar.gz` build and its checksum. The [Stowlark Android build instructions](https://github.com/stowlark/stowlark/blob/9c096a37d594f669fab3d2efdf3e56df32786dab/docs/android.md#build-from-source) describe how to build both from the version used for this integration. Place both files in the same directory accessible from Termux. Run the following from that directory.
+3. Get a trusted `stowlark-android-aarch64.tar.gz` build and its checksum. The [Stowlark Android build instructions](../../docs/android.md#build-from-source) show how to build both from the repository root. Place both files in the same directory accessible from Termux. Run the following from that directory.
 
    ```sh
    sha256sum -c stowlark-android-aarch64.tar.gz.sha256 &&
@@ -31,4 +31,4 @@ The **Linux (Stowlark)** chat tool runs reviewed shell and Python scripts in a s
 - Stowlark boots a fresh 256 MiB VM per run and stops it after 90 seconds, including boot. Combine steps that need the same files into one script.
 - Keep output small. Termux can truncate large replies, and AnythingLLM shortens returned output to fit the model's context.
 - If you stop a chat turn after approval, the already-started VM can continue through its existing deadline.
-- Use scripts you trust after review. [Stowlark documents the limits of QEMU software emulation as an isolation boundary.](https://github.com/stowlark/stowlark/blob/9c096a37d594f669fab3d2efdf3e56df32786dab/docs/android.md#trust-model)
+- Use scripts you trust after review. [Stowlark documents the limits of QEMU software emulation as an isolation boundary.](../../docs/android.md#trust-model)

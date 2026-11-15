@@ -1,10 +1,11 @@
 # Developing AnythingLLM Mobile
 
 Everything you need to build, run and release the app locally. For what the app does, see the [README](./README.md).
+Run the commands below from `anythingllm-mobile/` in the Stowlark checkout.
 
 ## Prerequisites
 
-- Node.js >= 18
+- Node.js 20.19.4 or newer. The `.nvmrc` pins the version used in CI.
 - Yarn
 - React Native development environment ([setup guide](https://reactnative.dev/docs/environment-setup))
 - Android SDK (for Android builds)
@@ -96,4 +97,4 @@ Besides `MainActivity`, the Android app exposes two system integrations, both un
 
 - Create issues for bugs or feature requests
 - PRs are welcome — please follow existing code style and run `yarn lint` before submitting
-- Contributors must sign our [Contributor License Agreement](./CLA.md) — a bot will prompt you on your first pull request
+- Contributions directed to upstream Mintplex Labs are subject to [its Contributor License Agreement](./CLA.md).

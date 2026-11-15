@@ -1,0 +1,49 @@
+name: AnythingLLM Mobile
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/anythingllm-mobile.yml'
+      - 'anythingllm-mobile/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/anythingllm-mobile.yml'
+      - 'anythingllm-mobile/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anythingllm-mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: Verify mobile app
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: anythingllm-mobile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: 'anythingllm-mobile/.nvmrc'
+      - name: Verify translations
+        run: node scripts/translations/verify.mjs
+      - name: Install dependencies
+        env:
+          HUSKY: '0'
+          RNLLAMA_SKIP_POSTINSTALL: '1'
+        run: corepack yarn install --frozen-lockfile --non-interactive
+      - name: Lint
+        run: corepack yarn lint
+      - name: Type check
+        run: corepack yarn typecheck
+      - name: Run Jest
+        run: corepack yarn test --runInBand
