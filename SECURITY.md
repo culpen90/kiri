@@ -26,3 +26,7 @@ update before reporting.
 - The daemon socket, the HTTP/HTTPS router, DNS, and the certificate
   authority (it is limited to `kiri.local` and `kiri.localhost` names).
 - The installer, `kiri setup` and auto-update.
+- The Android launcher and guest runner, including unexpected host file or
+  network exposure in the supported configuration. The Android backend uses
+  QEMU TCG, which [does not promise isolation from hostile guests](https://www.qemu.org/docs/master/system/security.html#non-virtualization-use-case).
+  See [the Android trust model](docs/android.md#trust-model).
