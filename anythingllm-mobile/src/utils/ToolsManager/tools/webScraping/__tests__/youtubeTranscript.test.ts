@@ -40,6 +40,10 @@ describe('parseCaptionXml', () => {
     const xml = '<timedtext><body><p t="0" d="1"><s>Hello</s><s> there</s></p><p t="1" d="1">a &lt;b&gt; c</p></body></timedtext>';
     expect(parseCaptionXml(xml)).toBe('Hello there a <b> c');
   });
+  test('keeps text in order around nested elements and CDATA', () => {
+    const xml = '<timedtext><body><p><s>left</s><![CDATA[ & ]]><font title="one > two">right</font></p></body></timedtext>';
+    expect(parseCaptionXml(xml)).toBe('left & right');
+  });
   test('empty', () => {
     expect(parseCaptionXml('<transcript></transcript>')).toBe('');
   });

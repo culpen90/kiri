@@ -1,3 +1,5 @@
+import { Parser } from 'htmlparser2';
+
 /**
  * pdf-lib's standard (non-embedded) fonts can only encode WinAnsi characters.
  * Drawing anything outside that set throws, so every string that reaches the
@@ -85,7 +87,12 @@ export function unescapeHtml(text: string): string {
     .replace(/&amp;/g, '&');
 }
 
-/** Strip tags from raw html so at least the text survives */
+/** Extract plain text from raw HTML tokens for document export. */
 export function stripHtml(text: string): string {
-  return unescapeHtml(text.replace(/<[^>]*>/g, ''));
+  const chunks: string[] = [];
+  const parser = new Parser({
+    ontext: chunk => chunks.push(chunk),
+  }, { decodeEntities: false });
+  parser.end(text);
+  return unescapeHtml(chunks.join(''));
 }

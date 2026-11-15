@@ -13,6 +13,8 @@
  * so when there is no transcript we throw and the caller reports it.
  */
 
+import { DomUtils, parseDocument } from 'htmlparser2';
+
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 /** Each request gets its own budget so a stalled hop cannot hang the tool call. */
@@ -20,11 +22,6 @@ const REQUEST_TIMEOUT_MS = 15_000;
 
 /** Same pattern as core `validYoutubeVideoUrl` - watch, youtu.be, embed, v, live and shorts URLs. */
 const RE_YOUTUBE_VIDEO = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?(?:.*&)?v=|(?:live\/)?|shorts\/))([\w-]{11})(?:\S+)?$/;
-
-/** Legacy caption XML: <text start="1.2" dur="3.4">...</text> */
-const RE_XML_TEXT = /<text[^>]*>([\s\S]*?)<\/text>/g;
-/** srv3 caption XML: <p t="1200" d="3400">...<s>word</s>...</p> */
-const RE_SRV3_P = /<p\b[^>]*>([\s\S]*?)<\/p>/g;
 
 export type YoutubeVideoMetadata = {
     title: string;
@@ -85,12 +82,12 @@ function decodeEntities(text: string): string {
 
 /** Flatten caption XML (legacy or srv3) into a single line of text. */
 export function parseCaptionXml(xml: string): string {
-    let matches = [...xml.matchAll(RE_XML_TEXT)];
-    if (!matches.length) matches = [...xml.matchAll(RE_SRV3_P)];
-    return matches
-        // Inner tags (<s>, <font>) are stripped before decoding so escaped brackets in captions survive.
-        // Caption text arrives double-escaped (`&amp;#39;`) so it is decoded twice.
-        .map(m => decodeEntities(decodeEntities(m[1].replace(/<[^>]+>/g, ''))))
+    const document = parseDocument(xml, { xmlMode: true, decodeEntities: false });
+    const legacy = DomUtils.getElementsByTagName('text', document.children);
+    const captions = legacy.length ? legacy : DomUtils.getElementsByTagName('p', document.children);
+    return captions
+        // Decode caption text after extracting XML nodes so escaped brackets survive as text.
+        .map(caption => decodeEntities(decodeEntities(DomUtils.textContent(caption))))
         .join(' ')
         .replace(/\s+/g, ' ')
         .trim();

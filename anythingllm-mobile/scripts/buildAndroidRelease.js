@@ -1,5 +1,6 @@
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 // Load the root .env (the same file Gradle reads via react-native-config) so the
@@ -25,22 +26,35 @@ console.log(`Building Android release with version: ${version}`);
 
 // Cross-platform helper functions
 const isWindows = process.platform === 'win32';
-const isMac = process.platform === 'darwin';
 
-function runCommand(command, options = {}) {
-    const defaultOptions = { stdio: 'inherit', shell: true };
-    execSync(command, { ...defaultOptions, ...options });
+function runCommand(file, args, options = {}) {
+    execFileSync(file, args, { stdio: 'inherit', ...options });
+}
+
+function runGradle(task) {
+    const options = { cwd: 'android' };
+    if (isWindows) {
+        // Windows requires cmd.exe for a batch file. The task is a fixed script argument.
+        runCommand('cmd.exe', ['/d', '/c', 'gradlew.bat', task], options);
+    } else {
+        runCommand('./gradlew', [task], options);
+    }
 }
 
 function extractArchive(zipPath, outputDir) {
     if (isWindows) {
-        // Use PowerShell on Windows
-        const extractCommand = `powershell -command "Expand-Archive -Path '${zipPath}' -DestinationPath '${outputDir}' -Force"`;
-        runCommand(extractCommand);
+        runCommand('powershell.exe', [
+            '-NoProfile', '-NonInteractive', '-Command',
+            'Expand-Archive -LiteralPath $env:ANYTHINGLLM_RELEASE_ARCHIVE -DestinationPath $env:ANYTHINGLLM_RELEASE_OUTPUT -Force',
+        ], {
+            env: {
+                ...process.env,
+                ANYTHINGLLM_RELEASE_ARCHIVE: zipPath,
+                ANYTHINGLLM_RELEASE_OUTPUT: outputDir,
+            },
+        });
     } else {
-        // Use unzip on Mac/Linux
-        const extractCommand = `unzip -o "${zipPath}" -d "${outputDir}"`;
-        runCommand(extractCommand);
+        runCommand('unzip', ['-o', zipPath, '-d', outputDir]);
     }
 }
 
@@ -56,7 +70,7 @@ function getJavaCommand() {
 
         for (const javaPath of javaPaths) {
             try {
-                runCommand(`"${javaPath}" -version`, { stdio: 'pipe' });
+                runCommand(javaPath, ['-version'], { stdio: 'pipe' });
                 return javaPath;
             } catch (error) {
                 // Continue to next path
@@ -75,10 +89,10 @@ try {
 
     // Clean the build
     console.log('Cleaning the build...');
-    runCommand(isWindows ? 'cd android && gradlew clean && cd ..' : 'cd android && ./gradlew clean && cd ..');
+    runGradle('clean');
 
     console.log('Building the AAB bundle...');
-    runCommand(isWindows ? 'cd android && gradlew bundleRelease && cd ..' : 'cd android && ./gradlew bundleRelease && cd ..');
+    runGradle('bundleRelease');
 
     // Keep the JS sourcemap for this exact build - it is the only way to decode the
     // `index.android.bundle:1:<col>` frames in Crashlytics JS crash reports. Stored outside
@@ -105,6 +119,9 @@ try {
         console.error('APP_RELEASE_STORE_PASSWORD environment variable is not set.');
         process.exit(1);
     }
+    if (/[\r\n]/.test(keystorePassword)) {
+        throw new Error('APP_RELEASE_STORE_PASSWORD must be a single line for bundletool.');
+    }
     if (!fs.existsSync(keystorePath)) {
         console.error('Keystore file not found. Please ensure the keystore file exists at android/app/anythingllm-upload-key.keystore');
         process.exit(1);
@@ -113,17 +130,23 @@ try {
     // Get Java command
     const javaCommand = getJavaCommand();
 
-    const bundletoolCommand = [
-        `"${javaCommand}" -jar scripts/bundletool-1.18.1.jar build-apks`,
-        `--bundle="${aabPath}"`,
-        `--output="${apksOutputPath}"`,
-        '--mode=universal',
-        `--ks="${keystorePath}"`,
-        `--ks-key-alias="${keystoreAlias}"`,
-        `--ks-pass="pass:${keystorePassword}"`
-    ].join(' ');
-
-    runCommand(bundletoolCommand);
+    // Bundletool accepts a password file so the secret stays out of the process arguments.
+    const signingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'anythingllm-signing-'));
+    try {
+        const passwordFile = path.join(signingDir, 'keystore-password');
+        fs.writeFileSync(passwordFile, keystorePassword, { mode: 0o600 });
+        runCommand(javaCommand, [
+            '-jar', 'scripts/bundletool-1.18.1.jar', 'build-apks',
+            `--bundle=${aabPath}`,
+            `--output=${apksOutputPath}`,
+            '--mode=universal',
+            `--ks=${keystorePath}`,
+            `--ks-key-alias=${keystoreAlias}`,
+            `--ks-pass=file:${passwordFile}`,
+        ]);
+    } finally {
+        fs.rmSync(signingDir, { recursive: true, force: true });
+    }
 
     // Extract the universal APK with versioned name
     const outputDir = `android/app/build/outputs/apks/universal-v${version}`;
@@ -166,4 +189,4 @@ try {
 } catch (error) {
     console.error('❌ Build failed:', error);
     process.exit(1);
-} 
+}
