@@ -102,7 +102,7 @@ build_deb() { # name full(0|1)
   cat > "$pkg/usr/share/doc/$name/copyright" <<EOF
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Stowlark
-Source: https://github.com/culpen90/stowlark
+Source: https://github.com/stowlark/stowlark
 Comment: Stowlark is derived from https://github.com/libracoder/kiri.
 
 Files: *
@@ -130,7 +130,7 @@ Priority: optional
 Architecture: $deb_arch
 Installed-Size: $size
 Maintainer: Stowlark <culpen90@users.noreply.github.com>
-Homepage: https://github.com/culpen90/stowlark
+Homepage: https://github.com/stowlark/stowlark
 Conflicts: $other
 Replaces: $other
 $([ "$full" = 1 ] || echo "Suggests: docker-cli | docker.io")

@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security problem
-    url: https://github.com/culpen90/stowlark/security/policy
+    url: https://github.com/stowlark/stowlark/security/policy
     about: Please report security problems privately, as SECURITY.md describes, not in a public issue.

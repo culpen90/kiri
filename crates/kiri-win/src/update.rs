@@ -38,7 +38,7 @@ use serde_json::json;
 
 use crate::engine::{emit, notice, trf};
 
-const RELEASES: &str = "https://github.com/culpen90/stowlark/releases";
+const RELEASES: &str = "https://github.com/stowlark/stowlark/releases";
 /// The biggest download accepted (the MSI is about 55 MB).
 const MAX_DOWNLOAD: u64 = 2 << 30;
 /// installer/windows/stowlark.wxs's UpgradeCode: what makes an MSI a Stowlark one.

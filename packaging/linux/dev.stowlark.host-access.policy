@@ -6,7 +6,7 @@
      use it (crates/kiri/src/hostaccess.rs). -->
 <policyconfig>
   <vendor>Stowlark</vendor>
-  <vendor_url>https://github.com/culpen90/stowlark</vendor_url>
+  <vendor_url>https://github.com/stowlark/stowlark</vendor_url>
   <action id="dev.stowlark.host-access">
     <description>Set up Stowlark for an account</description>
     <message>Stowlark needs your password to start its engine and let your account run containers.</message>

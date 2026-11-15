@@ -22,7 +22,7 @@
   </description>
   <launchable type="desktop-id">dev.stowlark.Stowlark.desktop</launchable>
   <icon type="stock">stowlark</icon>
-  <url type="homepage">https://github.com/culpen90/stowlark</url>
+  <url type="homepage">https://github.com/stowlark/stowlark</url>
   <developer id="dev.stowlark">
     <name>Stowlark</name>
   </developer>
@@ -40,7 +40,7 @@
   <content_rating type="oars-1.1"/>
   <releases>
     <release version="@VERSION@" date="@DATE@">
-      <url type="details">https://github.com/culpen90/stowlark/releases</url>
+      <url type="details">https://github.com/stowlark/stowlark/releases</url>
     </release>
   </releases>
 </component>

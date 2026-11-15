@@ -5,7 +5,7 @@
 # and, while no Docker engine has it, at /var/run/docker.sock too.
 [Unit]
 Description=Stowlark container engine
-Documentation=https://github.com/culpen90/stowlark
+Documentation=https://github.com/stowlark/stowlark
 After=network-online.target
 Wants=network-online.target
 

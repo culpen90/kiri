@@ -15,7 +15,7 @@
   <a href="docs/features.md">Features</a> ·
   <a href="docs/android.md">Android workspaces</a> ·
   <a href="docs/development.md">Build from source</a> ·
-  <a href="https://github.com/culpen90/stowlark/releases">Releases</a>
+  <a href="https://github.com/stowlark/stowlark/releases">Releases</a>
 </p>
 
 <p align="center">
@@ -67,7 +67,7 @@ Missing yours? Translations live in [`crates/kiri/src/ui/lang`](crates/kiri/src/
 
 ## Install
 
-See [GitHub Releases](https://github.com/culpen90/stowlark/releases) for
+See [GitHub Releases](https://github.com/stowlark/stowlark/releases) for
 published builds, or use the source build instructions below.
 
 | Platform | Build |

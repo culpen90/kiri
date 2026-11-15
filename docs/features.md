@@ -95,7 +95,7 @@ Kubernetes LoadBalancer services are published on `localhost`, and
 
 ## Build outputs and updates
 
-Check [Stowlark releases](https://github.com/culpen90/stowlark/releases) for
+Check [Stowlark releases](https://github.com/stowlark/stowlark/releases) for
 published builds. For local builds, see [the development guide](development.md).
 Installer filenames include the architecture, for example,
 `Stowlark-<version>-arm64.dmg` for Apple silicon and

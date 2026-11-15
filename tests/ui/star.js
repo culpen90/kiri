@@ -25,7 +25,7 @@ t("the first success asks, once", () => {
 });
 t("Star opens the repo and the card goes", () => {
   document.querySelector("#toasts .toast.star [data-star]").click();
-  if (!sent.some((m) => m.type === "open" && m.name === "https://github.com/culpen90/stowlark")) throw new Error("didn't open");
+  if (!sent.some((m) => m.type === "open" && m.name === "https://github.com/stowlark/stowlark")) throw new Error("didn't open");
   if (!document.querySelector("#toasts .toast.star.leaving")) throw new Error("stayed");
 });
 t("a container newly running counts; ones already up don't", () => {

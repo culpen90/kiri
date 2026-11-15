@@ -16,7 +16,7 @@ Include what you found, how to reproduce it, and the Stowlark version
 
 ## Supported versions
 
-Check the [Stowlark releases](https://github.com/culpen90/stowlark/releases)
+Check the [Stowlark releases](https://github.com/stowlark/stowlark/releases)
 and confirm the issue on the latest available version before reporting.
 
 ## In scope

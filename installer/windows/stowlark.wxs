@@ -32,7 +32,7 @@
   <?ifndef Size ?><?define Size = "" ?><?endif?>
   <?define Name = "Stowlark" ?>
   <?define Manufacturer = "Stowlark" ?>
-  <?define Url = "https://github.com/culpen90/stowlark" ?>
+  <?define Url = "https://github.com/stowlark/stowlark" ?>
   <?define Description = "Tiny, fast container runtime" ?>
   <?define Keywords = "containers, docker, wsl, runtime" ?>
 

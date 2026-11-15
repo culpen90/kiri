@@ -1,7 +1,7 @@
 # Building Stowlark releases
 
 Stowlark is a fork of [Kiri](https://github.com/libracoder/kiri). Check
-[GitHub Releases](https://github.com/culpen90/stowlark/releases) for published
+[GitHub Releases](https://github.com/stowlark/stowlark/releases) for published
 Stowlark artifacts and release notes.
 
 Set the workspace version in `Cargo.toml` to the release tag's version

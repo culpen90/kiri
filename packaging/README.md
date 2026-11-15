@@ -83,7 +83,7 @@ run containers, publish a port, remove; it stops a stowlark daemon already runni
 there, so it wants `STOWLARK_TEST_KILL=1`).
 
 When packages are published, download them from [Stowlark on
-GitHub Releases](https://github.com/culpen90/stowlark/releases).
+GitHub Releases](https://github.com/stowlark/stowlark/releases).
 
 ## Homebrew (planned, not built)
 

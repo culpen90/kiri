@@ -1492,7 +1492,7 @@ fn handle(text: &str, tx: &Sender<Cmd>, autostart: bool, view: Option<&str>) {
         }
         // The feed can link to a release in the Stowlark repository.
         "updatenotes" => {
-            if msg.name.strip_prefix("https://github.com/culpen90/stowlark/releases/tag/").is_some_and(|tag| !tag.is_empty() && tag.bytes().all(|b| b.is_ascii_alphanumeric() || b"-._~".contains(&b))) {
+            if msg.name.strip_prefix("https://github.com/stowlark/stowlark/releases/tag/").is_some_and(|tag| !tag.is_empty() && tag.bytes().all(|b| b.is_ascii_alphanumeric() || b"-._~".contains(&b))) {
                 open(&msg.name);
             }
             Ok(())
@@ -1989,8 +1989,8 @@ fn handle(text: &str, tx: &Sender<Cmd>, autostart: bool, view: Option<&str>) {
             // A build warning's rule page (docs.docker.com/go/dockerfile/rule/…).
             let docs = msg.name.strip_prefix("https://docs.docker.com/go/").is_some_and(|rest| rest.bytes().all(|b| b.is_ascii_alphanumeric() || b"-/".contains(&b)));
             if local || docs || matches!(msg.name.as_str(),
-                "https://github.com/culpen90/stowlark" | "https://github.com/culpen90/stowlark/issues/new" |
-                "https://github.com/culpen90/stowlark/releases" | "https://github.com/libracoder/kiri" |
+                "https://github.com/stowlark/stowlark" | "https://github.com/stowlark/stowlark/issues/new" |
+                "https://github.com/stowlark/stowlark/releases" | "https://github.com/libracoder/kiri" |
                 "https://runkiri.com/share/notice" | "https://canestack.com" | "https://github.com/anchore/grype" |
                 "https://login.docker.com/activate" | "https://github.com/login/device"
             ) {

@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use sha2::{Digest, Sha256};
 
-const RELEASES: &str = "https://github.com/culpen90/stowlark/releases";
+const RELEASES: &str = "https://github.com/stowlark/stowlark/releases";
 
 pub fn configured() -> bool {
     update_url().is_some()

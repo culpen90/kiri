@@ -89,7 +89,7 @@ impl Guest {
         // Virtualization.framework cannot boot its x86-64 guest.
         #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
         if translated() {
-            return Err(io::Error::other("this is Stowlark for Intel Macs, and this Mac has Apple silicon: install Stowlark for Apple silicon from https://github.com/culpen90/stowlark/releases"));
+            return Err(io::Error::other("this is Stowlark for Intel Macs, and this Mac has Apple silicon: install Stowlark for Apple silicon from https://github.com/stowlark/stowlark/releases"));
         }
         if !Vm::is_supported() {
             return Err(io::Error::other(if cfg!(target_os = "linux") {

@@ -827,8 +827,8 @@ fn set_pref(name: &str, value: Value) {
 /// A page link: only Stowlark's own addresses, as on the Mac.
 fn allowed_url(url: &str) -> bool {
     if release_notes_url(url) || matches!(url,
-        "https://github.com/culpen90/stowlark"
-        | "https://github.com/culpen90/stowlark/issues/new"
+        "https://github.com/stowlark/stowlark"
+        | "https://github.com/stowlark/stowlark/issues/new"
         | "https://github.com/libracoder/kiri"
         | "https://canestack.com"
         | "https://runkiri.com/share/notice"
@@ -851,7 +851,7 @@ fn allowed_url(url: &str) -> bool {
 }
 
 fn release_notes_url(url: &str) -> bool {
-    const RELEASES: &str = "https://github.com/culpen90/stowlark/releases";
+    const RELEASES: &str = "https://github.com/stowlark/stowlark/releases";
     url.strip_prefix(RELEASES).is_some_and(|rest| {
         rest.is_empty() || rest.strip_prefix("/tag/").is_some_and(|tag| {
             !tag.is_empty() && tag.bytes().all(|b| b.is_ascii_alphanumeric() || b"._~-".contains(&b))
@@ -868,7 +868,7 @@ mod tests {
         assert!(allowed_url("http://localhost:8080/app"));
         assert!(allowed_url("https://web.stowlark.localhost/"));
         assert!(allowed_url("http://api.stowlark.local"));
-        assert!(allowed_url("https://github.com/culpen90/stowlark"));
+        assert!(allowed_url("https://github.com/stowlark/stowlark"));
         assert!(!allowed_url("http://evil.example/"));
         // Bypass attempts the audit found.
         assert!(!allowed_url("http://localhost:1@evil.example/"));

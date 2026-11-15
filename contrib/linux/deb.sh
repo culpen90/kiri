@@ -36,7 +36,7 @@ Package: stowlark
 Version: $version
 Architecture: $arch
 Maintainer: Stowlark
-Homepage: https://github.com/culpen90/stowlark
+Homepage: https://github.com/stowlark/stowlark
 Section: admin
 Priority: optional
 Installed-Size: $size

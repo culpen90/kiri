@@ -12,7 +12,7 @@ Version:        %{stowlark_version}
 Release:        1%{?dist}
 Summary:        Tiny, fast container runtime (Docker API)%{!?with_cli:, engine only}
 License:        Apache-2.0
-URL:            https://github.com/culpen90/stowlark
+URL:            https://github.com/stowlark/stowlark
 Source0:        stowlark
 Source1:        stowlark-init
 Source2:        stowlark.service

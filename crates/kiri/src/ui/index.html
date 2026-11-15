@@ -4028,7 +4028,7 @@ function renderSettings() {
       <dt>${tr(VM)}</dt><dd>${a?.running ? `${a.awake ? tr("Running") : tr("Asleep")} · ${tr("kernel {version}", { version: esc(a.kernel) })}` : "—"}</dd>
       <dt>${tr("CPUs")}</dt><dd>${esc(a?.cpus ?? "—")}</dd>
       <dt>${tr("Memory")}</dt><dd>${a?.running ? tr("up to {size}", { size: mib(a.memory) }) : "—"}</dd>
-      <dt>${tr("Website")}</dt><dd><a data-open-site="https://github.com/culpen90/stowlark">GitHub</a></dd>
+      <dt>${tr("Website")}</dt><dd><a data-open-site="https://github.com/stowlark/stowlark">GitHub</a></dd>
       <dt><a data-open-site="https://github.com/libracoder/kiri">Kiri</a></dt><dd>${tr("Made by")} <a data-open-site="https://canestack.com">Canestack Labs</a></dd>
     </dl></div>`;
   const html = `<div class="settings"><div class="tabs">${tab("appearance", "textaa", tr("Appearance"))}${tab("resources", "stack", tr("Resources"))}${tab("network", "globe", tr("Network"))}${tab("builds", "hammer", tr("Builds"))}${loginsOn() ? tab("registries", "lock", tr("Registries")) : ""}${tab("kubernetes", "pods", "Kubernetes")}${tab("import", "stack", tr("Import"))}${tab("domains", "network", tr("Domains"))}${tab("diagnostics", "bug", tr("Diagnostics"))}${tab("about", "info", tr("About"))}</div>
@@ -5277,7 +5277,7 @@ setInterval(() => {
 }, 2000);
 
 // Feedback goes to the repo's GitHub issues; the app's "open" handler allows exactly this address.
-const FEEDBACK_URL = "https://github.com/culpen90/stowlark/issues/new";
+const FEEDBACK_URL = "https://github.com/stowlark/stowlark/issues/new";
 
 /* The VM's memory: under 1 GB in MB, so an idle VM doesn't read as "0.2". */
 const memText = (mib) => (mib < 1024 ? `${Math.round(mib)} MB` : `${(mib / 1024).toFixed(1)} GB`);
@@ -5394,9 +5394,9 @@ function aboutUpdate(version) {
   } else if (s?.state === "available") {
     row = `<span>${tr("Version {version}", { version: v })}</span><span class="updpill new">${tr("{version} available", { version: esc(s.latest) })}</span>${btn(tr("Show"), "data-updcheck", "primary")}`;
   } else if (s?.state === "package") {
-    row = `<span>${tr("Version {version}", { version: v })}</span>${s.latest ? `<span class="updpill new">${tr("{version} available", { version: esc(s.latest) })}</span><button class="linkbtn" data-open-site="https://github.com/culpen90/stowlark/releases">${tr("Download the new .deb or .rpm")}</button>` : `<span class="updpill">${tr("Up to date")}</span><span class="faint">${tr("checked {ago}", { ago: ago(s.checked) })}</span>${check}`}`;
+    row = `<span>${tr("Version {version}", { version: v })}</span>${s.latest ? `<span class="updpill new">${tr("{version} available", { version: esc(s.latest) })}</span><button class="linkbtn" data-open-site="https://github.com/stowlark/stowlark/releases">${tr("Download the new .deb or .rpm")}</button>` : `<span class="updpill">${tr("Up to date")}</span><span class="faint">${tr("checked {ago}", { ago: ago(s.checked) })}</span>${check}`}`;
   } else if (s?.state === "unconfigured") {
-    row = `<span>${tr("Version {version}", { version: v })}</span><span class="faint">${tr("doesn't update itself")}</span><button class="linkbtn" data-open-site="https://github.com/culpen90/stowlark/releases">${tr("Read more on GitHub ↗")}</button>`;
+    row = `<span>${tr("Version {version}", { version: v })}</span><span class="faint">${tr("doesn't update itself")}</span><button class="linkbtn" data-open-site="https://github.com/stowlark/stowlark/releases">${tr("Read more on GitHub ↗")}</button>`;
   } else if (s?.state === "test" || s?.state === "dev") {
     row = `<span>${tr("Version {version}", { version: v })}</span><span class="updpill test">${s.state === "dev" ? tr("Built from source") : tr("Test build")}</span><span class="faint">${tr("doesn't update itself")}</span>`;
   } else if (s?.state === "uptodate") {
@@ -5457,7 +5457,7 @@ function updateAction(a) {
 
 /* What's new: the feed's notes, a small Markdown ("## New", "- a line", `code`,
    **bold**), in a window with Download. Without notes, the button opens notes_url. */
-const NOTES_URL = /^https:\/\/github\.com\/culpen90\/stowlark\/releases\/tag\/[A-Za-z0-9._~-]+$/;
+const NOTES_URL = /^https:\/\/github\.com\/stowlark\/stowlark\/releases\/tag\/[A-Za-z0-9._~-]+$/;
 const WN_GROUPS = [
   [/new|added|feature/i, "new", "sparkle"],
   [/fix/i, "fix", "wrench"],
@@ -6291,7 +6291,7 @@ function closable(el, close) {
 /* Star Stowlark, asked once ever: the first time something works (a container
    started, a pull done, a share link live, Kubernetes up), a card a moment
    after that toast. ui.json keeps starAsked, so it never comes back. */
-const STAR_URL = "https://github.com/culpen90/stowlark";
+const STAR_URL = "https://github.com/stowlark/stowlark";
 const STAR_IC = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.2l-5.9 3.2 1.3-6.5-4.9-4.5 6.6-.8Z"/></svg>`;
 let prefsIn = false, starTimer = 0;
 function starMoment(text) {
