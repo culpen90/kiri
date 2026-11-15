@@ -67,6 +67,11 @@ pub mod update {
         parts(candidate) > parts(current)
     }
 
+    /// Linux gets updates through installed packages.
+    pub fn configured() -> bool {
+        false
+    }
+
     pub fn latest() -> io::Result<Release> {
         Err(io::Error::other(BY_APT))
     }
