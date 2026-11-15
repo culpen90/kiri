@@ -27,7 +27,7 @@ use std::collections::HashMap;
 use std::hash::BuildHasher;
 use std::io::{self, IsTerminal, Read, Write};
 use std::net::{Shutdown, TcpStream, ToSocketAddrs};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Condvar, Mutex};
@@ -49,19 +49,20 @@ const IDLE: Duration = Duration::from_secs(90);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const LOCAL_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
-// From build.rs: the release's build key, if this is an official build.
-include!(concat!(env!("OUT_DIR"), "/share_build_key.rs"));
+const ATTESTATION_KEY_FILE: &str = "STOWLARK_SHARE_ATTESTATION_KEY_FILE";
+type AttestationKey = (String, [u8; proto::attest::KEY_LEN]);
 
-/// The build key official releases answer the edge's challenge with (see
-/// `kiri_share_proto::attest`), as its id and bytes. `None` in builds made
-/// without `STOWLARK_SHARE_BUILD_KEY`; their tunnels show as unverified.
-fn build_key() -> Option<(&'static str, [u8; proto::attest::KEY_LEN])> {
-    let (id, masked, pad) = std::hint::black_box(BUILD_KEY)?;
-    let mut key = [0u8; proto::attest::KEY_LEN];
-    for (k, (m, p)) in key.iter_mut().zip(masked.iter().zip(pad)) {
-        *k = m ^ p;
-    }
-    Some((id, key))
+/// An optional credential provisioned for this installation at runtime.
+fn read_attestation_key(path: Option<&Path>) -> io::Result<Option<AttestationKey>> {
+    let Some(path) = path else { return Ok(None) };
+    let data = std::fs::read_to_string(path).map_err(|e| io::Error::new(e.kind(), format!("cannot read {ATTESTATION_KEY_FILE}: {e}")))?;
+    let (id, key) = proto::attest::parse_key(&data)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("{ATTESTATION_KEY_FILE} must contain id:hex with 64 hex digits")))?;
+    Ok(Some((id.to_owned(), key)))
+}
+
+fn configured_attestation_key() -> io::Result<Option<AttestationKey>> {
+    read_attestation_key(std::env::var_os(ATTESTATION_KEY_FILE).as_deref().map(Path::new))
 }
 
 // ---------------------------------------------------------------- config
@@ -979,9 +980,13 @@ impl Handle {
 
 type OnEvent = Arc<dyn Fn(Event) + Send + Sync>;
 
-/// Opens a tunnel. Fails at once only if not signed in; everything after
-/// that, including the first connection, is reported through `on_event`.
+/// Opens a tunnel. Configuration errors are returned directly. Connection
+/// events, including the first connection, are reported through `on_event`.
 pub fn start(opts: Options, on_event: impl Fn(Event) + Send + Sync + 'static) -> io::Result<Handle> {
+    start_with_key(opts, configured_attestation_key()?, on_event)
+}
+
+fn start_with_key(opts: Options, attestation_key: Option<AttestationKey>, on_event: impl Fn(Event) + Send + Sync + 'static) -> io::Result<Handle> {
     let cfg = load()?;
     let token = cfg.token.clone().ok_or_else(|| io::Error::other("not signed in; run `stowlark share login`"))?;
     let srv = server(&cfg);
@@ -994,7 +999,7 @@ pub fn start(opts: Options, on_event: impl Fn(Event) + Send + Sync + 'static) ->
     let version = env!("CARGO_PKG_VERSION");
     let client = if opts.app { format!("{} {version}", crate::flavor::APP) } else { format!("stowlark {version}") };
     let who = Who { machine: machine_id(&cfg.device), host: host_name(), device: cfg.device, client };
-    let thread = std::thread::Builder::new().name("share".into()).spawn(move || run_tunnel(srv, token, who, opts, s, on_event))?;
+    let thread = std::thread::Builder::new().name("share".into()).spawn(move || run_tunnel(srv, token, who, opts, s, on_event, attestation_key))?;
     Ok(Handle { stop, thread: Some(thread) })
 }
 
@@ -1049,7 +1054,7 @@ struct Who {
     client: String,
 }
 
-fn run_tunnel(srv: Server, token: String, who: Who, opts: Options, stop: Arc<Stopper>, on_event: OnEvent) {
+fn run_tunnel(srv: Server, token: String, who: Who, opts: Options, stop: Arc<Stopper>, on_event: OnEvent, attestation_key: Option<AttestationKey>) {
     let mut name = opts.name.clone().unwrap_or_else(|| opts.target.label.clone());
     let mut attempt = 0u32;
     // When a session that was live ended.
@@ -1059,7 +1064,7 @@ fn run_tunnel(srv: Server, token: String, who: Who, opts: Options, stop: Arc<Sto
             break None;
         }
         on_event(Event::Connecting { server: srv.host.clone() });
-        let end = match session(&srv, &token, &who, &name, &opts.target, &stop, &on_event) {
+        let end = match session(&srv, &token, &who, &name, &opts.target, &stop, &on_event, attestation_key.as_ref()) {
             Ok((end, issued)) => {
                 if let Some(issued) = issued {
                     attempt = 0;
@@ -1344,7 +1349,7 @@ impl Session {
     }
 
     /// Handles one frame; `Some` ends the session.
-    fn handle(self: &Arc<Self>, frame: &[u8], welcomed: &mut Option<String>) -> Option<End> {
+    fn handle(self: &Arc<Self>, frame: &[u8], welcomed: &mut Option<String>, attestation_key: Option<&AttestationKey>) -> Option<End> {
         let m = match proto::decode(frame) {
             Ok(m) => m,
             Err(e) => return Some(End::Lost(format!("bad frame from the edge: {e}"))),
@@ -1404,8 +1409,8 @@ impl Session {
             Msg::Challenge { nonce } => {
                 // Only sent to clients that offered an answer; one without a
                 // key replies with an empty one rather than stall the edge.
-                let (key, mac) = match build_key() {
-                    Some((id, key)) => (id, proto::attest::proof(&key, &nonce, &self.token, &self.device)),
+                let (key, mac) = match attestation_key {
+                    Some((id, key)) => (id.as_str(), proto::attest::proof(key, &nonce, &self.token, &self.device)),
                     None => ("", [0; proto::attest::MAC_LEN]),
                 };
                 if let Err(e) = self.send(Msg::Attest { key, mac }) {
@@ -1616,7 +1621,10 @@ fn issued_name(url: &str) -> String {
 
 /// One connection to the edge, until it ends. Returns how it ended and,
 /// if the edge welcomed the tunnel, the name it issued.
-fn session(srv: &Server, token: &str, who: &Who, name: &str, target: &Target, stop: &Stopper, on_event: &OnEvent) -> io::Result<(End, Option<String>)> {
+fn session(
+    srv: &Server, token: &str, who: &Who, name: &str, target: &Target,
+    stop: &Stopper, on_event: &OnEvent, attestation_key: Option<&AttestationKey>,
+) -> io::Result<(End, Option<String>)> {
     let (sock, conn) = dial(srv, proto::ALPN)?;
     if conn.alpn_protocol() != Some(proto::ALPN) {
         return Ok((End::Final(format!("{} isn't a Kiri Share server", srv.host)), None));
@@ -1639,7 +1647,7 @@ fn session(srv: &Server, token: &str, who: &Who, name: &str, target: &Target, st
         srv: srv.clone(),
         lanes: Lanes::default(),
     });
-    let features = proto::FEATURE_LANES | proto::FEATURE_WINDOW | if build_key().is_some() { proto::FEATURE_ATTEST } else { 0 };
+    let features = proto::FEATURE_LANES | proto::FEATURE_WINDOW | if attestation_key.is_some() { proto::FEATURE_ATTEST } else { 0 };
     sess.send(Msg::Hello(proto::Hello {
         protocol: proto::PROTOCOL,
         token,
@@ -1653,14 +1661,14 @@ fn session(srv: &Server, token: &str, who: &Who, name: &str, target: &Target, st
     }))?;
 
     let mut welcomed = None;
-    let end = read_loop(&sess, &mut reader, &mut welcomed);
+    let end = read_loop(&sess, &mut reader, &mut welcomed, attestation_key);
     sess.end_all();
     let _ = sess.sock.shutdown(Shutdown::Both);
     *stop.sock.lock().unwrap() = None;
     Ok((end, welcomed))
 }
 
-fn read_loop(sess: &Arc<Session>, reader: &mut TcpStream, welcomed: &mut Option<String>) -> End {
+fn read_loop(sess: &Arc<Session>, reader: &mut TcpStream, welcomed: &mut Option<String>, attestation_key: Option<&AttestationKey>) -> End {
     let mut raw = vec![0u8; 32 * 1024];
     let mut plain: Vec<u8> = Vec::new();
     loop {
@@ -1703,7 +1711,7 @@ fn read_loop(sess: &Arc<Session>, reader: &mut TcpStream, welcomed: &mut Option<
             if plain.len() - pos < len {
                 break;
             }
-            if let Some(end) = sess.handle(&plain[pos..pos + len], welcomed) {
+            if let Some(end) = sess.handle(&plain[pos..pos + len], welcomed, attestation_key) {
                 return end;
             }
             pos += len;
@@ -1924,8 +1932,8 @@ pub fn run(args: &[String]) -> io::Result<()> {
             }
             // --json: one JSON object per line on stdout, for programs that run a share.
             let json = args.iter().any(|a| a == "--json");
-            let target = match resolve(target) {
-                Ok(t) => t,
+            let (target, attestation_key) = match resolve(target).and_then(|target| configured_attestation_key().map(|key| (target, key))) {
+                Ok(configured) => configured,
                 Err(e) if json => {
                     println!("{}", serde_json::json!({ "event": "ended", "reason": e.to_string(), "error": true }));
                     return Err(e);
@@ -1964,7 +1972,7 @@ pub fn run(args: &[String]) -> io::Result<()> {
             let print: Box<dyn Fn(Event) + Send + Sync> = if json { Box::new(|e| println!("{}", event_json(&e))) } else { Box::new(printer(target.display.clone())) };
             let f = failed.clone();
             let traffic = TrafficFile::start();
-            let handle = start(Options { target, name, app: false }, move |e| {
+            let handle = start_with_key(Options { target, name, app: false }, attestation_key, move |e| {
                 if let Event::Ended { reason, error: true } = &e {
                     *f.lock().unwrap() = Some(reason.clone());
                 }
@@ -2286,17 +2294,18 @@ mod tests {
     }
 
     #[test]
-    fn build_key_is_the_one_built_with() {
-        let built = option_env!("STOWLARK_SHARE_BUILD_KEY").filter(|v| !v.trim().is_empty());
-        match (built.and_then(proto::attest::parse_key), build_key()) {
-            (None, None) => {}
-            (Some(want), Some(got)) => {
-                assert_eq!(want, got);
-                let (_, masked, _) = BUILD_KEY.unwrap();
-                assert_ne!(masked, got.1, "stored masked");
-            }
-            (want, got) => panic!("built with {:?}, have {:?}", want.map(|k| k.0), got.map(|k| k.0)),
-        }
+    fn attestation_key_is_provisioned_at_runtime() {
+        assert!(read_attestation_key(None).unwrap().is_none());
+        let dir = std::env::temp_dir().join(format!("stowlark-share-attestation-test-{}", std::process::id()));
+        std::fs::create_dir(&dir).unwrap();
+        let path = dir.join("key");
+        std::fs::write(&path, format!("test-installation:{}\n", "10".repeat(proto::attest::KEY_LEN))).unwrap();
+        let valid = read_attestation_key(Some(&path));
+        std::fs::write(&path, "invalid fixture").unwrap();
+        let invalid = read_attestation_key(Some(&path));
+        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!(valid.unwrap().unwrap().0, "test-installation");
+        assert_eq!(invalid.unwrap_err().kind(), io::ErrorKind::InvalidData);
     }
 
     #[test]

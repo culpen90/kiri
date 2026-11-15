@@ -41,8 +41,8 @@ pub mod attest;
 
 pub const PROTOCOL: u16 = 1;
 
-/// `Hello::features` bit: this client can answer a `Challenge`, because it
-/// is an official build with a build key compiled in.
+/// `Hello::features` bit: this client can answer a `Challenge` using a
+/// provisioned key.
 pub const FEATURE_ATTEST: u32 = 1;
 
 /// `Hello::features` bit: this client can open lanes (see the module docs).
@@ -94,10 +94,10 @@ pub enum Msg<'a> {
     /// Edge → client: the session is over. With `reconnect` the client should
     /// dial again (the edge is restarting); without it, it should stop.
     Goodbye { reconnect: bool, reason: &'a str },
-    /// Edge → client, after a `Hello` with [`FEATURE_ATTEST`]: prove this is
-    /// an official build by answering with `Attest`.
+    /// Edge → client, after a `Hello` with [`FEATURE_ATTEST`]: prove possession
+    /// of a provisioned key by answering with `Attest`.
     Challenge { nonce: [u8; attest::NONCE_LEN] },
-    /// Client → edge, the answer to `Challenge`: which build key (its id, as
+    /// Client → edge, the answer to `Challenge`: which key (its id, as
     /// configured on the edge) and [`attest::proof`] made with it.
     Attest { key: &'a str, mac: [u8; attest::MAC_LEN] },
     /// Client → edge, the first frame on an extra connection: the

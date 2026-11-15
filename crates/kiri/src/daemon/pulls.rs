@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 use std::io;
 use std::os::unix::net::UnixStream;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
@@ -55,7 +56,14 @@ static JOBS: LazyLock<Mutex<HashMap<String, Arc<Job>>>> = LazyLock::new(Default:
 /// none meaning the host's) and the sign-in, so nobody follows a pull made
 /// with someone else's credentials.
 pub fn key(image: &str, platform: &str, auth: &str) -> String {
-    format!("{image}\n{platform}\n{auth}")
+    static UNSHARED: AtomicU64 = AtomicU64::new(0);
+    let who = if auth.is_empty() {
+        "-".to_owned()
+    } else {
+        kiri_image::registry::credential_cache_identity(&[auth])
+            .unwrap_or_else(|| format!("unshared:{}", UNSHARED.fetch_add(1, Ordering::Relaxed)))
+    };
+    format!("{image}\n{platform}\n{who}")
 }
 
 /// Follows the pull of `key` under way, or starts one. True when this

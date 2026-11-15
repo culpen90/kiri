@@ -1,21 +1,20 @@
-//! Telling official Kiri builds from forks and scripts.
+//! Proving possession of a Share attestation key.
 //!
-//! Each release is built with a random 32-byte build key compiled in. The
+//! An installation can be provisioned with a random 32-byte key. The
 //! edge knows the keys by id (`id:hex`) and challenges clients that set
 //! [`crate::FEATURE_ATTEST`] with a fresh random nonce; the client answers
-//! with [`proof`]: HMAC-SHA-256 under the build key over the nonce, the
+//! with [`proof`]: HMAC-SHA-256 under the provisioned key over the nonce, the
 //! SHA-256 of its account token and its device id. The nonce makes every
 //! answer single-use, and the token and device bind it to this session, so
 //! an answer can't be replayed or relayed for someone else's.
 //!
-//! A key in a binary can be extracted, so this raises the bar rather than
-//! proving anything; a leaked key is revoked by removing its id on the edge,
-//! and other releases keep working.
+//! This proves possession of a credential. It does not attest to which
+//! executable is running. A leaked key is revoked by removing its id on the edge.
 
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::{Digest, Sha256};
 
-/// Bytes in a build key.
+/// Bytes in an attestation key.
 pub const KEY_LEN: usize = 32;
 /// Bytes in a `Challenge` nonce.
 pub const NONCE_LEN: usize = 32;
@@ -53,7 +52,7 @@ pub fn verify(key: &[u8; KEY_LEN], nonce: &[u8; NONCE_LEN], token: &str, device:
 pub fn parse_key(s: &str) -> Option<(&str, [u8; KEY_LEN])> {
     let (id, hex) = s.trim().split_once(':')?;
     let id_ok = !id.is_empty() && id.len() <= MAX_KEY_ID && id.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b));
-    if !id_ok || hex.len() != KEY_LEN * 2 {
+    if !id_ok || hex.len() != KEY_LEN * 2 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
         return None;
     }
     let mut key = [0u8; KEY_LEN];

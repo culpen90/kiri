@@ -39,6 +39,12 @@ a VM on a Mac is in [Testing Windows on Arm](testing-windows-arm.md).
 
 For Linux packages, see [the packaging guide](../packaging/README.md).
 
+If your Share edge provisions an attestation credential for an installation,
+set `STOWLARK_SHARE_ATTESTATION_KEY_FILE` in the client process to the path of
+a private file containing the edge-issued `id:hex` key. The client reads it
+when starting a tunnel. Without a configured file, Share uses its normal account
+token and does not offer optional attestation.
+
 ## Use
 
 ```sh
