@@ -8,6 +8,8 @@ const runtimePath = path.join(__dirname, 'runtime');
 const escapedRuntimePath = runtimePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const configOptions = {
+  // NativeWind's transform cache can contain absolute imports from another checkout.
+  cacheVersion: `${defaultConfig.cacheVersion}:${__dirname}`,
   resolver: {
     blockList: [
       ...[defaultConfig.resolver.blockList].flat(),

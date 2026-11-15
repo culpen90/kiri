@@ -62,9 +62,9 @@ function errorTrace(error: Error, stackLines: number) {
 }
 
 /** The error, its stack and app/device info - what a bug report needs to be traced. */
-function errorDetails(error: Error, stackLines = 40) {
+function errorDetails(error: Error) {
   return [
-    errorTrace(error, stackLines),
+    errorTrace(error, 40),
     '',
     `App version: ${DeviceInfo.getVersion()} (${DeviceInfo.getBuildNumber()})`,
     `OS: ${Platform.OS} ${Platform.Version}`,
