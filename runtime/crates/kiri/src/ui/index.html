@@ -6101,7 +6101,8 @@ const NEEDS_VAR = [
 ];
 // MySQL's way: "specify one of the following as an environment variable:"
 // and the names on the lines after it, as "- MYSQL_ROOT_PASSWORD".
-const LISTS_VARS = /one of the following|following (?:environment )?variables?|as an environment variable:\s*$/i;
+const listsVars = (line) => /one of the following|following (?:environment )?variables?/i.test(line)
+  || /as an environment variable:\s*$/i.test(line);
 const LISTED_VAR = /^\s*[-*•]\s*([A-Z][A-Z0-9]*_[A-Z0-9_]+)\b/;
 const varsIn = (line) => line.match(/\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/g) || [];
 const PRIVILEGED = /mount: .*permission denied|cgroup.*(?:read-only file system|permission denied)|operation not permitted.*(?:mount|cgroup)|requires? (?:--)?privileged|must be run with --privileged/i;
@@ -6126,7 +6127,7 @@ function stopReason(c) {
       const m = lines[i].match(re);
       if (m) return { kind: "env", name: m[1], alts: varsIn(lines[i]).filter((n) => n !== m[1]), quote: block(lines, i), short: tr("needs {name}", { name: m[1] }) };
     }
-    if (LISTS_VARS.test(lines[i])) {
+    if (listsVars(lines[i])) {
       let j = i + 1;
       while (j < lines.length && LISTED_VAR.test(lines[j])) j++;
       const [name, ...alts] = lines.slice(i + 1, j).map((l) => l.match(LISTED_VAR)[1]);
@@ -6157,7 +6158,7 @@ function genPassword() {
 }
 const strong = (v) => v.length >= 8 && /[A-Z]/.test(v) && /[a-z]/.test(v) && /\d/.test(v) && /[^A-Za-z0-9]/.test(v);
 const wantsStrong = (name) => name === "OPENSEARCH_INITIAL_ADMIN_PASSWORD" || name === "ELASTIC_PASSWORD";
-const secretish = (name) => /PASSWORD|SECRET|TOKEN|_KEY$/.test(name);
+const secretish = (name) => /PASSWORD|SECRET|TOKEN/.test(name) || /_KEY$/.test(name);
 function fixPanel(c) {
   const d = ui.detail;
   const done = ui.fixed?.id === c.Id && Date.now() < ui.fixed.until;
