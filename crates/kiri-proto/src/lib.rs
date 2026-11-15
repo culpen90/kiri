@@ -1,4 +1,4 @@
-//! Wire protocol between the Kiri host and the guest agent.
+//! Wire protocol between the Stowlark host and the guest agent.
 //!
 //! Every frame is `len: u32 LE | kind: u16 LE | payload`, where `len` counts
 //! `kind` plus `payload`. Encoding writes into a caller-owned buffer and
@@ -1347,7 +1347,7 @@ mod tests {
     #[test]
     fn run_spec_lists_survive_encoding() {
         let mut buf = Vec::new();
-        let net = Net { bridge: "kiri0", ip: [172, 17, 0, 2], prefix: 16, gateway: [172, 17, 0, 1], extra_hosts: &["1.2.3.4 x"], dns_names: &["web"], opts: &["netns=c0", "nameserver=8.8.8.8"] };
+        let net = Net { bridge: "stowlark0", ip: [172, 17, 0, 2], prefix: 16, gateway: [172, 17, 0, 1], extra_hosts: &["1.2.3.4 x"], dns_names: &["web"], opts: &["netns=c0", "nameserver=8.8.8.8"] };
         let limits = Limits { memory_max: 256 << 20, cpu_quota: 150_000, cpu_period: 100_000, cpu_weight: 100, pids_max: 64, shm_size: 1 << 20 };
         encode_run(&mut buf, "c1", &["sha256:top", "sha256:base"], &["echo", "hi"], &["A=1"], "/", "", "c1", 3, net, &["/a\t/b\tro"], &limits, 0b101, &["rlimit\t7\t1024\t2048"]);
         let Msg::Run(r) = decode(&buf).unwrap() else { panic!() };
@@ -1356,7 +1356,7 @@ mod tests {
         assert_eq!(r.argv.iter().collect::<Vec<_>>(), ["echo", "hi"]);
         assert_eq!(r.env.len(), 1);
         assert_eq!((r.cwd, r.user, r.hostname, r.flags), ("/", "", "c1", 3));
-        assert_eq!((r.net.bridge, r.net.ip, r.net.prefix, r.net.gateway), ("kiri0", [172, 17, 0, 2], 16, [172, 17, 0, 1]));
+        assert_eq!((r.net.bridge, r.net.ip, r.net.prefix, r.net.gateway), ("stowlark0", [172, 17, 0, 2], 16, [172, 17, 0, 1]));
         assert_eq!(r.net.extra_hosts.iter().collect::<Vec<_>>(), ["1.2.3.4 x"]);
         assert_eq!(r.mounts.iter().collect::<Vec<_>>(), ["/a\t/b\tro"]);
         assert_eq!(r.net.opts.iter().collect::<Vec<_>>(), ["netns=c0", "nameserver=8.8.8.8"]);
@@ -1405,7 +1405,7 @@ mod tests {
         round(Msg::FsData(b"NAME=Alpine"));
         round(Msg::MemoryPressure);
         round(Msg::RemoveVolume { name: "pgdata" });
-        round(Msg::RemoveBridge { bridge: "kiri3" });
+        round(Msg::RemoveBridge { bridge: "stowlark3" });
         round(Msg::CopyStat { entry: FsEntry { name: "hosts", mode: 0o100644, size: 9, mtime: 3, mtime_nsec: 4, ino: 5 }, link: "" });
         round(Msg::CopyDone);
         round(Msg::Update { id: "c1", limits: Limits { memory_max: 1, cpu_quota: 2, cpu_period: 3, cpu_weight: 4, pids_max: 5, shm_size: 6 } });
@@ -1428,9 +1428,9 @@ mod tests {
         encode_listening(&mut buf, &["   0: 00000000:11D7 00000000:0000 0A"]);
         let Msg::Listening(lines) = decode(&buf).unwrap() else { panic!() };
         assert_eq!(lines.iter().collect::<Vec<_>>(), ["   0: 00000000:11D7 00000000:0000 0A"]);
-        round(Msg::NetDetach { id: "c1", ifname: "eth1", bridge: "kiri2", ip: [172, 18, 0, 2] });
+        round(Msg::NetDetach { id: "c1", ifname: "eth1", bridge: "stowlark2", ip: [172, 18, 0, 2] });
         let mut buf = Vec::new();
-        encode_net_attach(&mut buf, "c1", "eth1", "kiri2", [10, 5, 0, 9], 24, [10, 5, 0, 1], &["web"], &["mac=02:42:0a:05:00:09"]);
+        encode_net_attach(&mut buf, "c1", "eth1", "stowlark2", [10, 5, 0, 9], 24, [10, 5, 0, 1], &["web"], &["mac=02:42:0a:05:00:09"]);
         let Msg::NetAttach { net, .. } = decode(&buf).unwrap() else { panic!() };
         assert_eq!(net.opts.iter().collect::<Vec<_>>(), ["mac=02:42:0a:05:00:09"]);
         let mut again = Vec::new();
@@ -1438,7 +1438,7 @@ mod tests {
         assert_eq!(buf, again);
         // A frame without the list, as an older sender writes it.
         let mut old = Vec::new();
-        encode_net_attach::<&str>(&mut old, "c1", "eth1", "kiri2", [10, 5, 0, 9], 24, [10, 5, 0, 1], &[], &[]);
+        encode_net_attach::<&str>(&mut old, "c1", "eth1", "stowlark2", [10, 5, 0, 9], 24, [10, 5, 0, 1], &[], &[]);
         old.truncate(old.len() - 4);
         let len = (old.len() - 4) as u32;
         old[..4].copy_from_slice(&len.to_le_bytes());

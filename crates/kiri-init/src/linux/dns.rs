@@ -11,7 +11,7 @@
 //! gateway (192.168.64.1). macOS doesn't always answer there: after a
 //! network change, sleep or a VPN, lookups are refused or go unanswered
 //! while the Mac itself resolves fine. So a lookup the gateway refuses, or
-//! leaves unanswered for `FALLBACK_AFTER`, is asked again through the Kiri
+//! leaves unanswered for `FALLBACK_AFTER`, is asked again through the Stowlark
 //! daemon on the Mac, over vsock, which asks the Mac's own resolvers
 //! (crates/kiri/src/daemon/dns.rs). A container's own `--dns` servers are
 //! never second-guessed.
@@ -27,7 +27,7 @@ const TTL: u32 = 600;
 /// Names every container's /etc/hosts has for the host. They're answered here
 /// too, as Docker Desktop's DNS does, for what reads DNS rather than
 /// /etc/hosts: a kind or k3s node's CoreDNS forwards its pods' lookups here.
-const HOST_NAMES: &[&str] = &["host.docker.internal", "host.kiri.internal", "gateway.docker.internal"];
+const HOST_NAMES: &[&str] = &["host.docker.internal", "host.stowlark.internal", "gateway.docker.internal"];
 /// Forwarded queries not answered within this are dropped.
 const FORWARD_TIMEOUT: Duration = Duration::from_secs(5);
 /// At most this many forwarded queries in flight (each has its own socket);
@@ -587,7 +587,7 @@ mod tests {
     #[test]
     fn host_names_answer_on_every_network() {
         let mut dns = Dns::default();
-        dns.servers.push(Server { bridges: vec!["kiri1".into()], sock: udp_socket().unwrap(), container: None });
+        dns.servers.push(Server { bridges: vec!["stowlark1".into()], sock: udp_socket().unwrap(), container: None });
         let q = b"\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x04host\x06docker\x08internal\x00\x00\x01\x00\x01";
         let r = dns.answer(0, q).expect("answered, not forwarded");
         assert_eq!(&r[6..8], &[0, 1], "one answer");
@@ -595,7 +595,7 @@ mod tests {
         let other = b"\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01";
         assert!(dns.answer(0, other).is_none(), "anything else is forwarded");
         // AAAA: answered with no records (NODATA), not forwarded upstream.
-        let q6 = query("host.kiri.internal", 28);
+        let q6 = query("host.stowlark.internal", 28);
         let r = dns.answer(0, &q6).expect("AAAA answered, not forwarded");
         assert_eq!((r[3] & 0x0f, answers(&r, q6.len()).len()), (0, 0));
         let q = query("gateway.docker.internal", 255);
@@ -605,14 +605,14 @@ mod tests {
     #[test]
     fn a_containers_server_answers_for_each_of_its_networks() {
         let mut dns = Dns::default();
-        dns.servers.push(Server { bridges: vec!["kiri1".into(), "kiri2".into()], sock: udp_socket().unwrap(), container: Some((42, [10, 5, 0, 2])) });
-        dns.register("kiri1", ["web"].iter(), [10, 5, 0, 3]);
-        dns.register("kiri2", ["db"].iter(), [10, 6, 0, 3]);
+        dns.servers.push(Server { bridges: vec!["stowlark1".into(), "stowlark2".into()], sock: udp_socket().unwrap(), container: Some((42, [10, 5, 0, 2])) });
+        dns.register("stowlark1", ["web"].iter(), [10, 5, 0, 3]);
+        dns.register("stowlark2", ["db"].iter(), [10, 6, 0, 3]);
         let q = query("db", 1);
         assert_eq!(answers(&dns.answer(0, &q).unwrap(), q.len()), [(1, vec![10, 6, 0, 3])]);
         let q = query("web", 1);
         assert_eq!(answers(&dns.answer(0, &q).unwrap(), q.len()), [(1, vec![10, 5, 0, 3])]);
-        dns.leave(42, "kiri2");
+        dns.leave(42, "stowlark2");
         assert!(dns.answer(0, &query("db", 1)).is_none(), "gone with the network");
         dns.drop_container(42);
         assert!(dns.servers.is_empty());
@@ -651,7 +651,7 @@ mod tests {
         let server = bind([127, 0, 0, 3], 0);
         let client = bind([127, 0, 0, 1], 0);
         let mut dns = Dns::default();
-        dns.servers.push(Server { bridges: vec!["kiri1".into()], sock: server, container: None });
+        dns.servers.push(Server { bridges: vec!["stowlark1".into()], sock: server, container: None });
         let server_fd = dns.servers[0].sock.as_raw_fd();
         let to = name(server_fd);
         let mut ports = Vec::new();
@@ -682,7 +682,7 @@ mod tests {
         let mut dns = Dns::default();
         dns.set_upstream([10, 5, 0, 2], vec![[8, 8, 8, 8]]);
         assert_eq!(dns.clients.get(&[10, 5, 0, 2]), Some(&vec![[8, 8, 8, 8]]));
-        dns.unregister("kiri1", [10, 5, 0, 2]);
+        dns.unregister("stowlark1", [10, 5, 0, 2]);
         assert!(dns.clients.is_empty());
         dns.set_upstream([10, 5, 0, 3], vec![]);
         assert!(dns.clients.is_empty());
@@ -720,11 +720,11 @@ mod tests {
     fn names_answer_a_and_aaaa() {
         let mut dns = Dns::default();
         // A server needs a socket; any UDP socket stands in for the bridge's.
-        dns.servers.push(super::Server { bridges: vec!["kiri1".into()], sock: super::udp_socket().unwrap(), container: None });
-        dns.register("kiri1", ["web", "Alias"].iter(), [10, 5, 0, 2]);
+        dns.servers.push(super::Server { bridges: vec!["stowlark1".into()], sock: super::udp_socket().unwrap(), container: None });
+        dns.register("stowlark1", ["web", "Alias"].iter(), [10, 5, 0, 2]);
         let v6 = [0xfd, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
-        dns.register6("kiri1", ["web", "Alias"].iter(), [10, 5, 0, 2], v6);
-        dns.register("kiri1", ["old"].iter(), [10, 5, 0, 3]);
+        dns.register6("stowlark1", ["web", "Alias"].iter(), [10, 5, 0, 2], v6);
+        dns.register("stowlark1", ["old"].iter(), [10, 5, 0, 3]);
 
         let q = query("web", 1);
         assert_eq!(answers(&dns.answer(0, &q).unwrap(), q.len()), [(1, vec![10, 5, 0, 2])]);
@@ -739,9 +739,9 @@ mod tests {
         // Not a container: forwarded.
         assert!(dns.answer(0, &query("example.com", 28)).is_none());
         // Gone with the container's IPv4 address.
-        dns.unregister("kiri1", [10, 5, 0, 2]);
+        dns.unregister("stowlark1", [10, 5, 0, 2]);
         assert!(dns.answer(0, &query("web", 28)).is_none());
-        dns.forget_bridge("kiri1");
+        dns.forget_bridge("stowlark1");
         assert!(dns.servers.is_empty() && dns.names.is_empty() && dns.names6.is_empty());
     }
 
@@ -764,7 +764,7 @@ mod tests {
     #[test]
     fn one_client_cant_take_every_forwarded_slot() {
         let mut dns = Dns::default();
-        dns.servers.push(Server { bridges: vec!["kiri0".into()], sock: udp_socket().unwrap(), container: None });
+        dns.servers.push(Server { bridges: vec!["stowlark0".into()], sock: udp_socket().unwrap(), container: None });
         let client = super::sockaddr([172, 17, 0, 2], 4000);
         for _ in 0..super::MAX_PER_CLIENT {
             let mut p = pending();
@@ -827,7 +827,7 @@ mod tests {
         client.set_read_timeout(Some(std::time::Duration::from_secs(2))).unwrap();
         let std::net::SocketAddr::V4(addr) = client.local_addr().unwrap() else { panic!() };
         let mut dns = Dns::default();
-        dns.servers.push(Server { bridges: vec!["kiri1".into()], sock: udp_socket().unwrap(), container: None });
+        dns.servers.push(Server { bridges: vec!["stowlark1".into()], sock: udp_socket().unwrap(), container: None });
         let mut fds = [0; 2];
         // SAFETY: `fds` has room for the pair.
         assert_eq!(unsafe { libc::socketpair(libc::AF_UNIX, libc::SOCK_STREAM | libc::SOCK_NONBLOCK, 0, fds.as_mut_ptr()) }, 0);

@@ -1,4 +1,4 @@
-//! `kiri raw pull`, `kiri raw images`, `kiri raw rmi`: the image store, without the daemon.
+//! `stowlark raw pull`, `stowlark raw images`, `stowlark raw rmi`: the image store, without the daemon.
 
 use std::io;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -15,7 +15,7 @@ fn invalid(msg: impl Into<String>) -> io::Error {
 }
 
 pub fn pull(args: &[String]) -> io::Result<()> {
-    let name = args.first().ok_or_else(|| invalid("usage: kiri raw pull <image>"))?;
+    let name = args.first().ok_or_else(|| invalid("usage: stowlark raw pull <image>"))?;
     let reference = Reference::parse(name).map_err(|e| invalid(e.to_string()))?;
     let store = store()?;
     let platform = Platform::host_linux();
@@ -71,7 +71,7 @@ pub fn list(_args: &[String]) -> io::Result<()> {
 
 pub fn remove(args: &[String]) -> io::Result<()> {
     if args.is_empty() {
-        return Err(invalid("usage: kiri raw rmi <image>..."));
+        return Err(invalid("usage: stowlark raw rmi <image>..."));
     }
     let store = store()?;
     for name in args {

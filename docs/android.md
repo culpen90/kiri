@@ -1,6 +1,6 @@
 # Linux workspaces on Android
 
-`kiri-android` boots a small ARM64 Alpine Linux VM with BusyBox (including a
+`stowlark-android` boots a small ARM64 Alpine Linux VM with BusyBox (including a
 POSIX shell and common command-line tools) and Python 3. It runs locally on an
 ARM64 Android device in [Termux](https://github.com/termux/termux-app#installation),
 without root or a desktop daemon. An agent that can start processes in Termux
@@ -15,30 +15,42 @@ can call the CLI directly. There is no public API for other Android apps.
    pkg install qemu-system-aarch64-headless
    ```
 
-2. Put `kiri-android-aarch64.tar.gz` and its `.sha256` file from your [trusted
+2. Put `stowlark-android-aarch64.tar.gz` and its `.sha256` file from your [trusted
    build](#build-from-source) together in your Termux working directory. Get
    the checksum from a trusted build or distribution channel; a checksum
    downloaded with an untrusted archive does not authenticate its publisher.
 
    ```sh
-   sha256sum -c kiri-android-aarch64.tar.gz.sha256 &&
+   sha256sum -c stowlark-android-aarch64.tar.gz.sha256 &&
      mkdir -p "$HOME/.local" &&
-     tar -xzf kiri-android-aarch64.tar.gz -C "$HOME/.local" &&
-     "$HOME/.local/kiri-android/bin/kiri-android" doctor
+     tar -xzf stowlark-android-aarch64.tar.gz -C "$HOME/.local" &&
+     "$HOME/.local/stowlark-android/bin/stowlark-android" doctor
    ```
 
    Install into Termux's private home, which allows the included binary to
-   run. For the examples below, run `export PATH="$HOME/.local/kiri-android/bin:$PATH"`
+   run. For the examples below, run `export PATH="$HOME/.local/stowlark-android/bin:$PATH"`
    or use the full path in your agent configuration.
 
 3. Try a temporary VM:
 
    ```sh
-   printf 'uname -m; python3 -c "print(6 * 7)"\n' | kiri-android run
+   printf 'uname -m; python3 -c "print(6 * 7)"\n' | stowlark-android run
    ```
 
    The JSON response should have `status: "exited"`, `exit_code: 0`, and
    `aarch64` and `42` in `stdout`.
+
+If you used the earlier `kiri-android` preview, stop any running jobs and move
+the workspace directory before creating workspaces with Stowlark:
+
+```sh
+test -d "$HOME/.kiri-android" &&
+  test ! -e "$HOME/.stowlark-android" &&
+  test ! -L "$HOME/.stowlark-android" &&
+  mv "$HOME/.kiri-android" "$HOME/.stowlark-android"
+```
+
+If `~/.stowlark-android` already exists, leave both directories in place.
 
 ## Use from an agent
 
@@ -51,9 +63,9 @@ import json
 import subprocess
 from pathlib import Path
 
-kiri = Path.home() / ".local/kiri-android/bin/kiri-android"
+stowlark = Path.home() / ".local/stowlark-android/bin/stowlark-android"
 job = subprocess.run(
-    [kiri, "run", "--timeout", "30"],
+    [stowlark, "run", "--timeout", "30"],
     input="printf 'hello from Linux\\n'\n",
     text=True,
     encoding="utf-8",
@@ -69,17 +81,17 @@ else:
 Use a named workspace if a later job needs the files. For example:
 
 ```sh
-kiri-android create notes
-printf 'echo draft > status.txt\n' | kiri-android run notes
-printf 'cat status.txt\n' | kiri-android run notes
-kiri-android list
-kiri-android delete notes
+stowlark-android create notes
+printf 'echo draft > status.txt\n' | stowlark-android run notes
+printf 'cat status.txt\n' | stowlark-android run notes
+stowlark-android list
+stowlark-android delete notes
 ```
 
 Each job starts a new Linux boot, under guest UID 1000 with its working
 directory and `HOME` set to `/workspace`. Only this directory persists in a
 named workspace. A run without a name discards its workspace at exit. The
-launcher runs one VM at a time and keeps its private state in `~/.kiri-android`.
+launcher runs one VM at a time and keeps its private state in `~/.stowlark-android`.
 Names contain up to 32 lowercase ASCII letters, digits and hyphens and begin
 with a letter or digit. Deleting a workspace removes its saved files.
 
@@ -135,11 +147,11 @@ emulator. To run the same smoke test on a development host with
 
 ```sh
 python3 guest/android/build.py --output-dir target/android-guest
-cargo build --locked -p kiri-android
-KIRI_ANDROID_ASSETS="$PWD/target/android-guest" \
-  python3 tests/android-vm.py "$PWD/target/debug/kiri-android"
+cargo build --locked -p stowlark-android
+STOWLARK_ANDROID_ASSETS="$PWD/target/android-guest" \
+  python3 tests/android-vm.py "$PWD/target/debug/stowlark-android"
 ```
 
-On Android, `python3 tests/android-vm.py "$HOME/.local/kiri-android/bin/kiri-android"`
+On Android, `python3 tests/android-vm.py "$HOME/.local/stowlark-android/bin/stowlark-android"`
 can verify an installed bundle from Termux (install the Termux `python`
 package to run the test). It creates and deletes only its own workspaces.

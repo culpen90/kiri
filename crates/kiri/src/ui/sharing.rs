@@ -1,6 +1,6 @@
 //! Share in the window: public links the app holds open while it runs, and
 //! the Share account. The tunnels are `crate::share`'s, the same library as
-//! `kiri share`; this keeps their handles and turns their events into page
+//! `stowlark share`; this keeps their handles and turns their events into page
 //! events (`{"type":"share", "id", ...}`).
 //!
 //! The Windows window (crates/kiri-win) includes this file as its own
@@ -120,7 +120,7 @@ pub fn open(target: String, name: String) {
 fn resolve(arg: &str) -> std::io::Result<share::Target> {
     share::resolve_via(arg, |name| {
         if !crate::client::alive() {
-            return Err(std::io::Error::other(format!("`{name}` isn't a port, and Kiri isn't running to look up a container by that name")));
+            return Err(std::io::Error::other(format!("`{name}` isn't a port, and Stowlark isn't running to look up a container by that name")));
         }
         let r = crate::client::request("GET", &format!("/containers/{name}/json"), None)?;
         if r.status == 404 {
@@ -150,7 +150,7 @@ pub fn open_k8s(source: String, ip: String, port: u16, label: String, name: Stri
     start(source, name, move || {
         let r = crate::client::request("POST", "/kiri/k8s/forward", Some(&json!({"ip": ip, "port": port})))?;
         if r.status == 404 {
-            return Err(std::io::Error::other("this Kiri engine can't reach Kubernetes services yet; restart Kiri"));
+            return Err(std::io::Error::other("this Stowlark engine can't reach Kubernetes services yet; restart Stowlark"));
         }
         if !r.ok() {
             return Err(std::io::Error::other(r.error()));
@@ -244,9 +244,9 @@ pub fn close(id: u64) {
     }
 }
 
-/// Kiri's Stop: every share this window opened closes, and so does every
-/// `kiri share` on this computer (the account's tunnels with this machine's
-/// id), so nothing stays public while Kiri is off.
+/// Stowlark's Stop: every share this window opened closes, and so does every
+/// `stowlark share` on this computer (the account's tunnels with this machine's
+/// id), so nothing stays public while Stowlark is off.
 pub fn close_all() {
     let handles: Vec<share::Handle> = with_links(|m| m.values_mut().filter_map(|l| l.handle.take()).collect());
     std::thread::spawn(move || {
@@ -301,7 +301,7 @@ pub fn tunnels() {
     });
 }
 
-/// What each `kiri share` on this computer has served (share.rs's traffic
+/// What each `stowlark share` on this computer has served (share.rs's traffic
 /// files): `{"type":"sharetraffic", "items": [{url, requests, in, out}]}`.
 /// Local and cheap, so the page asks every couple of seconds on Share.
 pub fn traffic() {
@@ -338,15 +338,15 @@ fn tagged(t: &share::LiveTunnel, machine: &str, device: &str, own: &[String]) ->
     })
 }
 
-/// What opened a tunnel, to name it by: `kiri share`, or the app's name
-/// without its version (`Kiri Dev`).
+/// What opened a tunnel, to name it by: `stowlark share`, or the app's name
+/// without its version (`Stowlark Dev`).
 fn program(t: &share::LiveTunnel) -> String {
     if t.kind != "app" {
-        return "kiri share".into();
+        return if t.client.starts_with("kiri ") { "kiri share".into() } else { "stowlark share".into() };
     }
     match t.client.trim().rsplit_once(' ') {
         Some((name, v)) if v.starts_with(|c: char| c.is_ascii_digit()) => name.to_owned(),
-        _ if t.client.trim().is_empty() => "Kiri".into(),
+        _ if t.client.trim().is_empty() => "Stowlark".into(),
         _ => t.client.trim().to_owned(),
     }
 }
@@ -360,7 +360,7 @@ pub fn browse_tunnel(name: &str) {
 }
 
 /// Closes one of the account's tunnels that this window didn't open: a
-/// `kiri share` on this computer, or one on another computer.
+/// `stowlark share` on this computer, or one on another computer.
 pub fn stop_tunnel(name: String) {
     std::thread::spawn(move || {
         if let Err(e) = share::close_tunnel(&name) {
@@ -436,24 +436,24 @@ mod tests {
             (v["where"].as_str().unwrap().to_owned(), v["mine"].as_bool().unwrap())
         };
         // This window's own link.
-        assert_eq!(at(&t("https://web-k3x9ab.runkiri.cloud", "mac1", "dev1", "app", "Kiri Dev 0.9.4")), ("here".into(), true));
-        // `kiri share` on this Mac, with its own config dir: another device, the same machine.
+        assert_eq!(at(&t("https://web-k3x9ab.runkiri.cloud", "mac1", "dev1", "app", "Stowlark Dev 0.9.4")), ("here".into(), true));
+        // `stowlark share` on this Mac, with its own config dir: another device, the same machine.
         assert_eq!(at(&t("https://flower-x1ab23.runkiri.cloud", "mac1", "dev9", "cli", "kiri 0.9.4")), ("here".into(), false));
         // An older CLI that sends no machine id, sharing this app's config.
         assert_eq!(at(&t("https://old-ab12cd.runkiri.cloud", "", "dev1", "cli", "kiri 0.8.0")), ("here".into(), false));
         // The app on another computer.
-        assert_eq!(at(&t("https://api-7fq2ab.runkiri.cloud", "mac2", "dev2", "app", "Kiri Dev 0.9.4")), ("external".into(), false));
+        assert_eq!(at(&t("https://api-7fq2ab.runkiri.cloud", "mac2", "dev2", "app", "Stowlark Dev 0.9.4")), ("external".into(), false));
         // No machine and another device: another computer, as far as anyone can tell.
         assert_eq!(at(&t("https://old-zz12cd.runkiri.cloud", "", "dev7", "cli", "kiri 0.8.0")), ("external".into(), false));
     }
 
     #[test]
     fn programs_are_named_without_their_version() {
-        assert_eq!(program(&t("", "", "", "app", "Kiri Dev 0.9.4")), "Kiri Dev");
-        assert_eq!(program(&t("", "", "", "app", "Kiri 1.0.0")), "Kiri");
-        assert_eq!(program(&t("", "", "", "app", "")), "Kiri");
+        assert_eq!(program(&t("", "", "", "app", "Stowlark Dev 0.9.4")), "Stowlark Dev");
+        assert_eq!(program(&t("", "", "", "app", "Stowlark 1.0.0")), "Stowlark");
+        assert_eq!(program(&t("", "", "", "app", "")), "Stowlark");
         assert_eq!(program(&t("", "", "", "cli", "kiri 0.9.4")), "kiri share");
-        assert_eq!(program(&t("", "", "", "", "bench")), "kiri share");
+        assert_eq!(program(&t("", "", "", "", "bench")), "stowlark share");
     }
 
     #[test]

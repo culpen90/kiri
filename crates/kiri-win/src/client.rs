@@ -1,5 +1,5 @@
 //! The window talks to the daemon the way the docker CLI does: HTTP over
-//! `\\.\pipe\kiri`, which kiri-win itself serves and carries into WSL. As
+//! `\\.\pipe\stowlark`, which stowlark-win itself serves and carries into WSL. As
 //! crates/kiri/src/client.rs over the unix socket: one short connection
 //! per request, and long-lived ones for `/events`, logs and stats.
 
@@ -20,11 +20,11 @@ pub fn set_pipe(name: &str) {
 
 /// The pipe the daemon is served on.
 pub fn pipe() -> String {
-    PIPE.get().cloned().unwrap_or_else(|| r"\\.\pipe\kiri".to_owned())
+    PIPE.get().cloned().unwrap_or_else(|| r"\\.\pipe\stowlark".to_owned())
 }
 
 fn connect() -> io::Result<Arc<Pipe>> {
-    Pipe::open(PIPE.get().map_or(r"\\.\pipe\kiri", String::as_str)).map(Arc::new)
+    Pipe::open(PIPE.get().map_or(r"\\.\pipe\stowlark", String::as_str)).map(Arc::new)
 }
 
 /// A connection as a byte stream. With `timeout`, a read that gets nothing
@@ -73,7 +73,7 @@ impl Response {
 fn head(r: &mut impl BufRead) -> io::Result<(u16, Option<usize>, bool)> {
     let mut line = String::new();
     r.read_line(&mut line)?;
-    let status = line.split_whitespace().nth(1).and_then(|s| s.parse().ok()).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Kiri is not answering"))?;
+    let status = line.split_whitespace().nth(1).and_then(|s| s.parse().ok()).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Stowlark is not answering"))?;
     let (mut len, mut chunked) = (None, false);
     loop {
         line.clear();
@@ -147,7 +147,7 @@ pub fn request_within(method: &str, path: &str, body: Option<&Value>, background
     let payload = body.map(Value::to_string).unwrap_or_default();
     write!(
         s,
-        "{method} {path} HTTP/1.1\r\nHost: kiri\r\nConnection: close\r\n{}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{payload}",
+        "{method} {path} HTTP/1.1\r\nHost: stowlark\r\nConnection: close\r\n{}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{payload}",
         background_header(background),
         payload.len()
     )?;
@@ -170,8 +170,8 @@ pub fn request_within(method: &str, path: &str, body: Option<&Value>, background
     Ok(Response { status, body })
 }
 
-/// Kiri's own version from a `/version` answer: `KiriVersion`, or `Version`
-/// from an engine older than that field (it reported Kiri's version there;
+/// Stowlark's own version from a `/version` answer: `KiriVersion`, or `Version`
+/// from an engine older than that field (it reported Stowlark's version there;
 /// it is now the Docker Engine version clients gate on).
 pub fn kiri_version(version: &Value) -> Option<&str> {
     version["KiriVersion"].as_str().or_else(|| version["Version"].as_str())
@@ -195,7 +195,7 @@ pub fn get_background(path: &str) -> io::Result<Value> {
     Ok(r.json())
 }
 
-/// The docker CLI Kiri ships, as the Mac's `docker_cli` (for builds.rs).
+/// The docker CLI Stowlark ships, as the Mac's `docker_cli` (for builds.rs).
 pub fn docker_cli() -> Option<String> {
     Some(crate::detail::docker_cli())
 }
@@ -224,7 +224,7 @@ pub fn post_lines_closable(path: &str, auth: Option<&str>, opened: impl FnOnce(C
     let pipe = connect()?;
     opened(Closer(pipe.clone()));
     let mut s = Conn(pipe, None);
-    write!(s, "POST {path} HTTP/1.1\r\nHost: kiri\r\nConnection: close\r\n{auth}Content-Type: application/json\r\nContent-Length: 0\r\n\r\n")?;
+    write!(s, "POST {path} HTTP/1.1\r\nHost: stowlark\r\nConnection: close\r\n{auth}Content-Type: application/json\r\nContent-Length: 0\r\n\r\n")?;
     let mut r = BufReader::new(s);
     let (status, len, chunked) = head(&mut r)?;
     let mut pending = Vec::new();
@@ -296,7 +296,7 @@ impl Stream {
         line_safe(path)?;
         let pipe = connect()?;
         let mut s = Conn(pipe.clone(), None);
-        write!(s, "GET {path} HTTP/1.1\r\nHost: kiri\r\n\r\n")?;
+        write!(s, "GET {path} HTTP/1.1\r\nHost: stowlark\r\n\r\n")?;
         let mut reader = BufReader::new(ConnReader(s));
         let (status, _, chunked) = head(&mut reader)?;
         if status != 200 || !chunked {
@@ -379,7 +379,7 @@ pub fn exec_start(container: &str, cmd: &[&str], background: bool) -> io::Result
     let body = r#"{"Detach":false,"Tty":true}"#;
     write!(
         s,
-        "POST /exec/{id}/start HTTP/1.1\r\nHost: kiri\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n{}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+        "POST /exec/{id}/start HTTP/1.1\r\nHost: stowlark\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n{}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
         background_header(background),
         body.len()
     )?;

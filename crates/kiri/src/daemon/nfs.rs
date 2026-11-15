@@ -1,5 +1,5 @@
 //! Container files in Finder: a read-only NFSv3 server on a Unix socket, one
-//! folder per running container, mounted at `~/Kiri` with macOS's own
+//! folder per running container, mounted at `~/Stowlark` with macOS's own
 //! `mount_nfs` (no admin rights, no kernel extension). A socket rather than a
 //! loopback port, because every account on the Mac can reach loopback and an
 //! NFS client names its own uid: here the kernel says who connected, and only
@@ -48,7 +48,7 @@ const NOTSUPP: u32 = 10004;
 /// The export's filesystem id, `KIRI`.
 const FSID: u64 = 0x4b49_5249;
 
-/// `~/.kiri/files/nfs.sock`. Under HOME, as the daemon's state is, in a
+/// `~/.stowlark/files/nfs.sock`. Under HOME, as the daemon's state is, in a
 /// folder only this user can open.
 pub fn socket_path() -> io::Result<PathBuf> {
     Ok(super::state_dir()?.join("files/nfs.sock"))
@@ -67,13 +67,13 @@ pub fn start(engine: Arc<Engine>) -> io::Result<PathBuf> {
     let listener = UnixListener::bind(&path)?;
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
     let handles = Arc::new(Mutex::new(Handles::default()));
-    std::thread::Builder::new().name("kiri-nfs".into()).spawn(move || {
+    std::thread::Builder::new().name("stowlark-nfs".into()).spawn(move || {
         for conn in listener.incoming().flatten() {
             if !allowed(&conn) {
                 continue;
             }
             let (engine, handles) = (engine.clone(), handles.clone());
-            let _ = std::thread::Builder::new().name("kiri-nfs-conn".into()).spawn(move || {
+            let _ = std::thread::Builder::new().name("stowlark-nfs-conn".into()).spawn(move || {
                 let _ = Server { engine: &engine, handles: &handles, listing: None }.serve(conn);
             });
         }
@@ -99,13 +99,13 @@ pub fn mount_point() -> io::Result<PathBuf> {
     Ok(home.join(crate::flavor::APP.get()))
 }
 
-/// Mounts the server at `~/Kiri`, as the user (no admin rights needed).
+/// Mounts the server at `~/Stowlark`, as the user (no admin rights needed).
 ///
 /// Only over what is safe to cover: no folder (it is made), an empty one
 /// (Finder's `.DS_Store` and `.localized` don't count), or a mount this
 /// engine left behind, say after `kill -9`. A folder with the person's own
 /// files in it, a file, a link, or anything else mounted there is left
-/// alone and the mount fails: `~/kiri` is the same folder on a
+/// alone and the mount fails: `~/stowlark` is the same folder on a
 /// case-insensitive disk, and a clone of the repo there is a likely thing
 /// to find.
 pub fn mount(socket: &Path) -> io::Result<PathBuf> {
@@ -135,7 +135,7 @@ pub fn mount(socket: &Path) -> io::Result<PathBuf> {
     Ok(dir)
 }
 
-/// Removes this engine's mount at `~/Kiri`, and nothing else: another
+/// Removes this engine's mount at `~/Stowlark`, and nothing else: another
 /// mount there is someone else's.
 pub fn unmount() {
     let (Ok(dir), Ok(socket)) = (mount_point(), socket_path()) else { return };
@@ -145,7 +145,7 @@ pub fn unmount() {
     }
 }
 
-/// Whether `~/Kiri` shows this engine's container files. The window asks
+/// Whether `~/Stowlark` shows this engine's container files. The window asks
 /// before it reads a container's folder there, so it never lists the Mac's
 /// own files as the container's.
 pub fn is_mounted() -> bool {
@@ -904,7 +904,7 @@ mod tests {
     }
 
     fn scratch(name: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("kiri-nfs-{name}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("stowlark-nfs-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
@@ -943,13 +943,13 @@ mod tests {
     /// Only an NFS mount from this engine's own socket is this engine's.
     #[test]
     fn knows_its_own_mount() {
-        let sock = "/Users/a/.kiri/files/nfs.sock";
+        let sock = "/Users/a/.stowlark/files/nfs.sock";
         let m = |fstype: &str, from: &str| Mounted { fstype: fstype.into(), from: from.into() };
-        assert!(m("nfs", "</Users/a/.kiri/files/nfs.sock>:/").is_ours(sock));
-        assert!(!m("nfs", "</Users/a/.kiri-other/files/nfs.sock>:/").is_ours(sock));
+        assert!(m("nfs", "</Users/a/.stowlark/files/nfs.sock>:/").is_ours(sock));
+        assert!(!m("nfs", "</Users/a/.stowlark-other/files/nfs.sock>:/").is_ours(sock));
         assert!(!m("nfs", "server:/export").is_ours(sock));
         assert!(!m("apfs", "/dev/disk5s1").is_ours(sock));
-        assert!(!m("hfs", "</Users/a/.kiri/files/nfs.sock>:/").is_ours(sock));
+        assert!(!m("hfs", "</Users/a/.stowlark/files/nfs.sock>:/").is_ours(sock));
     }
 
     /// The kernel's table is read, and a folder with nothing on it has no mount.

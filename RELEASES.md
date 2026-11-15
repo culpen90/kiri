@@ -1,71 +1,39 @@
-# How Kiri releases are built
+# Building Stowlark releases
 
-Kiri's source is all here. Releases are built from it by a private
-repository that holds only the build workflows. This page says what
-that repository does, what it doesn't, and how you can check what you
-download.
+Stowlark is a fork of [Kiri](https://github.com/libracoder/kiri). Check
+[GitHub Releases](https://github.com/culpen90/stowlark/releases) for published
+Stowlark artifacts and release notes.
 
-## Why the builds aren't public
+Set the workspace version in `Cargo.toml` to the release tag's version
+before building. Use the same checkout and its `Cargo.lock` for every
+platform. The build also verifies the pinned Docker CLI, Compose and buildx
+downloads before bundling them.
 
-The release builds need our signing keys: Apple's Developer ID for the Mac,
-our Windows signing certificate, and the token that uploads to
-download.runkiri.com. Public CI runs code from anyone who opens a pull
-request, so machines that hold those keys can't be public CI runners. VS Code,
-IntelliJ and Chrome are built the same way: open source, released from the
-maker's own build machines.
+- **macOS:** Build the VM kernel, disk and guest with `cargo xtask kernel`,
+  `cargo xtask disk` and `cargo xtask guest`. Then run `cargo xtask release`
+  for the application archive and `cargo xtask dmg` for the disk image.
+  See [Building from source](docs/development.md) for architecture flags.
+- **Windows:** Run `cargo xtask msi` for x86-64 or `cargo xtask msi --arch arm64`
+  for Windows on Arm. Both installers use Stowlark's MSI identity and install
+  under `%LOCALAPPDATA%\Stowlark`.
+- **Linux:** Run `scripts/ci/linux-build.sh` on Ubuntu, or
+  `scripts/ci/linux-packages.sh` on a Mac with a Docker-compatible engine.
+  The script writes the packages and `SHA256SUMS-linux` to `target/packages`.
+  Use `packaging/linux/test-host.sh` to install and exercise them on a test
+  machine with systemd.
+- **Android:** Run `scripts/build-android.sh` with an Android NDK. The bundle
+  and its checksum are written to `target/android-dist`.
+  See [Android Linux workspaces](docs/android.md).
 
-## What a release is
+The macOS build uses an ad hoc signature when a Developer ID is unavailable.
+For a signed and notarized build, set `STOWLARK_SIGN_IDENTITY` and
+`STOWLARK_NOTARY_PROFILE` on a machine with the corresponding credentials.
+Check the app with `codesign --verify --deep --strict -v Stowlark.app`.
+An MSI needs a separate Authenticode signing step if distributing it with
+a publisher signature.
 
-1. A version is tagged here as `vX.Y.Z`, signed by the maintainer.
-2. The private release repository checks out **this
-   repository at that tag**, with a read-only key. It has no source of its
-   own. The one change it makes is the version line in `Cargo.toml`, set
-   from the tag.
-3. It runs the scripts in this repository, the same ones anyone can read and
-   run:
-   - Mac: `cargo xtask guest`, `cargo xtask release` and `cargo xtask dmg`
-     (the VM's guest, the signed app, the disk image; all in `xtask/`), then
-     Apple's notarization (`xcrun notarytool`)
-   - Windows: `cargo xtask msi` (the installer, from `installer/windows`)
-   - Linux: `scripts/ci/linux-build.sh` (all `.deb` and `.rpm` packages),
-     then `packaging/linux/test-host.sh`, which installs them on Ubuntu and
-     Fedora and runs containers through them. A build that doesn't install
-     and run isn't released.
-4. The files are uploaded to download.runkiri.com, and the version goes
-   live (update feeds, website) only once the Mac, Windows and Linux builds
-   are all up. The upload scripts stay private, since they hold our
-   storage and signing setup; they upload and check files, nothing else.
-
-The Rust dependencies come from this repository's `Cargo.lock`. The docker CLI, Compose and buildx are downloaded
-at versions and SHA-256s pinned in `packaging/`.
-
-## Where it runs
-
-On dedicated build machines that we control. They never run jobs from this
-public repository.
-
-## Checking what you download
-
-- **Mac:** `Kiri.app` is signed with our Developer ID and notarized by Apple.
-  Check it with `codesign --verify --deep --strict -v /Applications/Kiri.app`
-  and `spctl -a -vv /Applications/Kiri.app`.
-- **Linux:** every release has `SHA256SUMS-linux` next to its packages.
-  Check with `sha256sum -c --ignore-missing SHA256SUMS-linux`.
-- **Windows:** Authenticode signing is being set up. Until it's in place the
-  installer is unsigned, and Windows SmartScreen asks before running it.
-- **Updates:** Kiri checks every update's SHA-256 against the release feed
-  before installing it. On the Mac it also checks that the new app is signed
-  by the same Developer ID team as the running one, not just signed by
-  someone.
-
-## Building it yourself
-
-Everything that builds a release is in `xtask/`, `scripts/` and `packaging/`, so you can build
-the same tag yourself (see `CONTRIBUTING.md`). Builds aren't byte-for-byte
-reproducible yet, so your files won't match ours bit for bit. Making the Linux
-packages reproducible is planned.
-
-## Reporting a problem
-
-If a download doesn't match its checksum or signature, or you think a release
-was tampered with, please report it privately as `SECURITY.md` describes.
+Mac and Windows builds generate update manifests when
+`STOWLARK_RELEASE_BASE` is set to the publisher's download directory.
+Use `STOWLARK_RELEASE_NOTES` or `STOWLARK_RELEASE_NOTES_URL` to add release
+notes to those manifests. Set `STOWLARK_UPDATE_URL` when launching the app
+to opt in to the HTTPS manifest for that platform and architecture.

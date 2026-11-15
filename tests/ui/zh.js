@@ -16,7 +16,7 @@ t("the page is in Chinese", () => {
   if (!/[一-鿿]/.test(document.querySelector("nav [data-view=containers]").textContent)) throw new Error("the sidebar isn't");
 });
 for (const v of ["containers", "images", "volumes", "networks", "builds", "share"]) { show(v); check(`the ${v} view`); }
-// The USB view, with its beta note, a device in Kiri and one on the Mac (the
+// The USB view, with its beta note, a device in Stowlark and one on the Mac (the
 // note under the list is the host's, worded in the window's language there).
 show("usb");
 kiri.on({ type: "usb", can: "attach", devices: [
@@ -32,11 +32,11 @@ for (const id of [...document.querySelectorAll("[data-stab]")].map((b) => b.data
   check(`Settings → ${id}`);
 }
 t("a dev build's empty list names its own context, in Chinese", () => {
-  kiri.on({ type: "status", dev: true, ours: "kiri-lang" });
+  kiri.on({ type: "status", dev: true, ours: "stowlark-lang" });
   kiri.on({ type: "lists", containers: [], images: [], volumes: [], networks: [] });
   show("containers");
   const p = document.querySelector("#content .empty p, #content p")?.innerHTML || "";
-  if (!/kiri-lang/.test(p) || !/[\u4e00-\u9fff]/.test(p)) throw new Error("it says " + p);
+  if (!/stowlark-lang/.test(p) || !/[\u4e00-\u9fff]/.test(p)) throw new Error("it says " + p);
 });
 t("English again from Settings, without a reload", () => {
   show("settings");

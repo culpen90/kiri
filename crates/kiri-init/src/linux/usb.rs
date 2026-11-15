@@ -44,7 +44,7 @@ pub fn accept(listener: &OwnedFd) {
         // SAFETY: a fresh descriptor from accept4.
         let sock = unsafe { OwnedFd::from_raw_fd(fd) };
         if let Err(e) = attach(sock) {
-            eprintln!("kiri-init: usb: {e}");
+            eprintln!("stowlark-init: usb: {e}");
         }
     }
 }

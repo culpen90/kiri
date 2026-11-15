@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 /// Where a volume's data lives inside the VM.
 pub fn guest_path(name: &str) -> String {
-    format!("/var/lib/kiri/volumes/{name}/_data")
+    format!("/var/lib/stowlark/volumes/{name}/_data")
 }
 
 /// Docker's rule: `[a-zA-Z0-9][a-zA-Z0-9_.-]*`.

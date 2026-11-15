@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Smoke-test kiri-android against the installed guest and a real QEMU.
+"""Smoke-test stowlark-android against the installed guest and a real QEMU.
 
-Pass the path to kiri-android. The launcher must be able to find QEMU and its
-guest assets as usual. On a development host, set KIRI_ANDROID_ASSETS first.
+Pass the path to stowlark-android. The launcher must be able to find QEMU and its
+guest assets as usual. On a development host, set STOWLARK_ANDROID_ASSETS first.
 The test uses a private state directory on development hosts and unique
 workspace names in Termux.
 """
@@ -31,8 +31,8 @@ class Launcher:
     def __init__(self, program, state_dir, guest_timeout):
         self.program = program
         self.guest_timeout = guest_timeout
-        self.env = dict(os.environ, KIRI_ANDROID_STATE_DIR=str(state_dir))
-        self.env["KIRI_ANDROID_VM_HOST_ONLY"] = "not-for-the-guest"
+        self.env = dict(os.environ, STOWLARK_ANDROID_STATE_DIR=str(state_dir))
+        self.env["STOWLARK_ANDROID_VM_HOST_ONLY"] = "not-for-the-guest"
         self.owned = []
 
     def call(self, *args, script=None, code=0, timeout=30):
@@ -90,7 +90,7 @@ def smoke_test(client, host_only_file):
     require(Path(doctor["state_dir"]).stat().st_mode & 0o077 == 0, "State directory is not private")
     before = client.workspaces()
     require(isinstance(before, list), "Workspace list is missing")
-    prefix = "kiri-smoke-" + secrets.token_hex(4)
+    prefix = "stowlark-smoke-" + secrets.token_hex(4)
     first, second = f"{prefix}-a", f"{prefix}-b"
     expected_workspaces = sorted([*before, first, second])
     rejected = client.call("create", "../", code=125)
@@ -109,7 +109,7 @@ def smoke_test(client, host_only_file):
 test "$(uname -s)" = Linux
 test "$(id -u)" = 1000
 test "$PWD" = /workspace
-test "${{KIRI_ANDROID_VM_HOST_ONLY+x}}" = ''
+test "${{STOWLARK_ANDROID_VM_HOST_ONLY+x}}" = ''
 test ! -e {host_path}
 test "$(cut -s -d: -f1 /proc/net/dev | tr -d ' ')" = lo
 test ! -r /dev/vda
@@ -131,7 +131,7 @@ result = db.execute('select 40 + 2').fetchone()
 assert json.loads(json.dumps(result)) == [42]
 ssl.create_default_context()
 PYTHON
-printf '%s\\n' 'hello 世界 $(echo literal) $KIRI_ANDROID_VM_HOST_ONLY'
+printf '%s\\n' 'hello 世界 $(echo literal) $STOWLARK_ANDROID_VM_HOST_ONLY'
 printf '%s\\n' 'guest stderr' >&2
 printf '%s' 'persistent' > marker
 sleep 300 &
@@ -140,7 +140,7 @@ exit 23
         name=first,
         code=23,
     )
-    require(result["stdout"] == "hello 世界 $(echo literal) $KIRI_ANDROID_VM_HOST_ONLY\n", "Guest stdout changed")
+    require(result["stdout"] == "hello 世界 $(echo literal) $STOWLARK_ANDROID_VM_HOST_ONLY\n", "Guest stdout changed")
     require(result["stderr"] == "guest stderr\n", "Guest stderr was mixed with VM output")
     require(host_only_file.read_text() == "host fixture\n", "Host fixture unexpectedly changed")
     print("PASS Linux shell, Python, process cleanup, guest UID and output, and disabled host channels", flush=True)
@@ -153,7 +153,7 @@ exit 23
     require(client.workspaces() == expected_workspaces, "An ephemeral run registered a workspace")
     print("PASS named persistence and independent ephemeral workspaces", flush=True)
 
-    result = client.run(f"yes kiri | head -c {OUTPUT_LIMIT + 4096}\n", status="output_limit", code=125)
+    result = client.run(f"yes stowlark | head -c {OUTPUT_LIMIT + 4096}\n", status="output_limit", code=125)
     output_size = len(result["stdout"].encode()) + len(result["stderr"].encode())
     require(output_size <= OUTPUT_LIMIT, f"Run returned {output_size} bytes above the output limit")
     # The shell command is first, so the next run can detect accidental partial
@@ -173,13 +173,13 @@ exit 23
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("launcher", help="Path to kiri-android, or its name on PATH")
+    parser.add_argument("launcher", help="Path to stowlark-android, or its name on PATH")
     parser.add_argument("--guest-timeout", type=int, default=90, help="Timeout for each normal guest run in seconds")
     args = parser.parse_args()
     if not 1 <= args.guest_timeout <= 300:
         parser.error("--guest-timeout must be between 1 and 300 seconds")
 
-    with tempfile.TemporaryDirectory(prefix="kiri-android-test-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="stowlark-android-test-") as temp_dir:
         temp = Path(temp_dir)
         host_only_file = temp / "host-only.txt"
         host_only_file.write_text("host fixture\n")

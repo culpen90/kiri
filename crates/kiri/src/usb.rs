@@ -1,11 +1,11 @@
-//! `kiri usb`: USB devices for containers (beta).
+//! `stowlark usb`: USB devices for containers (beta).
 //!
 //! On a Mac the containers run in a VM with no USB controller, so a device
-//! has to be passed through: `kiri usb attach` captures it from macOS
+//! has to be passed through: `stowlark usb attach` captures it from macOS
 //! (through the USB helper, `helper.rs`, installed on first use with one
 //! administrator prompt) and hands it to the VM, where
 //! it shows up like on any Linux machine (`/dev/ttyUSB0`, `/dev/input/…`,
-//! `/dev/bus/usb/…`) for `docker run --device`. `kiri usb detach` gives it
+//! `/dev/bus/usb/…`) for `docker run --device`. `stowlark usb detach` gives it
 //! back to macOS.
 //!
 //! On Linux the containers run on the host's own kernel and already see its
@@ -25,7 +25,7 @@ mod usbip;
 #[cfg_attr(target_os = "macos", allow(dead_code))]
 pub mod sysfs;
 
-const USAGE: &str = "usage: kiri usb [list] | attach DEVICE | detach DEVICE | helper remove\n\
+const USAGE: &str = "usage: stowlark usb [list] | attach DEVICE | detach DEVICE | helper remove\n\
     DEVICE is a location (0x02114000), vendor:product (1532:00d7) or part of the name";
 
 pub fn run(args: &[String]) -> io::Result<()> {
@@ -63,7 +63,7 @@ fn list() -> io::Result<()> {
     println!("{:<12} {:<10} {:<6} {:<10} {:<9} NAME", "LOCATION", "ID", "SPEED", "STATE", "KIND");
     for d in &devices {
         let state = if attached.iter().any(|a| a == &d.location()) {
-            "in Kiri"
+            "in Stowlark"
         } else if waiting.iter().any(|(l, _)| l == &d.location()) {
             "waiting"
         } else {
@@ -72,7 +72,7 @@ fn list() -> io::Result<()> {
         let kind = match d.kind() { "" => "usb", k => k };
         println!("{:<12} {:04x}:{:04x}  {:<6} {:<10} {:<9} {}", d.location(), d.vendor, d.product, d.speed_name(), state, kind, d.name);
     }
-    // Left the bus: Kiri attaches them again when they come back.
+    // Left the bus: Stowlark attaches them again when they come back.
     for (l, name) in waiting.iter().filter(|(l, _)| !devices.iter().any(|d| &d.location() == l)) {
         println!("{:<12} {:<10} {:<6} {:<10} {:<9} {}", l, "-", "-", "waiting", "-", name);
     }
@@ -91,7 +91,7 @@ pub fn attached() -> Vec<String> {
         .collect()
 }
 
-/// The devices that left and that Kiri attaches again when they come back,
+/// The devices that left and that Stowlark attaches again when they come back,
 /// as (location, name).
 #[cfg(target_os = "macos")]
 fn waiting() -> Vec<(String, String)> {
@@ -109,12 +109,12 @@ fn waiting() -> Vec<(String, String)> {
 fn attach(which: &str) -> io::Result<()> {
     let d = mac::find(which)?;
     if attached().contains(&d.location()) {
-        println!("{} is already in Kiri.", d.name);
+        println!("{} is already in Stowlark.", d.name);
         return Ok(());
     }
     attach_device(&d)?;
-    println!("{} is in Kiri now. In a container: --device /dev/ttyUSB0 (serial), /dev/input (HID) or /dev/bus/usb (raw).", d.name);
-    println!("It is gone from the Mac until `kiri usb detach {}`.", d.location());
+    println!("{} is in Stowlark now. In a container: --device /dev/ttyUSB0 (serial), /dev/input (HID) or /dev/bus/usb (raw).", d.name);
+    println!("It is gone from the Mac until `stowlark usb detach {}`.", d.location());
     Ok(())
 }
 
@@ -141,10 +141,10 @@ pub fn detach_location(location: &str) -> io::Result<()> {
 fn detach(which: &str) -> io::Result<()> {
     let d = match mac::find(which) {
         Ok(d) => d,
-        // Away from the bus and waited for: `kiri usb ls` gives its location.
+        // Away from the bus and waited for: `stowlark usb ls` gives its location.
         Err(e) => {
             return match waiting().into_iter().find(|(l, _)| l == which) {
-                Some((l, name)) => detach_location(&l).map(|()| println!("Kiri stops waiting for {name}; it stays on the Mac when it comes back.")),
+                Some((l, name)) => detach_location(&l).map(|()| println!("Stowlark stops waiting for {name}; it stays on the Mac when it comes back.")),
                 None => Err(e),
             };
         }
@@ -277,7 +277,7 @@ mod kind_tests {
 // One shape on every system: { type: "usb", devices: [{ key, name, id,
 // speed, state, path, kind, maker, serial, bus, dev, busid, since }], note }.
 // maker, serial, bus/dev (or Windows' busid) and since (Unix seconds, when
-// it went into Kiri) are there when the system knows them. `state` is "kiri" (in the VM), "host" (on
+// it went into Stowlark) are there when the system knows them. `state` is "kiri" (in the VM), "host" (on
 // this computer, can be attached) or "shared" (containers see it as it is).
 
 /// The devices for the window's USB view.
@@ -308,11 +308,11 @@ pub fn ui_list() -> serde_json::Value {
         }
     }
     serde_json::json!({"type": "usb", "devices": rows, "can": "attach",
-        "note": "A device in Kiri is gone from the Mac until you detach it. In a container: --device /dev/ttyUSB0 (serial), /dev/input (HID) or /dev/bus/usb (raw)."})
+        "note": "A device in Stowlark is gone from the Mac until you detach it. In a container: --device /dev/ttyUSB0 (serial), /dev/input (HID) or /dev/bus/usb (raw)."})
 }
 
 /// A device's `state` from its row in the daemon's list: "waiting" when it
-/// left and Kiri attaches it again when it comes back.
+/// left and Stowlark attaches it again when it comes back.
 #[cfg(target_os = "macos")]
 fn state_of(inside: Option<&serde_json::Value>) -> &'static str {
     match inside {
@@ -332,7 +332,7 @@ fn paths(a: &serde_json::Value) -> Vec<serde_json::Value> {
 pub fn ui_attach(key: &str) -> io::Result<String> {
     let d = mac::find(key)?;
     attach_device(&d)?;
-    Ok(format!("{} is in Kiri", d.name))
+    Ok(format!("{} is in Stowlark", d.name))
 }
 
 #[cfg(target_os = "macos")]
@@ -465,7 +465,7 @@ mod tests {
 
     #[test]
     fn sysfs_lists_devices_not_hubs_with_their_tty() {
-        let d = std::env::temp_dir().join(format!("kiri-usb-sysfs-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("stowlark-usb-sysfs-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         let dev = |name: &str, files: &[(&str, &str)]| {
             let p = d.join(name);

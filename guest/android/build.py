@@ -80,10 +80,10 @@ def kernel_assets(archive, files):
     image = gzip.decompress(wrapped[offset:offset + length])
     if image[56:60] != b"ARMd":
         raise ValueError("unexpected ARM64 Image header")
-    files["lib/kiri-modules"] = (stat.S_IFDIR | 0o755, b"", 0, 0)
+    files["lib/stowlark-modules"] = (stat.S_IFDIR | 0o755, b"", 0, 0)
     for module in MODULES:
         compressed = archive.extractfile(f"lib/modules/{KERNEL_RELEASE}/kernel/{module}.ko.gz").read()
-        module_file = f"lib/kiri-modules/{Path(module).name}.ko"
+        module_file = f"lib/stowlark-modules/{Path(module).name}.ko"
         files[module_file] = (stat.S_IFREG | 0o644, gzip.decompress(compressed), 0, 0)
     return image
 
@@ -126,10 +126,10 @@ def build(output, cache):
     with ThreadPoolExecutor(max_workers=6) as workers:
         archives = list(workers.map(lambda pin: fetch(cache, *pin), pins))
     subprocess.run([
-        "cargo", "build", "--locked", "--release", "-p", "kiri-init", "--bin", "kiri-android-init", "--features", "android-guest",
+        "cargo", "build", "--locked", "--release", "-p", "stowlark-init", "--bin", "stowlark-android-init", "--features", "android-guest",
         "--target", TARGET, "--target-dir", str(target_dir),
     ], cwd=ROOT, check=True)
-    init = (target_dir / TARGET / "release" / "kiri-android-init").read_bytes()
+    init = (target_dir / TARGET / "release" / "stowlark-android-init").read_bytes()
     files = {}
     image = None
     sources = []
@@ -162,7 +162,7 @@ def build(output, cache):
             f"({MIRROR}/main/aarch64/). The initial filesystem contains the [Alpine minirootfs]"
             f"({MIRROR}/releases/aarch64/) and the packages listed below. The included links point to "
             "the packaging sources with upstream source URLs, patches, and build instructions.\n\n"
-            "The Kiri guest launcher is built from `crates/kiri-init/src/bin/kiri-android-init.rs` "
+            "The Stowlark guest launcher is built from `crates/kiri-init/src/bin/kiri-android-init.rs` "
             "under Apache-2.0. `guest/android/alpine.sha256` records every downloaded artifact.\n\n"
             + "".join(sorted(set(sources)))
         )

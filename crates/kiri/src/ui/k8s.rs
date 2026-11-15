@@ -1,7 +1,7 @@
-//! The window's Kubernetes section: Pods and Services of the `kiri k8s`
+//! The window's Kubernetes section: Pods and Services of the `stowlark k8s`
 //! cluster, a pod's logs, Delete, and Start when it is off.
 //!
-//! Everything goes through `kubectl` inside the `kiri-k8s` container, by the
+//! Everything goes through `kubectl` inside the `stowlark-k8s` container, by the
 //! engine's exec API, so the Mac needs no kubectl and no kubeconfig. Nothing
 //! here starts the cluster or wakes the VM on its own: the lists are read
 //! only while the node container runs (and so the VM is awake), with
@@ -33,7 +33,7 @@ static LISTING: AtomicBool = AtomicBool::new(false);
 /// asking a node that is struggling (a memory-starved VM) every few seconds
 /// would only pile more kubectl processes onto it.
 static QUIET_UNTIL: AtomicU64 = AtomicU64::new(0);
-/// The `kiri k8s` command running for the window ("start", "stop", "set",
+/// The `stowlark k8s` command running for the window ("start", "stop", "set",
 /// "deletecluster"), one at a time.
 static OP: Mutex<Option<&'static str>> = Mutex::new(None);
 /// The one pod log stream the page shows, as detail.rs keeps the container's.
@@ -208,7 +208,7 @@ fn list() {
     if LISTING.swap(true, Ordering::SeqCst) {
         return;
     }
-    spawn("kiri-k8s-list", || {
+    spawn("stowlark-k8s-list", || {
         let event = read_lists();
         LISTING.store(false, Ordering::SeqCst);
         emit(event.to_string());
@@ -282,7 +282,7 @@ fn delete(ns: String, pod: String) {
     if !valid(&ns) || !valid(&pod) {
         return;
     }
-    spawn("kiri-k8s-delete", move || {
+    spawn("stowlark-k8s-delete", move || {
         match kubectl(&["delete", "pod", "-n", &ns, &pod, "--wait=false"]) {
             Ok((0, _)) => emit(notice("ok", &format!("Deleting pod {pod}"))),
             Ok((_, out)) => emit(notice("error", out.trim().lines().last().unwrap_or("kubectl delete failed"))),
@@ -292,7 +292,7 @@ fn delete(ns: String, pod: String) {
     });
 }
 
-/// `kiri k8s …`, as its own process, as the command line runs it: each line
+/// `stowlark k8s …`, as its own process, as the command line runs it: each line
 /// it prints is the page's progress, and its last error line the toast.
 fn op(name: &'static str, args: Vec<String>) {
     {
@@ -302,7 +302,7 @@ fn op(name: &'static str, args: Vec<String>) {
         }
         *running = Some(name);
     }
-    spawn("kiri-k8s-op", move || {
+    spawn("stowlark-k8s-op", move || {
         let _op = crate::diag::enter_op(crate::diag::new_op(&format!("k8s{name}")));
         crate::diag::info!("action started", action = format!("k8s {name}"));
         let result = (|| -> io::Result<()> {
@@ -313,7 +313,7 @@ fn op(name: &'static str, args: Vec<String>) {
                 .arg("k8s")
                 .args(&args)
                 // Its lines (and its requests to the engine) under this op.
-                .env("KIRI_OP", crate::diag::op().unwrap_or_default())
+                .env("STOWLARK_OP", crate::diag::op().unwrap_or_default())
                 .stdin(std::process::Stdio::null())
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
@@ -336,8 +336,8 @@ fn op(name: &'static str, args: Vec<String>) {
             if status.success() {
                 return Ok(());
             }
-            let why = err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("kiri k8s failed").trim();
-            Err(io::Error::other(why.strip_prefix("kiri: ").unwrap_or(why).to_owned()))
+            let why = err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("stowlark k8s failed").trim();
+            Err(io::Error::other(why.strip_prefix("stowlark: ").unwrap_or(why).to_owned()))
         })();
         *OP.lock().unwrap_or_else(|e| e.into_inner()) = None;
         // A new or restarted node answers at once: no waiting out an earlier timeout.
@@ -367,7 +367,7 @@ fn logs(ns: String, pod: String, container: String, previous: bool) {
     }
     let generation = LOGS_GEN.load(Ordering::SeqCst);
     let key = format!("{ns}/{pod}/{container}{}", if previous { "/previous" } else { "" });
-    spawn("kiri-k8s-logs", move || {
+    spawn("stowlark-k8s-logs", move || {
         let which = if previous { "--previous" } else { "-f" };
         // The shell says its pid first, then becomes kubectl.
         let (mut r, _) = match exec_start(&["sh", "-c", "echo $$; exec kubectl logs \"$@\"", "logs", which, "--tail=2000", "-n", &ns, &pod, "-c", &container]) {
@@ -389,7 +389,7 @@ fn logs(ns: String, pod: String, container: String, previous: bool) {
         let _ = r.get_ref().set_read_timeout(None);
         let (tx, rx) = mpsc::channel::<Vec<u8>>();
         let flush_key = key.clone();
-        spawn("kiri-k8s-logs-emit", move || {
+        spawn("stowlark-k8s-logs-emit", move || {
             let mut batch: Vec<u8> = Vec::new();
             loop {
                 let ended = match rx.recv_timeout(Duration::from_millis(60)) {
@@ -435,7 +435,7 @@ fn logs(ns: String, pod: String, container: String, previous: bool) {
 }
 
 fn kill(pid: u32) {
-    spawn("kiri-k8s-logs-kill", move || {
+    spawn("stowlark-k8s-logs-kill", move || {
         if let Ok((mut r, _)) = exec_start(&["kill", &pid.to_string()]) {
             let _ = r.read_to_end(&mut Vec::new());
         }
@@ -454,11 +454,11 @@ fn stop_logs() {
 
 #[cfg(test)]
 mod tests {
-    /// Against a running cluster (`kiri k8s start`), read-only:
-    /// `KIRI_LIVE_K8S=1 KIRI_SOCKET=~/.kiri-dev/run/docker.sock cargo test -p kiri live_k8s_lists -- --nocapture`.
+    /// Against a running cluster (`stowlark k8s start`), read-only:
+    /// `STOWLARK_LIVE_K8S=1 STOWLARK_SOCKET=~/.stowlark-dev/run/docker.sock cargo test -p stowlark live_k8s_lists -- --nocapture`.
     #[test]
     fn live_k8s_lists() {
-        if std::env::var_os("KIRI_LIVE_K8S").is_none() {
+        if std::env::var_os("STOWLARK_LIVE_K8S").is_none() {
             return;
         }
         let v = super::read_lists();

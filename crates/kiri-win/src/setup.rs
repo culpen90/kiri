@@ -1,9 +1,9 @@
 //! First run on Windows: from a PC with no WSL to `docker run` working, in
 //! the window (setup.html; the protocol is in setup-protocol.md). Steps:
 //! WSL (downloaded with progress, installed after one administrator
-//! approval, then a restart), a Linux for Kiri (Kiri Linux, from the
+//! approval, then a restart), a Linux for Stowlark (Stowlark Linux, from the
 //! bundle; or Ubuntu, downloaded), the engine, the Docker tools, ready.
-//! Progress lives in %LOCALAPPDATA%\Kiri\setup.json, so a restart resumes.
+//! Progress lives in %LOCALAPPDATA%\Stowlark\setup.json, so a restart resumes.
 
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -66,7 +66,7 @@ const UBUNTU: Pin = Pin {
     file: "ubuntu-26.04.1-wsl-arm64.wsl",
 };
 const UBUNTU_DISTRO: &str = "Ubuntu-26.04";
-pub(crate) const KIRI_DISTRO: &str = "kiri";
+pub(crate) const STOWLARK_DISTRO: &str = "stowlark";
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -79,7 +79,7 @@ struct Saved {
     distro: Option<String>,
     /// Unix seconds of the WSL install that needs a restart.
     restart_after: Option<u64>,
-    /// Why setup last stopped, kept so a restart of Kiri doesn't lose it.
+    /// Why setup last stopped, kept so a restart of Stowlark doesn't lose it.
     last_error: Option<String>,
 }
 
@@ -99,11 +99,11 @@ struct State {
     sizes: Value,
     existing_ubuntu: bool,
     other_docker: bool,
-    /// The engine besides Kiri, by name (crate::buildwith), for the build question.
+    /// The engine besides Stowlark, by name (crate::buildwith), for the build question.
     other_engine: Option<&'static str>,
     make_default: bool,
-    /// Builds on Kiri: the answer to "Keep building with Docker / Build
-    /// with Kiri", asked only with another engine here.
+    /// Builds on Stowlark: the answer to "Keep building with Docker / Build
+    /// with Stowlark", asked only with another engine here.
     build_kiri: bool,
     autostart: bool,
     /// A first start: the page asks for the language before anything else.
@@ -119,7 +119,7 @@ static BUSY: AtomicBool = AtomicBool::new(false);
 static CANCEL: AtomicBool = AtomicBool::new(false);
 
 fn dir() -> PathBuf {
-    std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("Kiri")).unwrap_or_else(|| PathBuf::from("."))
+    std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("Stowlark")).unwrap_or_else(|| PathBuf::from("."))
 }
 
 fn saved() -> Saved {
@@ -136,14 +136,14 @@ fn save(s: &Saved) {
     let _ = std::fs::write(dir().join("setup.json"), serde_json::to_vec_pretty(s).unwrap_or_default());
 }
 
-/// The distro setup put Kiri in, for the bridge.
+/// The distro setup put Stowlark in, for the bridge.
 pub fn distro() -> Option<String> {
     saved().distro
 }
 
 /// The SHA-256 of each bundle file, embedded at build time by
 /// `cargo xtask windows` (`name=hash;…`). A dev build has none.
-const BUNDLE_SHA256: Option<&str> = option_env!("KIRI_BUNDLE_SHA256");
+const BUNDLE_SHA256: Option<&str> = option_env!("STOWLARK_BUNDLE_SHA256");
 
 /// A file from the bundle, checked against its embedded SHA-256 so a file
 /// swapped in the unzipped folder (a drive-by download, another process)
@@ -153,7 +153,7 @@ pub(crate) fn verified(rel: &str) -> io::Result<PathBuf> {
     let path = bundle().join(rel);
     let Some(want) = BUNDLE_SHA256.and_then(|m| m.split(';').find_map(|e| e.strip_prefix(rel).and_then(|r| r.strip_prefix('=')))) else {
         // A debug build (plain `cargo build`) has no manifest and uses the
-        // file as is. A release must have one: otherwise building kiri-win on
+        // file as is. A release must have one: otherwise building stowlark-win on
         // its own would quietly skip every bundle check.
         if cfg!(debug_assertions) {
             return Ok(path);
@@ -161,23 +161,23 @@ pub(crate) fn verified(rel: &str) -> io::Result<PathBuf> {
         return Err(io::Error::other(format!("this build carries no checksum for {rel}; build the bundle with `cargo xtask windows`")));
     };
     if !path.is_file() {
-        return Err(io::Error::other(format!("{rel} is missing from Kiri's folder")));
+        return Err(io::Error::other(format!("{rel} is missing from Stowlark's folder")));
     }
     let got = sha256(&path)?;
     if got != want {
-        return Err(io::Error::other(format!("{rel} in Kiri's folder does not match this build (SHA-256 {got}); download Kiri again")));
+        return Err(io::Error::other(format!("{rel} in Stowlark's folder does not match this build (SHA-256 {got}); download Stowlark again")));
     }
     Ok(path)
 }
 
-/// Where kiri-win was started from: the unzipped bundle on first run. Debug
+/// Where stowlark-win was started from: the unzipped bundle on first run. Debug
 /// builds run from target/debug use the bundle made by `cargo xtask windows-dev`.
 fn bundle() -> PathBuf {
     let local = std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)).unwrap_or_default();
     #[cfg(debug_assertions)]
-    if !local.join("kiri-linux.tar.gz").is_file() {
-        let bundled = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../target/kiri-windows-{}", std::env::consts::ARCH));
-        if bundled.join("kiri-linux.tar.gz").is_file() {
+    if !local.join("stowlark-linux.tar.gz").is_file() {
+        let bundled = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../target/stowlark-windows-{}", std::env::consts::ARCH));
+        if bundled.join("stowlark-linux.tar.gz").is_file() {
             return bundled;
         }
     }
@@ -213,7 +213,7 @@ fn existing_ubuntu() -> Option<String> {
     distros().into_iter().find(|d| d.starts_with("Ubuntu"))
 }
 
-/// Another Docker on this PC: Docker Desktop, or a docker CLI on PATH that is not Kiri's.
+/// Another Docker on this PC: Docker Desktop, or a docker CLI on PATH that is not Stowlark's.
 fn other_docker() -> bool {
     let desktop = std::env::var_os("ProgramFiles").is_some_and(|p| Path::new(&p).join(r"Docker\Docker\Docker Desktop.exe").is_file());
     let ours = dir().join("bin");
@@ -232,7 +232,7 @@ fn restarted_since(at: u64) -> bool {
     now_secs().saturating_sub(uptime) > at
 }
 
-/// Whether the window should open on setup rather than Kiri.
+/// Whether the window should open on setup rather than Stowlark.
 pub fn needed() -> bool {
     let s = saved();
     !s.done || s.distro.as_deref().is_none_or(|d| !distros().iter().any(|x| x == d))
@@ -265,7 +265,7 @@ fn fresh_state(step: &'static str, s: &Saved) -> State {
     State {
         step,
         linux: s.linux.clone(),
-        sizes: json!({"wsl": WSL_MSI.size, "ubuntu": UBUNTU.size, "kiri": std::fs::metadata(bundle().join("kiri-linux.tar.gz")).map_or(0, |m| m.len())}),
+        sizes: json!({"wsl": WSL_MSI.size, "ubuntu": UBUNTU.size, "kiri": std::fs::metadata(bundle().join("stowlark-linux.tar.gz")).map_or(0, |m| m.len())}),
         existing_ubuntu: existing_ubuntu().is_some(),
         other_docker: other,
         other_engine: crate::buildwith::other_engine(),
@@ -372,7 +372,7 @@ fn mb(bytes: u64) -> u64 {
     (bytes + 500_000) / 1_000_000
 }
 
-/// Downloads `pin` into %LOCALAPPDATA%\Kiri\downloads with curl.exe (part
+/// Downloads `pin` into %LOCALAPPDATA%\Stowlark\downloads with curl.exe (part
 /// of Windows), showing bytes, speed and time left, then checks its SHA-256.
 fn download(pin: &Pin, task_index: usize) -> io::Result<PathBuf> {
     let dl = dir().join("downloads");
@@ -441,15 +441,15 @@ pub(crate) fn sha256(path: &Path) -> io::Result<String> {
     Ok(h.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
 
-/// Runs kiri-admin.ps1 (contrib/windows, installed beside this exe) with
+/// Runs stowlark-admin.ps1 (contrib/windows, installed beside this exe) with
 /// `args` in an elevated PowerShell (Windows asks for approval) and returns
 /// its exit code; a refusal is "cancelled". A script file checked against
 /// this build's SHA-256, not script text in this binary run with
 /// -EncodedCommand: an elevated, hidden PowerShell fed an encoded script is
-/// what malware droppers do, and Defender quarantined kiri-win.exe 0.1.7 as
+/// what malware droppers do, and Defender quarantined upstream kiri-win.exe 0.1.7 as
 /// Trojan:Win32/Bearfoos.A!ml for carrying it.
 fn elevated(args: &[&str]) -> io::Result<i32> {
-    let script = verified("kiri-admin.ps1")?;
+    let script = verified("stowlark-admin.ps1")?;
     match crate::win::elevated_script(&script, args) {
         // As before: anything that kept it from starting reads as declined.
         Err(e) => {
@@ -474,7 +474,7 @@ fn install_wsl() -> io::Result<()> {
     task(1, "active", &tr("Windows is asking"));
     // The downloaded MSI lives in a user-writable folder, so a process at
     // the user's own integrity could swap it between its SHA-256 check above
-    // and the elevated install. kiri-admin.ps1 -Wsl re-verifies it, as admin,
+    // and the elevated install. stowlark-admin.ps1 -Wsl re-verifies it, as admin,
     // on a copy the user cannot touch, and requires it to be Microsoft-signed,
     // before running it; its exit codes are read below.
     let msi = msi.to_string_lossy();
@@ -500,14 +500,14 @@ fn install_wsl() -> io::Result<()> {
         let mut s = saved();
         s.restart_after = Some(now_secs());
         save(&s);
-        // After the restart, Kiri opens once by itself and carries on.
+        // After the restart, Stowlark opens once by itself and carries on.
         if let Ok(exe) = std::env::current_exe() {
             let registered = quiet("reg.exe")
-                .args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce", "/v", "KiriSetup", "/t", "REG_SZ", "/d", &format!("\"{}\"", exe.display()), "/f"])
+                .args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce", "/v", "StowlarkSetup", "/t", "REG_SZ", "/d", &format!("\"{}\"", exe.display()), "/f"])
                 .status()
                 .is_ok_and(|s| s.success());
                 if !registered {
-                    return Err(io::Error::other("Windows would not register Kiri to carry on after the restart"));
+                    return Err(io::Error::other("Windows would not register Stowlark to carry on after the restart"));
                 }
         }
         update(|s| {
@@ -523,39 +523,39 @@ fn install_wsl() -> io::Result<()> {
     Ok(())
 }
 
-/// Step 2: Kiri Linux from the bundle, or Ubuntu (already here, or downloaded).
+/// Step 2: Stowlark Linux from the bundle, or Ubuntu (already here, or downloaded).
 fn install_linux(kind: &str) -> io::Result<()> {
-    // The engine and Kiri Linux in the bundle are this build's architecture.
+    // The engine and Stowlark Linux in the bundle are this build's architecture.
     if let Some(e) = crate::win::arch_mismatch() {
         return Err(io::Error::other(e));
     }
     let base = dir().join("wsl");
     std::fs::create_dir_all(&base)?;
     let distro = if kind == "kiri" {
-        update(|s| s.tasks = tasks(&[tr("Unpack Kiri Linux"), tr("Add it to WSL"), tr("Start it")]));
+        update(|s| s.tasks = tasks(&[tr("Unpack Stowlark Linux"), tr("Add it to WSL"), tr("Start it")]));
         task(0, "active", "");
-        let tar = verified("kiri-linux.tar.gz")?;
+        let tar = verified("stowlark-linux.tar.gz")?;
         task(0, "done", &format!("{} MB", std::fs::metadata(&tar)?.len().div_ceil(1_000_000)));
         task(1, "active", "");
-        if !distros().iter().any(|d| d == KIRI_DISTRO) {
-            log_line(&format!("wsl --import {KIRI_DISTRO} {} kiri-linux.tar.gz --version 2", base.join(KIRI_DISTRO).display()));
-            wsl_ok(quiet("wsl.exe").args(["--import", KIRI_DISTRO]).arg(base.join(KIRI_DISTRO)).arg(&tar).args(["--version", "2"]))?;
+        if !distros().iter().any(|d| d == STOWLARK_DISTRO) {
+            log_line(&format!("wsl --import {STOWLARK_DISTRO} {} stowlark-linux.tar.gz --version 2", base.join(STOWLARK_DISTRO).display()));
+            wsl_ok(quiet("wsl.exe").args(["--import", STOWLARK_DISTRO]).arg(base.join(STOWLARK_DISTRO)).arg(&tar).args(["--version", "2"]))?;
         }
         task(1, "done", "");
         task(2, "active", "");
-        wsl_ok(quiet("wsl.exe").args(["-d", KIRI_DISTRO, "-u", "root", "--", "/usr/local/bin/kiri-start"]))?;
+        wsl_ok(quiet("wsl.exe").args(["-d", STOWLARK_DISTRO, "-u", "root", "--", "/usr/local/bin/stowlark-start"]))?;
         task(2, "done", "");
-        KIRI_DISTRO.to_owned()
+        STOWLARK_DISTRO.to_owned()
     } else {
         let existing = existing_ubuntu();
         let distro = match existing {
             Some(d) => {
-                update(|s| s.tasks = tasks(&[tr("Use the Ubuntu already here"), tr("Install Kiri's engine in it"), tr("Start it")]));
+                update(|s| s.tasks = tasks(&[tr("Use the Ubuntu already here"), tr("Install Stowlark's engine in it"), tr("Start it")]));
                 task(0, "done", &d);
                 d
             }
             None => {
-                update(|s| s.tasks = tasks(&[tr("Download Ubuntu"), tr("Unpack it into WSL"), tr("Install Kiri's engine in it"), tr("Start it")]));
+                update(|s| s.tasks = tasks(&[tr("Download Ubuntu"), tr("Unpack it into WSL"), tr("Install Stowlark's engine in it"), tr("Start it")]));
                 let file = download(&UBUNTU, 0)?;
                 update(|s| s.progress = None);
                 task(1, "active", "≈ 1.6 GB");
@@ -573,8 +573,8 @@ fn install_linux(kind: &str) -> io::Result<()> {
         };
         task(1, "active", "");
         // The engine binaries install.sh copies are checked too.
-        verified("kiri")?;
-        verified("kiri-init")?;
+        verified("stowlark")?;
+        verified("stowlark-init")?;
         let install = to_wsl(&distro, &verified("install.sh")?)?;
         wsl_ok(quiet("wsl.exe").args(["-d", &distro, "-u", "root", "--", "sh", &install]))?;
         task(1, "done", "");
@@ -619,8 +619,8 @@ fn engine() -> io::Result<()> {
     });
     task(0, "active", "");
     let t0 = Instant::now();
-    // Started here, not only waited for: setup resumed after Kiri or
-    // Windows restarted finds Kiri's Linux there but its engine not running,
+    // Started here, not only waited for: setup resumed after Stowlark or
+    // Windows restarted finds Stowlark's Linux there but its engine not running,
     // and nothing else starts it while the window is on setup.
     if !crate::client::alive()
         && let Err(e) = crate::engine::ensure_daemon()
@@ -632,7 +632,7 @@ fn engine() -> io::Result<()> {
             return Err(io::Error::other("cancelled"));
         }
         if t0.elapsed() > Duration::from_secs(60) {
-            return Err(io::Error::other("Kiri's engine did not answer within a minute"));
+            return Err(io::Error::other("Stowlark's engine did not answer within a minute"));
         }
         std::thread::sleep(Duration::from_millis(200));
     }
@@ -688,10 +688,10 @@ fn tools() -> io::Result<()> {
     update(|s| {
         s.step = "tools";
         s.progress = None;
-        s.tasks = tasks(&["docker 29.9.2".to_owned(), "Compose v5.6.1".to_owned(), "buildx v0.38.1".to_owned(), tr("docker build on Kiri"), tr("Make Kiri the default")]);
+        s.tasks = tasks(&["docker 29.9.2".to_owned(), "Compose v5.6.1".to_owned(), "buildx v0.38.1".to_owned(), tr("docker build on Stowlark"), tr("Make Stowlark the default")]);
     });
     task(0, "active", "");
-    for f in ["bin/docker.exe", "bin/kiri.exe", "bin/cli-plugins/docker-compose.exe", "bin/cli-plugins/docker-buildx.exe"] {
+    for f in ["bin/docker.exe", "bin/stowlark.exe", "bin/cli-plugins/docker-compose.exe", "bin/cli-plugins/docker-buildx.exe"] {
         verified(f)?;
     }
     let make_default = STATE.lock().unwrap_or_else(PoisonError::into_inner).as_ref().is_some_and(|s| s.make_default);
@@ -699,7 +699,7 @@ fn tools() -> io::Result<()> {
     // files and run from its file with its parameters as arguments. Not a
     // copy in this binary run through [scriptblock]::Create from Base64:
     // that is the textbook dropper, and Defender's heuristics flagged
-    // kiri-win.exe 0.1.7 for it (Trojan:Win32/Bearfoos.A!ml).
+    // upstream kiri-win.exe 0.1.7 for it (Trojan:Win32/Bearfoos.A!ml).
     let script = verified("setup-tools.ps1")?;
     let mut cmd = quiet("powershell.exe");
     cmd.args(crate::win::PS_FILE).arg(&script).arg("-Bundle").arg(bundle());
@@ -739,11 +739,11 @@ fn tools() -> io::Result<()> {
             .unwrap_or_else(|| "installing the Docker tools failed".to_owned());
         return Err(io::Error::other(why));
     }
-    // From here on Kiri runs from %LOCALAPPDATA%\Kiri, not the download folder.
+    // From here on Stowlark runs from %LOCALAPPDATA%\Stowlark, not the download folder.
     if let Ok(exe) = std::env::current_exe() {
-        let installed = dir().join("kiri-win.exe");
+        let installed = dir().join("stowlark-win.exe");
         if exe != installed {
-            std::fs::copy(&exe, &installed).map_err(|e| io::Error::other(format!("could not install kiri-win.exe to {}: {e}", installed.display())))?;
+            std::fs::copy(&exe, &installed).map_err(|e| io::Error::other(format!("could not install stowlark-win.exe to {}: {e}", installed.display())))?;
         }
     }
     update(|s| {
@@ -753,13 +753,13 @@ fn tools() -> io::Result<()> {
     Ok(())
 }
 
-/// Ready → Open Kiri: remember setup is done, start at sign-in if asked.
+/// Ready → Open Stowlark: remember setup is done, start at sign-in if asked.
 fn finish() {
     let autostart = STATE.lock().unwrap_or_else(PoisonError::into_inner).as_ref().is_none_or(|s| s.autostart);
-    // Which builder docker build uses: asked with another engine here, Kiri's without.
+    // Which builder docker build uses: asked with another engine here, Stowlark's without.
     let asked = STATE.lock().unwrap_or_else(PoisonError::into_inner).as_ref().filter(|s| s.other_docker).map(|s| s.build_kiri);
     let built = match asked {
-        Some(kiri) => crate::buildwith::choose(if kiri { crate::buildwith::With::Kiri } else { crate::buildwith::With::Docker }),
+        Some(stowlark) => crate::buildwith::choose(if stowlark { crate::buildwith::With::Stowlark } else { crate::buildwith::With::Docker }),
         None => crate::buildwith::apply(),
     };
     if let Err(e) = built {
@@ -771,18 +771,18 @@ fn finish() {
     s.last_error = None;
     save(&s);
     crate::serve::set_setup_pending(false);
-    let exe = dir().join("kiri-win.exe");
+    let exe = dir().join("stowlark-win.exe");
     let run_key = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
     if autostart {
         if exe.is_file() {
-            let _ = quiet("reg.exe").args(["add", run_key, "/v", "Kiri", "/t", "REG_SZ", "/d", &format!("\"{}\" --background", exe.display()), "/f"]).status();
+            let _ = quiet("reg.exe").args(["add", run_key, "/v", "Stowlark", "/t", "REG_SZ", "/d", &format!("\"{}\" --background", exe.display()), "/f"]).status();
         } else {
-            crate::serve::log("not set to start at sign-in: kiri-win.exe is not installed");
+            crate::serve::log("not set to start at sign-in: stowlark-win.exe is not installed");
         }
     } else {
-        let _ = quiet("reg.exe").args(["delete", run_key, "/v", "Kiri", "/f"]).status();
+        let _ = quiet("reg.exe").args(["delete", run_key, "/v", "Stowlark", "/f"]).status();
     }
-    let _ = quiet("reg.exe").args(["delete", r"HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce", "/v", "KiriSetup", "/f"]).status();
+    let _ = quiet("reg.exe").args(["delete", r"HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce", "/v", "StowlarkSetup", "/f"]).status();
     Handle.run(|ui| ui.navigate_main());
 }
 
@@ -832,7 +832,7 @@ pub fn on_message(msg: &str) {
         }
         "setup-install-wsl" => run("wsl", install_wsl),
         "setup-restart" => {
-            let _ = quiet("shutdown.exe").args(["/r", "/t", "5", "/c", "Kiri: finishing Windows Subsystem for Linux"]).status();
+            let _ = quiet("shutdown.exe").args(["/r", "/t", "5", "/c", "Stowlark: finishing Windows Subsystem for Linux"]).status();
         }
         "setup-later" => Handle.run(crate::app::Ui::hide),
         "setup-choose" => {

@@ -1,33 +1,33 @@
-//! `kiri setup`: makes this Mac use Kiri the way OrbStack's installer does,
+//! `stowlark setup`: makes this Mac use Stowlark the way OrbStack's installer does,
 //! without touching anything another engine owns.
 //!
-//! - a `kiri` docker context (`--use` also makes it the current one)
-//! - a LaunchAgent that starts `kiri daemon` at login (`--no-agent` skips it)
-//! - the app's bundled `docker`, Compose and buildx, when run from Kiri.app
-//! - `docker` and `kiri` in `~/.kiri/bin`, which a marked line in the shell
+//! - a `stowlark` docker context (`--use` also makes it the current one)
+//! - a LaunchAgent that starts `stowlark daemon` at login (`--no-agent` skips it)
+//! - the app's bundled `docker`, Compose and buildx, when run from Stowlark.app
+//! - `docker` and `stowlark` in `~/.stowlark/bin`, which a marked line in the shell
 //!   profiles (zsh's, bash's, and fish's if used) adds to the end of PATH,
 //!   so a docker CLI already installed keeps priority; and
-//!   `/usr/local/bin/kiri` when that directory is the user's
-//! - on a Mac with no other Docker engine, `kiri` as docker's default context
-//! - a buildx builder, `kiri-build`, that loads what it builds into Kiri,
+//!   `/usr/local/bin/stowlark` when that directory is the user's
+//! - on a Mac with no other Docker engine, `stowlark` as docker's default context
+//! - a buildx builder, `stowlark-build`, that loads what it builds into Stowlark,
 //!   and the choice of builder for plain `docker build` (src/buildwith.rs)
-//! - `*.kiri.local` names for containers: `/etc/resolver/kiri.local`, which
+//! - `*.stowlark.local` names for containers: `/etc/resolver/stowlark.local`, which
 //!   needs an administrator once (`--no-domains` skips it; `--domains` does
 //!   only this)
-//! - `/var/run/docker.sock` linked to Kiri's socket, for tools that ignore
+//! - `/var/run/docker.sock` linked to Stowlark's socket, for tools that ignore
 //!   docker contexts (docker-py, Go's `client.FromEnv`, docker-java,
 //!   Testcontainers, IDE plugins), when no other engine has it: asked for
-//!   with `*.kiri.local`'s password (`--docker-socket` does only this), and
+//!   with `*.stowlark.local`'s password (`--docker-socket` does only this), and
 //!   put back at boot by a LaunchDaemon. Until then, or if the password is
-//!   declined, `~/.testcontainers.properties` points Testcontainers at Kiri,
+//!   declined, `~/.testcontainers.properties` points Testcontainers at Stowlark,
 //!   unless the user has a file of their own there
 //!
-//! `kiri setup --uninstall` takes back exactly those, and the `kiri` kubectl
-//! context that `kiri k8s` adds.
+//! `stowlark setup --uninstall` takes back exactly those, and the `stowlark` kubectl
+//! context that `stowlark k8s` adds.
 //!
-//! Kiri Dev (src/flavor.rs) sets up only its own: the `kiri-dev` context,
-//! its LaunchAgent, its builder and `~/.kiri-dev/bin`. PATH, docker's
-//! default context and `*.kiri.local` stay the installed Kiri's.
+//! Stowlark Dev (src/flavor.rs) sets up only its own: the `stowlark-dev` context,
+//! its LaunchAgent, its builder and `~/.stowlark-dev/bin`. PATH, docker's
+//! default context and `*.stowlark.local` stay the installed Stowlark's.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -36,14 +36,14 @@ use std::process::Command;
 use serde_json::{Value, json};
 
 // The bundle identifier (`APP_ID`) named in the LaunchAgent makes macOS
-// say "Kiri" in Login Items, rather than the name on the signing
+// say "Stowlark" in Login Items, rather than the name on the signing
 // certificate.
 use crate::flavor::{AGENT, APP_ID, CONTEXT, dev};
 
 use crate::builds::{BUILDER, builder};
 pub use crate::builds::ensure_builder;
 
-/// `~/.kiri/bin`, or `~/.kiri-dev/bin`.
+/// `~/.stowlark/bin`, or `~/.stowlark-dev/bin`.
 fn bin_dir() -> io::Result<PathBuf> {
     Ok(home()?.join(crate::flavor::STATE.get()).join("bin"))
 }
@@ -78,19 +78,19 @@ fn write_json(path: &Path, v: &Value) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    let tmp = path.with_extension("kiri-tmp");
+    let tmp = path.with_extension("stowlark-tmp");
     std::fs::write(&tmp, serde_json::to_vec_pretty(v).map_err(io::Error::other)?)?;
     std::fs::rename(tmp, path)
 }
 
-/// Kiri.app's `Contents`, when this binary runs from the app.
+/// Stowlark.app's `Contents`, when this binary runs from the app.
 fn bundle_contents() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?.canonicalize().ok()?;
     let contents = exe.parent()?.parent()?.to_path_buf();
     contents.join("Info.plist").is_file().then_some(contents)
 }
 
-/// Whether this process is Kiri.app being opened from Finder or the Dock:
+/// Whether this process is Stowlark.app being opened from Finder or the Dock:
 /// the app's binary, started by launchd (LaunchServices), not from a shell,
 /// where running it bare must not change anything.
 pub fn launched_from_app() -> bool {
@@ -98,11 +98,11 @@ pub fn launched_from_app() -> bool {
     bundle_contents().is_some() && unsafe { libc::getppid() } == 1
 }
 
-/// The first time the app opens: the same as `kiri setup`, quietly, except
-/// `*.kiri.local`, which the window offers and the user chooses.
+/// The first time the app opens: the same as `stowlark setup`, quietly, except
+/// `*.stowlark.local`, which the window offers and the user chooses.
 pub fn first_launch() -> io::Result<()> {
     if agent_plist()?.is_file() && agent_runs_this()? {
-        // Set up by an older Kiri: make sure the commands are there too.
+        // Set up by an older Stowlark: make sure the commands are there too.
         if let Some(contents) = bundle_contents() {
             let _ = bundled_cli(&contents);
         }
@@ -121,11 +121,11 @@ pub fn run(args: &[String]) -> io::Result<()> {
         return uninstall();
     }
     if flag("--domains") {
-        return if dev() { Err(io::Error::other(format!("*.kiri.local belongs to the installed Kiri, not {}", crate::flavor::APP))) } else { domains() };
+        return if dev() { Err(io::Error::other(format!("*.stowlark.local belongs to the installed Stowlark, not {}", crate::flavor::APP))) } else { domains() };
     }
     if flag("--docker-socket") {
         if dev() {
-            return Err(io::Error::other(format!("/var/run/docker.sock belongs to the installed Kiri, not {}", crate::flavor::APP)));
+            return Err(io::Error::other(format!("/var/run/docker.sock belongs to the installed Stowlark, not {}", crate::flavor::APP)));
         }
         let result = docker_socket();
         println!("{}", docker_socket_fallback(&crate::daemon::socket_path()?));
@@ -139,29 +139,29 @@ pub fn run(args: &[String]) -> io::Result<()> {
         let mut cfg = read_json(&path)?;
         cfg["currentContext"] = CONTEXT.get().into();
         write_json(&path, &cfg)?;
-        println!("docker now uses Kiri by default (`docker context use default` to switch back)");
+        println!("docker now uses Stowlark by default (`docker context use default` to switch back)");
     }
     if let Some(contents) = bundle_contents() {
         bundled_cli(&contents)?;
     }
     if !flag("--no-agent") {
         let plist = agent()?;
-        println!("kiri daemon starts at login ({})", plist.display());
+        println!("stowlark daemon starts at login ({})", plist.display());
     }
     match builder() {
         Ok(true) => match crate::buildwith::places().map(|p| p.saved()) {
-            Ok(Some(crate::buildwith::With::Kiri)) => println!("docker build uses BuildKit in Kiri (builder `{BUILDER}`)"),
-            _ => println!("docker build follows docker's context, and builds on Kiri when docker uses Kiri (`kiri build-with kiri` sends every build to Kiri)"),
+            Ok(Some(crate::buildwith::With::Stowlark)) => println!("docker build uses BuildKit in Stowlark (builder `{BUILDER}`)"),
+            _ => println!("docker build follows docker's context, and builds on Stowlark when docker uses Stowlark (`stowlark build-with stowlark` sends every build to Stowlark)"),
         },
         Ok(false) => {}
-        Err(e) => println!("docker build: the `{BUILDER}` builder comes later ({e}); the window makes it once Kiri is running"),
+        Err(e) => println!("docker build: the `{BUILDER}` builder comes later ({e}); the window makes it once Stowlark is running"),
     }
     if !flag("--no-domains") && !dev() {
         // domains() asks for /var/run/docker.sock with the same password;
         // with the names already there, it is asked for on its own.
         let named = crate::daemon::dns::installed();
         if let Err(e) = domains() {
-            println!("container names stay on *.kiri.localhost ({e}); `kiri setup --domains` tries again");
+            println!("container names stay on *.stowlark.localhost ({e}); `stowlark setup --domains` tries again");
         } else if named {
             if let Err(e) = docker_socket() {
                 println!("{DOCKER_SOCK} stays as it is ({e})");
@@ -174,25 +174,25 @@ pub fn run(args: &[String]) -> io::Result<()> {
     Ok(())
 }
 
-/// Points macOS at Kiri for `*.kiri.local`. Writing /etc/resolver needs an
+/// Points macOS at Stowlark for `*.stowlark.local`. Writing /etc/resolver needs an
 /// administrator, so macOS asks for the password, once.
 pub fn domains() -> io::Result<()> {
     use crate::daemon::dns;
     if dns::installed() {
-        println!("containers answer at http://<name>.kiri.local");
+        println!("containers answer at http://<name>.stowlark.local");
         return Ok(());
     }
-    let tmp = std::env::temp_dir().join(format!("kiri-resolver-{}", std::process::id()));
-    std::fs::write(&tmp, format!("# Kiri: container names (kiri setup --uninstall removes this)\nnameserver 127.0.0.1\nport {}\n", dns::PORT))?;
+    let tmp = std::env::temp_dir().join(format!("stowlark-resolver-{}", std::process::id()));
+    std::fs::write(&tmp, format!("# Stowlark: container names (stowlark setup --uninstall removes this)\nnameserver 127.0.0.1\nport {}\n", dns::PORT))?;
     // /var/run/docker.sock with the same password, when it is free. Its
     // failing must not undo the names: how it went is read back after.
     let link = docker_socket_script()?;
     let (command, why) = match &link {
         Some(l) => (
             format!("mkdir -p /etc/resolver && cp '{}' {} && chmod 644 {} && ({l} || true)", tmp.display(), dns::RESOLVER, dns::RESOLVER),
-            "Kiri wants to give your containers names like myapp.kiri.local, and to answer at /var/run/docker.sock for tools that look for Docker there.",
+            "Stowlark wants to give your containers names like myapp.stowlark.local, and to answer at /var/run/docker.sock for tools that look for Docker there.",
         ),
-        None => (format!("mkdir -p /etc/resolver && cp '{}' {} && chmod 644 {}", tmp.display(), dns::RESOLVER, dns::RESOLVER), "Kiri wants to give your containers names like myapp.kiri.local."),
+        None => (format!("mkdir -p /etc/resolver && cp '{}' {} && chmod 644 {}", tmp.display(), dns::RESOLVER, dns::RESOLVER), "Stowlark wants to give your containers names like myapp.stowlark.local."),
     };
     let result = as_admin(&command, why);
     let _ = std::fs::remove_file(&tmp);
@@ -201,24 +201,24 @@ pub fn domains() -> io::Result<()> {
         let _ = docker_socket_fallback(&crate::daemon::socket_path()?);
     }
     result?;
-    println!("containers answer at http://<name>.kiri.local");
+    println!("containers answer at http://<name>.stowlark.local");
     Ok(())
 }
 
 /// Where tools that ignore docker contexts look for Docker: docker-py, Go's
 /// `client.FromEnv`, docker-java, Testcontainers, many IDE plugins.
 const DOCKER_SOCK: &str = "/var/run/docker.sock";
-/// macOS empties /var/run at every boot, so a LaunchDaemon puts Kiri's link
+/// macOS empties /var/run at every boot, so a LaunchDaemon puts Stowlark's link
 /// back then, only if nothing else has taken the path by that time. Docker
 /// Desktop's and OrbStack's helpers replace it when they start, as they
 /// replace each other's.
-const SOCKET_LABEL: &str = "dev.kiri.docker-socket";
-const SOCKET_DAEMON: &str = "/Library/LaunchDaemons/dev.kiri.docker-socket.plist";
+const SOCKET_LABEL: &str = "dev.stowlark.docker-socket";
+const SOCKET_DAEMON: &str = "/Library/LaunchDaemons/dev.stowlark.docker-socket.plist";
 
 /// Who has /var/run/docker.sock.
 #[derive(Debug, PartialEq)]
 enum DockerSock {
-    Kiri,
+    Stowlark,
     Free,
     /// Another engine: what it points at.
     Taken(String),
@@ -244,7 +244,7 @@ fn docker_sock_at(path: &Path, ours: &Path, engines: &[PathBuf]) -> DockerSock {
     if meta.file_type().is_symlink() {
         let Ok(target) = std::fs::read_link(path) else { return DockerSock::Taken(path.display().to_string()) };
         if target == ours {
-            return DockerSock::Kiri;
+            return DockerSock::Stowlark;
         }
         if target.exists() || engines.iter().any(|e| target.starts_with(e)) {
             return DockerSock::Taken(target.display().to_string());
@@ -261,7 +261,7 @@ fn sh_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 
-/// The root commands that link /var/run/docker.sock to Kiri's socket and
+/// The root commands that link /var/run/docker.sock to Stowlark's socket and
 /// install the LaunchDaemon that puts it back at boot.
 struct LinkScript {
     command: String,
@@ -276,7 +276,7 @@ impl std::fmt::Display for LinkScript {
 }
 
 /// The commands for when /var/run/docker.sock is free; None when it is
-/// Kiri's already or another engine's, or for Kiri Dev.
+/// Stowlark's already or another engine's, or for Stowlark Dev.
 fn docker_socket_script() -> io::Result<Option<LinkScript>> {
     let ours = crate::daemon::socket_path()?;
     if dev() || docker_sock(&ours) != DockerSock::Free {
@@ -291,7 +291,7 @@ fn docker_socket_script() -> io::Result<Option<LinkScript>> {
 <plist version="1.0">
 <dict>
   <key>Label</key><string>{SOCKET_LABEL}</string>
-  <key>ProgramArguments</key><array><string>/bin/sh</string><string>-c</string><string>{}</string><string>kiri-docker-socket</string><string>{}</string></array>
+  <key>ProgramArguments</key><array><string>/bin/sh</string><string>-c</string><string>{}</string><string>stowlark-docker-socket</string><string>{}</string></array>
   <key>RunAtLoad</key><true/>
 </dict>
 </plist>
@@ -299,7 +299,7 @@ fn docker_socket_script() -> io::Result<Option<LinkScript>> {
         esc(&boot),
         esc(&ours_s)
     );
-    let tmp = std::env::temp_dir().join(format!("kiri-docker-socket-{}.plist", std::process::id()));
+    let tmp = std::env::temp_dir().join(format!("stowlark-docker-socket-{}.plist", std::process::id()));
     std::fs::write(&tmp, plist)?;
     // `[ ! -e ]` again as root: another engine may have started since. A
     // link left dangling by a removed engine is replaced.
@@ -311,46 +311,46 @@ fn docker_socket_script() -> io::Result<Option<LinkScript>> {
     Ok(Some(LinkScript { command, tmp }))
 }
 
-/// `kiri setup --docker-socket`: /var/run/docker.sock to Kiri, if free
+/// `stowlark setup --docker-socket`: /var/run/docker.sock to Stowlark, if free
 /// (macOS asks for the password).
 pub fn docker_socket() -> io::Result<()> {
     let Some(l) = docker_socket_script()? else { return Ok(()) };
-    let result = as_admin(&l.command, "Kiri wants to answer at /var/run/docker.sock, for tools that look for Docker there.");
+    let result = as_admin(&l.command, "Stowlark wants to answer at /var/run/docker.sock, for tools that look for Docker there.");
     let _ = std::fs::remove_file(&l.tmp);
     result
 }
 
-/// Says where tools that ignore docker contexts find Kiri, and keeps
+/// Says where tools that ignore docker contexts find Stowlark, and keeps
 /// `~/.testcontainers.properties` for when /var/run/docker.sock is not
-/// Kiri's but could be (a declined password, not yet asked).
+/// Stowlark's but could be (a declined password, not yet asked).
 fn docker_socket_fallback(ours: &Path) -> String {
     match docker_sock(ours) {
-        DockerSock::Kiri => {
+        DockerSock::Stowlark => {
             let _ = testcontainers(ours, false);
-            format!("{DOCKER_SOCK} → Kiri (docker-py, Testcontainers and other tools that ignore docker contexts)")
+            format!("{DOCKER_SOCK} → Stowlark (docker-py, Testcontainers and other tools that ignore docker contexts)")
         }
         DockerSock::Taken(t) => {
             let _ = testcontainers(ours, false);
-            format!("{DOCKER_SOCK} is another engine's ({t}) and stays so; DOCKER_HOST=unix://{} points a tool at Kiri", ours.display())
+            format!("{DOCKER_SOCK} is another engine's ({t}) and stays so; DOCKER_HOST=unix://{} points a tool at Stowlark", ours.display())
         }
         DockerSock::Free => match testcontainers(ours, true) {
-            Ok(true) => format!("{DOCKER_SOCK} is not Kiri's yet (`kiri setup --docker-socket` asks for the password); Testcontainers finds Kiri through ~/.testcontainers.properties"),
-            _ => format!("{DOCKER_SOCK} is not Kiri's yet (`kiri setup --docker-socket` asks for the password); until then DOCKER_HOST=unix://{} points a tool at Kiri", ours.display()),
+            Ok(true) => format!("{DOCKER_SOCK} is not Stowlark's yet (`stowlark setup --docker-socket` asks for the password); Testcontainers finds Stowlark through ~/.testcontainers.properties"),
+            _ => format!("{DOCKER_SOCK} is not Stowlark's yet (`stowlark setup --docker-socket` asks for the password); until then DOCKER_HOST=unix://{} points a tool at Stowlark", ours.display()),
         },
     }
 }
 
-/// The first line of the `~/.testcontainers.properties` Kiri writes: only a
-/// file that starts with it is Kiri's to change or remove.
-const TESTCONTAINERS_MARK: &str = "# Written by Kiri while /var/run/docker.sock is not Kiri's (kiri setup --uninstall removes it)";
+/// The first line of the `~/.testcontainers.properties` Stowlark writes: only a
+/// file that starts with it is Stowlark's to change or remove.
+const TESTCONTAINERS_MARK: &str = "# Written by Stowlark while /var/run/docker.sock is not Stowlark's (stowlark setup --uninstall removes it)";
 
 fn testcontainers_text(ours: &Path) -> String {
     format!("{TESTCONTAINERS_MARK}\ndocker.host=unix://{}\n", ours.display())
 }
 
-/// Writes (`on`) or removes Kiri's `~/.testcontainers.properties`. A file
+/// Writes (`on`) or removes Stowlark's `~/.testcontainers.properties`. A file
 /// the user (or Testcontainers itself) wrote is never touched. True when
-/// Kiri's file is there afterwards.
+/// Stowlark's file is there afterwards.
 fn testcontainers(ours: &Path, on: bool) -> io::Result<bool> {
     testcontainers_at(&home()?.join(".testcontainers.properties"), ours, on)
 }
@@ -358,7 +358,7 @@ fn testcontainers(ours: &Path, on: bool) -> io::Result<bool> {
 fn testcontainers_at(path: &Path, ours: &Path, on: bool) -> io::Result<bool> {
     let ours_text = testcontainers_text(ours);
     match std::fs::read_to_string(path) {
-        // Only exactly what Kiri wrote: Testcontainers adds keys of its own.
+        // Only exactly what Stowlark wrote: Testcontainers adds keys of its own.
         Ok(text) if text.starts_with(TESTCONTAINERS_MARK) && text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).all(|l| l.starts_with("docker.host=")) => {
             if on {
                 if text != ours_text {
@@ -382,7 +382,7 @@ fn testcontainers_at(path: &Path, ours: &Path, on: bool) -> io::Result<bool> {
 }
 
 /// For the window, after the password prompt: how /var/run/docker.sock
-/// went, if it is not Kiri's.
+/// went, if it is not Stowlark's.
 pub fn docker_socket_note() -> Option<String> {
     let ours = crate::daemon::socket_path().ok()?;
     match docker_sock(&ours) {
@@ -391,12 +391,12 @@ pub fn docker_socket_note() -> Option<String> {
     }
 }
 
-/// Takes /var/run/docker.sock back, if it is still Kiri's, and the
+/// Takes /var/run/docker.sock back, if it is still Stowlark's, and the
 /// LaunchDaemon that put it there.
 fn remove_docker_socket() -> io::Result<()> {
     let ours = crate::daemon::socket_path()?;
     let _ = testcontainers(&ours, false);
-    let linked = docker_sock(&ours) == DockerSock::Kiri;
+    let linked = docker_sock(&ours) == DockerSock::Stowlark;
     if !linked && !Path::new(SOCKET_DAEMON).exists() {
         return Ok(());
     }
@@ -404,25 +404,25 @@ fn remove_docker_socket() -> io::Result<()> {
     if linked {
         command.push_str(&format!("; [ \"$(readlink {DOCKER_SOCK})\" = {} ] && rm -f {DOCKER_SOCK}; true", sh_quote(&ours.to_string_lossy())));
     }
-    as_admin(&command, "Kiri wants to remove its /var/run/docker.sock.")?;
+    as_admin(&command, "Stowlark wants to remove its /var/run/docker.sock.")?;
     println!("removed {DOCKER_SOCK}");
     Ok(())
 }
 
-/// Takes `*.kiri.local` back; containers stay on `*.kiri.localhost`.
+/// Takes `*.stowlark.local` back; containers stay on `*.stowlark.localhost`.
 pub fn remove_domains() -> io::Result<()> {
     let resolver = crate::daemon::dns::RESOLVER;
     if !Path::new(resolver).exists() {
         return Ok(());
     }
-    as_admin(&format!("rm -f {resolver}"), "Kiri wants to remove its *.kiri.local names.")?;
-    println!("removed *.kiri.local");
+    as_admin(&format!("rm -f {resolver}"), "Stowlark wants to remove its *.stowlark.local names.")?;
+    println!("removed *.stowlark.local");
     Ok(())
 }
 
 /// Runs a shell command as root through macOS's own password prompt. The
 /// script runs in this process, not through `osascript`, so the prompt says
-/// "Kiri wants to make changes". AppleScript belongs on the main thread: the
+/// "Stowlark wants to make changes". AppleScript belongs on the main thread: the
 /// window's workers hand it there, and the CLI is already on it.
 pub(crate) fn as_admin(command: &str, why: &str) -> io::Result<()> {
     let script = format!("do shell script \"{}\" with prompt \"{}\" with administrator privileges", command.replace('"', "\\\""), why.replace('"', "\\\""));
@@ -457,8 +457,8 @@ fn apple_script(source: &str) -> io::Result<()> {
     Err(io::Error::other(format!("{} ({})", field("NSAppleScriptErrorMessage").unwrap_or_default(), field("NSAppleScriptErrorNumber").unwrap_or_default())))
 }
 
-/// Kiri Lite, once its tools are downloaded: the CLI links and the build
-/// builder that `kiri setup` could not make without them.
+/// Stowlark Lite, once its tools are downloaded: the CLI links and the build
+/// builder that `stowlark setup` could not make without them.
 pub fn after_tools() -> io::Result<()> {
     if let Some(contents) = bundle_contents() {
         bundled_cli(&contents)?;
@@ -466,7 +466,7 @@ pub fn after_tools() -> io::Result<()> {
     builder().map(drop)
 }
 
-/// The context, as `docker context create kiri --docker host=…` writes it.
+/// The context, as `docker context create stowlark --docker host=…` writes it.
 fn context(socket: &Path) -> io::Result<()> {
     let meta = json!({
         "Name": CONTEXT.get(),
@@ -476,7 +476,7 @@ fn context(socket: &Path) -> io::Result<()> {
     write_json(&context_dir(CONTEXT.get())?.join("meta.json"), &meta)
 }
 
-/// Makes `name` the context plain `docker` uses: Kiri's own (made first if
+/// Makes `name` the context plain `docker` uses: Stowlark's own (made first if
 /// missing), "default", or another context that exists, to switch back to.
 pub fn use_context(name: &str) -> io::Result<()> {
     if name == CONTEXT.get() {
@@ -495,24 +495,24 @@ pub fn use_context(name: &str) -> io::Result<()> {
     write_json(&path, &cfg)
 }
 
-/// Links `kiri` and the app's `docker` into `~/.kiri/bin`, puts that
+/// Links `stowlark` and the app's `docker` into `~/.stowlark/bin`, puts that
 /// directory on PATH, and adds docker's plugins (Compose, buildx) to the
 /// CLI's plugin search path. An existing `docker` on PATH is left alone.
-/// The docker CLI, Compose and buildx are bundled in Kiri.app, or in Kiri
-/// Lite downloaded to tools::dir() (nothing yet if not downloaded); `kiri`
+/// The docker CLI, Compose and buildx are bundled in Stowlark.app, or in Stowlark
+/// Lite downloaded to tools::dir() (nothing yet if not downloaded); `stowlark`
 /// is linked either way.
 fn bundled_cli(contents: &Path) -> io::Result<()> {
     let ours = bin_dir()?;
     std::fs::create_dir_all(&ours)?;
-    // `kiri` itself, for `kiri k8s`, `kiri machine`, `kiri import`…
-    let kiri = ours.join("kiri");
-    let _ = std::fs::remove_file(&kiri);
-    std::os::unix::fs::symlink(contents.join("MacOS/kiri"), &kiri)?;
-    // Kiri Dev's commands are run by path: ~/.kiri-dev/bin/kiri.
+    // `stowlark` itself, for `stowlark k8s`, `stowlark machine`, `stowlark import`…
+    let stowlark = ours.join("stowlark");
+    let _ = std::fs::remove_file(&stowlark);
+    std::os::unix::fs::symlink(contents.join("MacOS/stowlark"), &stowlark)?;
+    // Stowlark Dev's commands are run by path: ~/.stowlark-dev/bin/stowlark.
     if !dev() {
         let h = home()?;
         shell_path(&h, &zdotdir(&h))?;
-        system_link(&kiri);
+        system_link(&stowlark);
     }
     let mut bin = contents.join("Resources/bin");
     if !bin.join("docker").is_file() {
@@ -524,10 +524,10 @@ fn bundled_cli(contents: &Path) -> io::Result<()> {
     let link = ours.join("docker");
     let _ = std::fs::remove_file(&link);
     std::os::unix::fs::symlink(bin.join("docker"), &link)?;
-    // Kiri Dev's plugins stay its own: `docker --context kiri-dev`, or
-    // ~/.kiri-dev/bin/docker.
+    // Stowlark Dev's plugins stay its own: `docker --context stowlark-dev`, or
+    // ~/.stowlark-dev/bin/docker.
     if dev() {
-        println!("docker and kiri commands: {}", ours.display());
+        println!("docker and stowlark commands: {}", ours.display());
         return Ok(());
     }
     default_context()?;
@@ -540,44 +540,44 @@ fn bundled_cli(contents: &Path) -> io::Result<()> {
     }
     cfg["cliPluginsExtraDirs"] = dirs.into();
     write_json(&path, &cfg)?;
-    println!("docker and kiri commands: {} (on PATH in new terminal windows)", ours.display());
+    println!("docker and stowlark commands: {} (on PATH in new terminal windows)", ours.display());
     Ok(())
 }
 
-/// `/usr/local/bin/kiri`, when the user can write there (Homebrew on Intel
+/// `/usr/local/bin/stowlark`, when the user can write there (Homebrew on Intel
 /// Macs makes it theirs). That directory is on every shell's PATH already,
-/// so `kiri` works even in a terminal opened before Kiri was. A `kiri`
-/// there that isn't Kiri's is left alone.
-const SYSTEM_LINK: &str = "/usr/local/bin/kiri";
+/// so `stowlark` works even in a terminal opened before Stowlark was. A `stowlark`
+/// there that isn't Stowlark's is left alone.
+const SYSTEM_LINK: &str = "/usr/local/bin/stowlark";
 
-fn system_link(kiri: &Path) {
+fn system_link(stowlark: &Path) {
     let link = Path::new(SYSTEM_LINK);
-    // Missing, or a link an older Kiri left (to a Kiri.app or ~/.kiri/bin
+    // Missing, or a link an older Stowlark left (to a Stowlark.app or ~/.stowlark/bin
     // that moved, or to nothing): made again to this one. Anything else there
-    // isn't Kiri's to replace; stale::stale_kiri() names it.
+    // isn't Stowlark's to replace; stale::stale_kiri() names it.
     let replace = match std::fs::read_link(link) {
-        Ok(target) => target != kiri && (kiri_link(&target) || !link.exists()),
+        Ok(target) => target != stowlark && (kiri_link(&target) || !link.exists()),
         Err(_) => link.symlink_metadata().is_err(),
     };
     if replace {
         let _ = std::fs::remove_file(link);
-        let _ = std::os::unix::fs::symlink(kiri, link);
+        let _ = std::os::unix::fs::symlink(stowlark, link);
     }
 }
 
-/// A link target that is some Kiri's `kiri`: inside a Kiri app bundle, or a
-/// Kiri bin directory (~/.kiri/bin, ~/.kiri-dev/bin).
+/// A link target that is some Stowlark's `stowlark`: inside a Stowlark app bundle, or a
+/// Stowlark bin directory (~/.stowlark/bin, ~/.stowlark-dev/bin).
 fn kiri_link(target: &Path) -> bool {
     let t = target.to_string_lossy();
-    t.ends_with("/kiri") && (t.contains(".app/Contents/MacOS/") || t.contains("/.kiri/bin/") || t.contains("/.kiri-dev/bin/"))
+    t.ends_with("/stowlark") && (t.contains(".app/Contents/MacOS/") || t.contains("/.stowlark/bin/") || t.contains("/.stowlark-dev/bin/"))
 }
 
-/// Whether `/usr/local/bin/kiri` is the link system_link() makes.
+/// Whether `/usr/local/bin/stowlark` is the link system_link() makes.
 fn system_link_is_ours() -> bool {
-    bin_dir().is_ok_and(|b| std::fs::read_link(SYSTEM_LINK).is_ok_and(|t| t == b.join("kiri")))
+    bin_dir().is_ok_and(|b| std::fs::read_link(SYSTEM_LINK).is_ok_and(|t| t == b.join("stowlark")))
 }
 
-/// Every other process running this app's `kiri` binary, asked to quit,
+/// Every other process running this app's `stowlark` binary, asked to quit,
 /// then made to after a few seconds.
 fn stop_others() {
     let Some(exe) = std::env::current_exe().ok().and_then(|e| std::fs::canonicalize(e).ok()) else { return };
@@ -604,19 +604,19 @@ fn regex_escape(s: &str) -> String {
     })
 }
 
-/// The marked lines Kiri adds to shell profiles, and removes on uninstall.
-const PROFILE_MARK: &str = "# Added by Kiri: its docker and kiri commands (kiri setup --uninstall removes this)";
+/// The marked lines Stowlark adds to shell profiles, and removes on uninstall.
+const PROFILE_MARK: &str = "# Added by Stowlark: its docker and stowlark commands (stowlark setup --uninstall removes this)";
 
-/// Adds `~/.kiri/bin` to the end of PATH once, however many of the
+/// Adds `~/.stowlark/bin` to the end of PATH once, however many of the
 /// profiles a shell reads. Plain sh, for zsh and bash alike.
-const SH_LINE: &str = r#"case ":$PATH:" in *":$HOME/.kiri/bin:"*) ;; *) export PATH="$PATH:$HOME/.kiri/bin" ;; esac"#;
+const SH_LINE: &str = r#"case ":$PATH:" in *":$HOME/.stowlark/bin:"*) ;; *) export PATH="$PATH:$HOME/.stowlark/bin" ;; esac"#;
 
-/// The line Kiri 0.1.0 wrote, only to `~/.zprofile`; taken back on uninstall.
-const OLD_SH_LINE: &str = "export PATH=\"$PATH:$HOME/.kiri/bin\"";
+/// The line Stowlark 0.1.0 wrote, only to `~/.zprofile`; taken back on uninstall.
+const OLD_SH_LINE: &str = "export PATH=\"$PATH:$HOME/.stowlark/bin\"";
 
-const FISH_LINE: &str = "fish_add_path --append $HOME/.kiri/bin";
+const FISH_LINE: &str = "fish_add_path --append $HOME/.stowlark/bin";
 
-/// The shell profiles Kiri puts `~/.kiri/bin` in, so `kiri` is found in
+/// The shell profiles Stowlark puts `~/.stowlark/bin` in, so `stowlark` is found in
 /// every terminal:
 /// - zsh (the macOS default) reads `.zprofile` only in login shells, which
 ///   Terminal opens but VS Code, tmux and IDE terminals do not, and a
@@ -633,7 +633,7 @@ fn profiles(home: &Path, zdotdir: &Path) -> Vec<(PathBuf, &'static str)> {
         v.push((home.join(".bashrc"), SH_LINE));
     }
     if home.join(".config/fish").is_dir() {
-        v.push((home.join(".config/fish/conf.d/kiri.fish"), FISH_LINE));
+        v.push((home.join(".config/fish/conf.d/stowlark.fish"), FISH_LINE));
     }
     v
 }
@@ -676,13 +676,13 @@ fn remove_shell_path(home: &Path, zdotdir: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// On a Mac with no other Docker engine, plain `docker` uses Kiri. With
+/// On a Mac with no other Docker engine, plain `docker` uses Stowlark. With
 /// OrbStack or Docker Desktop around, the user's choice stays as it is.
 fn default_context() -> io::Result<()> {
     let h = home()?;
-    // Kiri's own /var/run/docker.sock is not another engine.
+    // Stowlark's own /var/run/docker.sock is not another engine.
     let ours = crate::daemon::socket_path()?;
-    let system = !matches!(docker_sock(&ours), DockerSock::Kiri) && Path::new(DOCKER_SOCK).exists();
+    let system = !matches!(docker_sock(&ours), DockerSock::Stowlark) && Path::new(DOCKER_SOCK).exists();
     let other = system
         || [h.join(".orbstack/run/docker.sock"), h.join(".docker/run/docker.sock")].iter().any(|p| p.exists())
         || Path::new("/Applications/OrbStack.app").exists()
@@ -694,7 +694,7 @@ fn default_context() -> io::Result<()> {
     }
     cfg["currentContext"] = CONTEXT.get().into();
     write_json(&path, &cfg)?;
-    println!("docker uses Kiri by default (no other Docker engine on this Mac)");
+    println!("docker uses Stowlark by default (no other Docker engine on this Mac)");
     Ok(())
 }
 
@@ -707,7 +707,7 @@ fn uid() -> u32 {
     unsafe { libc::getuid() }
 }
 
-/// A LaunchAgent for `kiri daemon`: started at login, restarted if it
+/// A LaunchAgent for `stowlark daemon`: started at login, restarted if it
 /// crashes, never restarted after a clean exit.
 fn agent() -> io::Result<PathBuf> {
     let exe = std::env::current_exe()?.canonicalize()?;
@@ -759,7 +759,7 @@ fn agent() -> io::Result<PathBuf> {
     Ok(path)
 }
 
-/// Whether the LaunchAgent starts this copy of Kiri. One left by another
+/// Whether the LaunchAgent starts this copy of Stowlark. One left by another
 /// copy (an older download, a build elsewhere) is replaced when this one opens.
 fn agent_runs_this() -> io::Result<bool> {
     let exe = std::env::current_exe()?.canonicalize()?;
@@ -767,7 +767,7 @@ fn agent_runs_this() -> io::Result<bool> {
     Ok(std::fs::read_to_string(agent_plist()?)?.contains(&format!("<string>{esc}</string><string>daemon</string>")))
 }
 
-/// Adds the app's name to a LaunchAgent written by an older Kiri. launchd
+/// Adds the app's name to a LaunchAgent written by an older Stowlark. launchd
 /// reads it at the next login, so the running daemon is left alone.
 fn name_agent() -> io::Result<()> {
     let path = agent_plist()?;
@@ -786,9 +786,9 @@ pub fn docker_cli() -> Option<PathBuf> {
 
 fn uninstall() -> io::Result<()> {
     let _ = Command::new("/bin/launchctl").args(["bootout", &format!("gui/{}/{AGENT}", uid())]).stderr(std::process::Stdio::null()).status();
-    // Uninstalling stops everything this Kiri runs: the engine (the agent,
+    // Uninstalling stops everything this Stowlark runs: the engine (the agent,
     // just booted out, which stops the VM and its containers) and any window
-    // or kiri command still open from this app (`kiri share`, a second
+    // or stowlark command still open from this app (`stowlark share`, a second
     // daemon). Not this process: it's the one uninstalling.
     stop_others();
     match std::fs::remove_file(agent_plist()?) {
@@ -796,7 +796,7 @@ fn uninstall() -> io::Result<()> {
         Err(e) if e.kind() == io::ErrorKind::NotFound => {}
         Err(e) => return Err(e),
     }
-    // Only a context that still points at Kiri's socket is ours to remove.
+    // Only a context that still points at Stowlark's socket is ours to remove.
     let dir = context_dir(CONTEXT.get())?;
     let meta = read_json(&dir.join("meta.json"))?;
     if meta["Endpoints"]["docker"]["Host"].as_str().is_some_and(|h| h.ends_with(&format!("{}/run/docker.sock", crate::flavor::STATE))) {
@@ -815,13 +815,13 @@ fn uninstall() -> io::Result<()> {
     // `get_mut`: indexing would add the key to a config that lacks it.
     if let Some(dirs) = cfg.get_mut("cliPluginsExtraDirs").and_then(Value::as_array_mut) {
         let before = dirs.len();
-        dirs.retain(|d| !d.as_str().is_some_and(|s| s.contains("Kiri.app/Contents/Resources/bin")));
+        dirs.retain(|d| !d.as_str().is_some_and(|s| s.contains("Stowlark.app/Contents/Resources/bin")));
         changed |= dirs.len() != before;
     }
     if changed {
         write_json(&path, &cfg)?;
     }
-    // Docker's builder back as it was, before Kiri's goes.
+    // Docker's builder back as it was, before Stowlark's goes.
     if let Err(e) = crate::buildwith::places().and_then(|p| p.uninstall()) {
         println!("could not give docker build back its own builder ({e})");
     }
@@ -832,8 +832,8 @@ fn uninstall() -> io::Result<()> {
         let _ = std::fs::remove_file(SYSTEM_LINK);
     }
     let _ = std::fs::remove_file(bin_dir()?.join("docker"));
-    let _ = std::fs::remove_file(bin_dir()?.join("kiri"));
-    // The cluster's kubectl context (`kiri k8s`); the cluster stays in Kiri's data.
+    let _ = std::fs::remove_file(bin_dir()?.join("stowlark"));
+    // The cluster's kubectl context (`stowlark k8s`); the cluster stays in Stowlark's data.
     crate::k8s::forget();
     // Every flavor has a helper of its own.
     if let Err(e) = crate::usb::helper::remove() {
@@ -844,7 +844,7 @@ fn uninstall() -> io::Result<()> {
         return Ok(());
     }
     match home().and_then(|h| remove_shell_path(&h, &zdotdir(&h))) {
-        Ok(()) => println!("removed ~/.kiri/bin from shell profiles"),
+        Ok(()) => println!("removed ~/.stowlark/bin from shell profiles"),
         Err(e) => println!("could not tidy the shell profiles ({e})"),
     }
     if let Err(e) = remove_domains() {
@@ -853,7 +853,7 @@ fn uninstall() -> io::Result<()> {
     if let Err(e) = remove_docker_socket() {
         println!("could not remove {DOCKER_SOCK} ({e})");
     }
-    println!("Kiri's data stays in ~/Library/Application Support/Kiri; delete it to remove images and volumes too");
+    println!("Stowlark's data stays in ~/Library/Application Support/Stowlark; delete it to remove images and volumes too");
     Ok(())
 }
 
@@ -867,7 +867,7 @@ mod tests {
     }
 
     fn scratch(name: &str) -> std::path::PathBuf {
-        let d = std::env::temp_dir().join(format!("kiri-setup-test-{name}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("stowlark-setup-test-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
@@ -877,12 +877,12 @@ mod tests {
     fn docker_sock_owner() {
         use super::DockerSock::*;
         let d = scratch("sock");
-        let ours = d.join("kiri/run/docker.sock");
+        let ours = d.join("stowlark/run/docker.sock");
         let link = d.join("docker.sock");
         let at = |engines: &[std::path::PathBuf]| super::docker_sock_at(&link, &ours, engines);
         assert_eq!(at(&[]), Free);
         std::os::unix::fs::symlink(&ours, &link).unwrap();
-        assert_eq!(at(&[]), Kiri, "Kiri's link, even with the daemon stopped");
+        assert_eq!(at(&[]), Stowlark, "Stowlark's link, even with the daemon stopped");
         // OrbStack's link with OrbStack not running: still OrbStack's.
         std::fs::remove_file(&link).unwrap();
         let orb = d.join(".orbstack/run/docker.sock");
@@ -905,10 +905,10 @@ mod tests {
     fn testcontainers_file_is_kiris_only_when_marked() {
         let d = scratch("tc");
         let path = d.join(".testcontainers.properties");
-        let ours = std::path::Path::new("/Users/me/.kiri/run/docker.sock");
+        let ours = std::path::Path::new("/Users/me/.stowlark/run/docker.sock");
         assert!(super::testcontainers_at(&path, ours, true).unwrap());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), super::testcontainers_text(ours));
-        assert!(std::fs::read_to_string(&path).unwrap().contains("docker.host=unix:///Users/me/.kiri/run/docker.sock\n"));
+        assert!(std::fs::read_to_string(&path).unwrap().contains("docker.host=unix:///Users/me/.stowlark/run/docker.sock\n"));
         assert!(!super::testcontainers_at(&path, ours, false).unwrap());
         assert!(!path.exists());
         // The user's own file, or one Testcontainers has added to, stays.
@@ -923,14 +923,14 @@ mod tests {
 
     #[test]
     fn quotes_for_sh() {
-        assert_eq!(super::sh_quote("/Users/o'neil/.kiri"), r"'/Users/o'\''neil/.kiri'");
+        assert_eq!(super::sh_quote("/Users/o'neil/.stowlark"), r"'/Users/o'\''neil/.stowlark'");
     }
 
     #[test]
     fn shell_profiles_put_kiri_on_path_once_and_take_it_back() {
         let h = scratch("profiles");
         std::fs::write(h.join(".zprofile"), "export A=1").unwrap();
-        // An install by Kiri 0.1.0: the old line, in .zprofile only.
+        // An install by Stowlark 0.1.0: the old line, in .zprofile only.
         std::fs::write(h.join(".profile"), format!("export B=2\n\n{}\n{}\n", super::PROFILE_MARK, super::OLD_SH_LINE)).unwrap();
         std::fs::write(h.join(".bashrc"), "").unwrap();
         super::shell_path(&h, &h).unwrap();
@@ -947,7 +947,7 @@ mod tests {
         assert_eq!(read(".zprofile").trim_end(), "export A=1");
         assert_eq!(read(".profile").trim_end(), "export B=2");
         assert_eq!(read(".zshrc").trim(), "");
-        assert!(!read(".bashrc").contains("kiri"));
+        assert!(!read(".bashrc").contains("stowlark"));
     }
 
     #[test]
@@ -959,6 +959,6 @@ mod tests {
             .env("PATH", "/usr/bin:/bin")
             .output()
             .unwrap();
-        assert_eq!(String::from_utf8_lossy(&out.stdout), "/usr/bin:/bin:/h/.kiri/bin");
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "/usr/bin:/bin:/h/.stowlark/bin");
     }
 }

@@ -36,14 +36,14 @@ pub fn accept(listener: &OwnedFd, running: &[(&str, libc::pid_t)], paths: &Paths
                 let code = match job(sock, running, paths) {
                     Ok(()) => 0,
                     Err(e) => {
-                        eprintln!("kiri-init: copy: {e}");
+                        eprintln!("stowlark-init: copy: {e}");
                         1
                     }
                 };
                 // SAFETY: leaving the child without running the parent's destructors.
                 unsafe { libc::_exit(code) }
             }
-            pid if pid < 0 => eprintln!("kiri-init: copy: fork: {}", io::Error::last_os_error()),
+            pid if pid < 0 => eprintln!("stowlark-init: copy: fork: {}", io::Error::last_os_error()),
             // The parent's copy closes here; the agent reaps the child like any other.
             _ => drop(sock),
         }

@@ -1,6 +1,6 @@
-//! Kiri's window on Windows: the Mac app's own page
-//! (crates/kiri/src/ui/index.html) in WebView2, and Kiri's icon in the
-//! notification area. Closing the window hides it and Kiri keeps serving
+//! Stowlark's window on Windows: the Mac app's own page
+//! (crates/kiri/src/ui/index.html) in WebView2, and Stowlark's icon in the
+//! notification area. Closing the window hides it and Stowlark keeps serving
 //! from the tray, as the Mac app stays in the menu bar.
 //!
 //! The page talks to its host through `webkit.messageHandlers.kiri`; a
@@ -37,18 +37,18 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_LBUTTONUP, WM_RBUTTONUP, WM_SETICON, WM_SIZE, WM_TIMER, WNDCLASSW, WS_OVERLAPPEDWINDOW,
 };
 
-pub const CLASS: PCWSTR = w!("KiriWindow");
+pub const CLASS: PCWSTR = w!("StowlarkWindow");
 /// Runs the jobs other threads queued for this one.
 const WM_RUN: u32 = WM_APP + 1;
 /// From the tray icon.
 const WM_TRAY: u32 = WM_APP + 2;
-/// From a second launch of kiri-win: show the window.
+/// From a second launch of stowlark-win: show the window.
 pub const WM_SHOW: u32 = WM_APP + 3;
 
 const PAGE: &str = include_str!("../../kiri/src/ui/index.html");
 /// The first-run setup (setup.rs), Windows only.
 const SETUP_PAGE: &str = include_str!("setup.html");
-/// The window opens on setup rather than Kiri.
+/// The window opens on setup rather than Stowlark.
 static SETUP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Whether the window is on the setup page (setup commands are live then).
@@ -59,17 +59,17 @@ pub fn in_setup() -> bool {
 fn page_html() -> String {
     if SETUP.load(Ordering::SeqCst) { crate::assemble::words(SETUP_PAGE, crate::engine::prefs()["lang"].as_str()) } else { crate::assemble::page(PAGE, crate::engine::prefs()["lang"].as_str()) }
 }
-/// Kiri's icon cropped to its artwork for Windows (brand/windows-icons.ps1),
+/// Stowlark's icon cropped to its artwork for Windows (brand/windows-icons.ps1),
 /// by size: the Mac's has Apple's margin and looks small in the taskbar.
 const ICONS: [(i32, &[u8]); 8] = [
-    (16, include_bytes!("../../../brand/icon/windows/kiri-16.png")),
-    (20, include_bytes!("../../../brand/icon/windows/kiri-20.png")),
-    (24, include_bytes!("../../../brand/icon/windows/kiri-24.png")),
-    (32, include_bytes!("../../../brand/icon/windows/kiri-32.png")),
-    (40, include_bytes!("../../../brand/icon/windows/kiri-40.png")),
-    (48, include_bytes!("../../../brand/icon/windows/kiri-48.png")),
-    (64, include_bytes!("../../../brand/icon/windows/kiri-64.png")),
-    (256, include_bytes!("../../../brand/icon/windows/kiri-256.png")),
+    (16, include_bytes!("../../../brand/icon/windows/stowlark-16.png")),
+    (20, include_bytes!("../../../brand/icon/windows/stowlark-20.png")),
+    (24, include_bytes!("../../../brand/icon/windows/stowlark-24.png")),
+    (32, include_bytes!("../../../brand/icon/windows/stowlark-32.png")),
+    (40, include_bytes!("../../../brand/icon/windows/stowlark-40.png")),
+    (48, include_bytes!("../../../brand/icon/windows/stowlark-48.png")),
+    (64, include_bytes!("../../../brand/icon/windows/stowlark-64.png")),
+    (256, include_bytes!("../../../brand/icon/windows/stowlark-256.png")),
 ];
 
 /// Before the page's own scripts: its `webkit.messageHandlers.kiri` on WebView2.
@@ -99,7 +99,7 @@ type Job = Box<dyn FnOnce(&mut Ui) + Send>;
 static JOBS: Mutex<Vec<Job>> = Mutex::new(Vec::new());
 static WINDOW: AtomicIsize = AtomicIsize::new(0);
 
-/// What the rest of kiri-win uses to reach the window, from any thread.
+/// What the rest of stowlark-win uses to reach the window, from any thread.
 #[derive(Debug, Clone, Copy)]
 pub struct Handle;
 
@@ -178,7 +178,7 @@ const TIMER_FOREGROUND: usize = 1;
 /// Brings the window to the front. Windows lets a process take the
 /// foreground only while the user is working in it; to any other it
 /// flashes the taskbar button and leaves the window behind, which is how
-/// Kiri came up behind the installer's window and the shell. For a window
+/// Stowlark came up behind the installer's window and the shell. For a window
 /// the user asked for, sharing the input queue of the thread that is
 /// foreground makes the call ours to make; failing even that, the window
 /// at least goes on top of the others.
@@ -257,7 +257,7 @@ impl Ui {
         unsafe { IsWindowVisible(self.hwnd).as_bool() }
     }
 
-    /// Setup is done: the window becomes Kiri's.
+    /// Setup is done: the window becomes Stowlark's.
     pub fn navigate_main(&mut self) {
         SETUP.store(false, Ordering::SeqCst);
         self.loaded = false;
@@ -344,7 +344,7 @@ pub fn run(show: bool, setup: bool, on_message: impl Fn(String) + 'static, on_tr
         let scale = |v: i32| v * GetDpiForSystem() as i32 / 96;
         let (sw, sh) = (GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
         let (w, h) = (scale(1280).min(sw * 9 / 10), scale(840).min(sh * 9 / 10));
-        let hwnd = CreateWindowExW(WINDOW_EX_STYLE(0), CLASS, w!("Kiri"), WS_OVERLAPPEDWINDOW, (sw - w) / 2, (sh - h) / 2, w, h, None, None, Some(instance.into()), None)?;
+        let hwnd = CreateWindowExW(WINDOW_EX_STYLE(0), CLASS, w!("Stowlark"), WS_OVERLAPPEDWINDOW, (sw - w) / 2, (sh - h) / 2, w, h, None, None, Some(instance.into()), None)?;
         let flag = windows::core::BOOL::from(windows_dark());
         let _ = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, (&raw const flag).cast(), std::mem::size_of_val(&flag) as u32);
         hwnd
@@ -380,13 +380,13 @@ pub fn run(show: bool, setup: bool, on_message: impl Fn(String) + 'static, on_tr
     Ok(())
 }
 
-/// Whether a kiri-win is running: its window exists, shown or not.
+/// Whether a stowlark-win is running: its window exists, shown or not.
 pub fn running() -> bool {
     // SAFETY: looking up a window by our class name.
     unsafe { FindWindowW(CLASS, None).is_ok_and(|h| !h.is_invalid()) }
 }
 
-/// Asks the kiri-win already running to show its window. False if there is none.
+/// Asks the stowlark-win already running to show its window. False if there is none.
 pub fn show_running() -> bool {
     // SAFETY: looking up a window by our class name and posting to it.
     unsafe {
@@ -439,7 +439,7 @@ fn tray(hwnd: HWND, icon: Option<HICON>, op: windows::Win32::UI::Shell::NOTIFY_I
     if let Some(i) = icon {
         nid.hIcon = i;
     }
-    for (d, s) in nid.szTip.iter_mut().zip("Kiri".encode_utf16()) {
+    for (d, s) in nid.szTip.iter_mut().zip("Stowlark".encode_utf16()) {
         *d = s;
     }
     // SAFETY: a filled-in NOTIFYICONDATAW for our window.
@@ -461,9 +461,9 @@ fn tray_menu(hwnd: HWND) {
         };
         let l = crate::lang::resolve(crate::engine::prefs()["lang"].as_str());
         let tr = |en: &str| crate::lang::tr(l, en);
-        item(MF_STRING, ID_OPEN, &tr("Open Kiri"));
+        item(MF_STRING, ID_OPEN, &tr("Open Stowlark"));
         item(MF_SEPARATOR, 0, "");
-        item(MF_STRING | MF_GRAYED, 0, &tr("Kiri: {state}").replace("{state}", &if menu.vm.is_empty() { "…".to_owned() } else { tr(&menu.vm) }));
+        item(MF_STRING | MF_GRAYED, 0, &tr("Stowlark: {state}").replace("{state}", &if menu.vm.is_empty() { "…".to_owned() } else { tr(&menu.vm) }));
         for (i, (_, name)) in menu.running.iter().enumerate().take(20) {
             item(MF_STRING, ID_CONTAINER + i, &format!("    {name}"));
         }
@@ -472,7 +472,7 @@ fn tray_menu(hwnd: HWND) {
         item(MF_STRING, ID_STOP, &tr("Stop"));
         item(MF_SEPARATOR, 0, "");
         item(MF_STRING, ID_UPDATE, &tr("Check for Updates…"));
-        item(MF_STRING, ID_QUIT, &tr("Quit Kiri"));
+        item(MF_STRING, ID_QUIT, &tr("Quit Stowlark"));
         let mut p = POINT::default();
         let _ = GetCursorPos(&mut p);
         // The menu closes when clicking elsewhere only if we are foreground.
@@ -536,9 +536,9 @@ fn taskbar_created() -> u32 {
     ID.with(|id| *id)
 }
 
-/// WebView2's data (cache, local storage) lives in %LOCALAPPDATA%\Kiri.
+/// WebView2's data (cache, local storage) lives in %LOCALAPPDATA%\Stowlark.
 fn data_dir() -> HSTRING {
-    let dir = std::env::var_os("LOCALAPPDATA").map(|d| std::path::PathBuf::from(d).join("Kiri").join("WebView2")).unwrap_or_default();
+    let dir = std::env::var_os("LOCALAPPDATA").map(|d| std::path::PathBuf::from(d).join("Stowlark").join("WebView2")).unwrap_or_default();
     HSTRING::from(dir.as_os_str())
 }
 
@@ -576,7 +576,7 @@ fn webview_ready(hwnd: HWND, ctl: ICoreWebView2Controller) -> windows::core::Res
         let wv = ctl.CoreWebView2()?;
         let settings = wv.Settings()?;
         settings.SetIsStatusBarEnabled(false)?;
-        settings.SetAreDevToolsEnabled(cfg!(debug_assertions) || std::env::var_os("KIRI_DEVTOOLS").is_some())?;
+        settings.SetAreDevToolsEnabled(cfg!(debug_assertions) || std::env::var_os("STOWLARK_DEVTOOLS").is_some())?;
         settings.SetAreDefaultContextMenusEnabled(cfg!(debug_assertions))?;
         settings.SetIsZoomControlEnabled(false)?;
 

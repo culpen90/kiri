@@ -1,8 +1,8 @@
-//! Kiri Lite's docker CLI, Compose and buildx. Kiri.app bundles them; Kiri
+//! Stowlark Lite's docker CLI, Compose and buildx. Stowlark.app bundles them; Stowlark
 //! Lite downloads the same pinned versions (cli_pins.rs) on first launch
-//! into `~/Library/Application Support/Kiri/cli`, checks each against its
+//! into `~/Library/Application Support/Stowlark/cli`, checks each against its
 //! SHA-256 before anything is put in place, and moves it there atomically.
-//! Downloads go through Kiri's proxy settings (Settings → Network).
+//! Downloads go through Stowlark's proxy settings (Settings → Network).
 
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 
 use crate::cli_pins::MacArch;
 
-/// Where Kiri Lite keeps the tools.
+/// Where Stowlark Lite keeps the tools.
 pub fn dir() -> io::Result<PathBuf> {
     Ok(kiri_image::Store::default_root()?.join("cli"))
 }
@@ -24,7 +24,7 @@ pub fn installed() -> bool {
     dir().is_ok_and(|d| FILES.iter().all(|f| d.join(f).is_file()))
 }
 
-/// Whether this is Kiri Lite: the app bundle without the bundled CLI.
+/// Whether this is Stowlark Lite: the app bundle without the bundled CLI.
 pub fn lite() -> bool {
     std::env::current_exe()
         .ok()
@@ -36,7 +36,7 @@ pub fn lite() -> bool {
 pub(crate) fn agent() -> ureq::Agent {
     let mut cfg = ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(15)))
-        .user_agent(concat!("kiri/", env!("CARGO_PKG_VERSION")));
+        .user_agent(concat!("stowlark/", env!("CARGO_PKG_VERSION")));
     let e = crate::daemon::proxy::effective();
     if let Some(p) = e.https.or(e.http).and_then(|u| ureq::Proxy::new(&u).ok()) {
         cfg = cfg.proxy(Some(p));
@@ -141,7 +141,7 @@ pub fn ensure(progress: &mut dyn FnMut(&str, usize, usize, u8)) -> io::Result<()
 mod tests {
     #[test]
     fn refuses_a_wrong_checksum() {
-        let dir = std::env::temp_dir().join(format!("kiri-tools-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-tools-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("x");
         std::fs::write(&f, b"hello").unwrap();
@@ -152,11 +152,11 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// Downloads the real tools into `KIRI_DATA_DIR`:
-    /// `KIRI_LIVE_TOOLS=1 KIRI_DATA_DIR=/tmp/x cargo test -p kiri tools_download -- --nocapture`.
+    /// Downloads the real tools into `STOWLARK_DATA_DIR`:
+    /// `STOWLARK_LIVE_TOOLS=1 STOWLARK_DATA_DIR=/tmp/x cargo test -p stowlark tools_download -- --nocapture`.
     #[test]
     fn tools_download() {
-        if std::env::var_os("KIRI_LIVE_TOOLS").is_none() {
+        if std::env::var_os("STOWLARK_LIVE_TOOLS").is_none() {
             return;
         }
         let mut seen = 0;

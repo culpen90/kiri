@@ -1,4 +1,4 @@
-//! `kiri ui`: a tiny native window over `kiri daemon`.
+//! `stowlark ui`: a tiny native window over `stowlark daemon`.
 //!
 //! The system's own WebKit in a native window: AppKit through objc2 on the
 //! Mac (`mac.rs`), GTK on Linux (`gtk.rs`). No UI framework and no bundled
@@ -83,7 +83,7 @@ enum Cmd {
     RemoveNetwork(String),
     /// Settings → About: the engine's details.
     About,
-    /// Settings → Domains: turn `*.kiri.local` on or off (asks for the password).
+    /// Settings → Domains: turn `*.stowlark.local` on or off (asks for the password).
     Domains(bool),
     /// New published ports for a container: `[{container_port, host_port, proto, host_ip}]`.
     Ports { id: String, ports: serde_json::Value },
@@ -156,15 +156,16 @@ fn menu_state() -> std::sync::MutexGuard<'static, MenuState> {
 }
 
 /// A container's local address, as the page builds it: its chosen
-/// `dev.kiri.domain`, else Compose's service.project, else its name.
+/// `dev.stowlark.domain`, else Compose's service.project, else its name.
 fn local_url(c: &serde_json::Value) -> Option<String> {
     if c["Ports"].as_array().is_none_or(|p| p.is_empty()) {
         return None;
     }
     let label = |k: &str| c["Labels"][k].as_str().unwrap_or("");
-    let suffix = if crate::daemon::dns::installed() { "kiri.local" } else { "kiri.localhost" };
-    let chosen = label("dev.kiri.domain").split(',').next().unwrap_or("").trim();
-    let chosen = chosen.strip_suffix(".kiri.localhost").or_else(|| chosen.strip_suffix(".kiri.local")).unwrap_or(chosen);
+    let suffix = if crate::daemon::dns::installed() { "stowlark.local" } else { "stowlark.localhost" };
+    let chosen = c["Labels"]["dev.stowlark.domain"].as_str().unwrap_or_else(|| label("dev.kiri.domain"));
+    let chosen = chosen.split(',').next().unwrap_or("").trim();
+    let chosen = [".stowlark.localhost", ".stowlark.local", ".kiri.localhost", ".kiri.local"].into_iter().find_map(|suffix| chosen.strip_suffix(suffix)).unwrap_or(chosen);
     let name = c["Names"][0].as_str().unwrap_or("").trim_start_matches('/');
     let host = match (chosen, label("com.docker.compose.project")) {
         (c, _) if !c.is_empty() => c.to_owned(),
@@ -207,7 +208,7 @@ fn json_str(out: &mut String, v: &str) {
     out.push('"');
 }
 
-/// The engine thread: a client of `kiri daemon`. It answers the window's
+/// The engine thread: a client of `stowlark daemon`. It answers the window's
 /// commands and sends it the daemon's lists whenever an event says they
 /// changed, so the page never polls.
 fn engine(rx: Receiver<Cmd>, tx: Sender<Cmd>) {
@@ -229,7 +230,7 @@ fn engine(rx: Receiver<Cmd>, tx: Sender<Cmd>) {
                 emit(state("booting", None));
                 match ensure_daemon().and_then(|()| expect_ok(client::request("POST", "/kiri/wake", None))) {
                     Ok(()) => {
-                        // `docker build` through Kiri, if setup ran before the daemon was up.
+                        // `docker build` through Stowlark, if setup ran before the daemon was up.
                         std::thread::spawn(setup::ensure_builder);
                         refresh(&mut connected);
                     }
@@ -330,8 +331,8 @@ fn engine(rx: Receiver<Cmd>, tx: Sender<Cmd>) {
                 // Cancelling macOS's password prompt is a choice, not an error.
                 match result {
                     Err(e) if !e.to_string().contains("-128") => emit(notice("error", &trf("Could not change container names: {error}", &[("error", &e)]))),
-                    _ if crate::daemon::dns::installed() => emit(notice("ok", &tr("Containers now answer at <name>.kiri.local"))),
-                    _ if !on => emit(notice("ok", &tr("Containers answer at <name>.kiri.localhost"))),
+                    _ if crate::daemon::dns::installed() => emit(notice("ok", &tr("Containers now answer at <name>.stowlark.local"))),
+                    _ if !on => emit(notice("ok", &tr("Containers answer at <name>.stowlark.localhost"))),
                     _ => {}
                 }
                 // /var/run/docker.sock was asked for with the same password.
@@ -411,18 +412,18 @@ pub(crate) fn reveal(path: &std::path::Path) {
     }
 }
 
-/// Kiri's folder in the home directory, ~/.kiri: the window's settings and
+/// Stowlark's folder in the home directory, ~/.stowlark: the window's settings and
 /// files. On the Mac the engine's socket is in it too; on Linux the engine is
-/// a system service with its socket in /run/kiri. `KIRI_SOCKET` moves it, as
+/// a system service with its socket in /run/stowlark. `STOWLARK_SOCKET` moves it, as
 /// on the Mac (the tests use that).
 pub(crate) fn state_dir() -> Option<std::path::PathBuf> {
-    if cfg!(target_os = "linux") && std::env::var_os("KIRI_SOCKET").is_none() {
+    if cfg!(target_os = "linux") && std::env::var_os("STOWLARK_SOCKET").is_none() {
         return std::env::var_os("HOME").map(|h| std::path::Path::new(&h).join(crate::flavor::STATE.get()));
     }
     client::socket().ok()?.parent()?.parent().map(std::path::Path::to_path_buf)
 }
 
-/// Kiri opening for the first time on this account: no settings were saved
+/// Stowlark opening for the first time on this account: no settings were saved
 /// before this run. Worked out on the first read, before anything is saved.
 fn fresh() -> bool {
     static FRESH: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
@@ -438,14 +439,14 @@ fn ask_language() {
     }
 }
 
-/// The window's settings, kept in ~/.kiri/ui.json: font, mono, scale.
+/// The window's settings, kept in ~/.stowlark/ui.json: font, mono, scale.
 fn prefs_path() -> Option<std::path::PathBuf> {
     let dir = state_dir()?;
     let _ = std::fs::create_dir_all(&dir);
     Some(dir.join("ui.json"))
 }
 
-/// The settings, with the defaults for what the person hasn't picked: Kiri
+/// The settings, with the defaults for what the person hasn't picked: Stowlark
 /// starts dark until Settings → Appearance says otherwise.
 pub(crate) fn prefs() -> serde_json::Value {
     fresh();
@@ -463,8 +464,8 @@ pub(crate) fn prefs() -> serde_json::Value {
 /// (crate::usb words it in English; these are its notes).
 fn usb_words(mut v: serde_json::Value) -> serde_json::Value {
     let note = match v["note"].as_str() {
-        Some("A device in Kiri is gone from the Mac until you detach it. In a container: --device /dev/ttyUSB0 (serial), /dev/input (HID) or /dev/bus/usb (raw).") => {
-            tr("A device in Kiri is gone from the Mac until you detach it. In a container: --device /dev/ttyUSB0 (serial), /dev/input (HID) or /dev/bus/usb (raw).")
+        Some("A device in Stowlark is gone from the Mac until you detach it. In a container: --device /dev/ttyUSB0 (serial), /dev/input (HID) or /dev/bus/usb (raw).") => {
+            tr("A device in Stowlark is gone from the Mac until you detach it. In a container: --device /dev/ttyUSB0 (serial), /dev/input (HID) or /dev/bus/usb (raw).")
         }
         Some("Containers run on this computer's own kernel, so they see its USB devices as they are: docker run --device with the path shown.") => {
             tr("Containers run on this computer's own kernel, so they see its USB devices as they are: docker run --device with the path shown.")
@@ -477,8 +478,8 @@ fn usb_words(mut v: serde_json::Value) -> serde_json::Value {
 
 /// Attach's and Detach's word back, in the window's language.
 fn usb_text(text: &str) -> String {
-    match text.strip_suffix(" is in Kiri") {
-        Some(name) => trf("{name} is in Kiri", &[("name", &name)]),
+    match text.strip_suffix(" is in Stowlark") {
+        Some(name) => trf("{name} is in Stowlark", &[("name", &name)]),
         None if text == "Given back to the Mac" => tr("Given back to the Mac"),
         None => text.to_owned(),
     }
@@ -517,7 +518,7 @@ fn set_pref(name: &str, value: serde_json::Value) {
     all[name] = value;
     let tmp = path.with_extension("json.tmp");
     if std::fs::write(&tmp, all.to_string()).and_then(|()| std::fs::rename(&tmp, &path)).is_err() {
-        emit(notice("error", &tr("Could not save the setting to ~/.kiri/ui.json")));
+        emit(notice("error", &tr("Could not save the setting to ~/.stowlark/ui.json")));
     }
     if name == "lang" {
         window::relang();
@@ -580,7 +581,7 @@ fn resources(save: Option<serde_json::Value>) {
     }
 }
 
-/// A docker CLI from elsewhere (Docker Desktop, OrbStack, Homebrew): Kiri
+/// A docker CLI from elsewhere (Docker Desktop, OrbStack, Homebrew): Stowlark
 /// Lite then has nothing to download. An app opened from Finder has a short
 /// PATH, so the usual places are looked at too.
 fn other_docker_cli() -> bool {
@@ -590,7 +591,7 @@ fn other_docker_cli() -> bool {
     dirs.iter().any(|d| d.join("docker").is_file())
 }
 
-/// Downloads Kiri Lite's tools in the background, with progress for the page.
+/// Downloads Stowlark Lite's tools in the background, with progress for the page.
 fn setup_tools() {
     std::thread::spawn(|| {
         let mut last = std::time::Instant::now();
@@ -628,12 +629,12 @@ fn update_state(state: &str, latest: Option<&str>, error: Option<String>) {
 /// version again. With "Check for updates automatically" off, only a manual
 /// check asks the feed.
 fn update_check(manual: bool) {
-    // Once, when the window opens: an older `kiri` that terminals run instead
+    // Once, when the window opens: an older `stowlark` that terminals run instead
     // of this one is how an update or reinstall seems not to have happened.
     if !manual && !crate::flavor::dev()
         && let Some(p) = crate::stale::stale_kiri()
     {
-        emit(notice("error", &trf("{path} comes first on your PATH, so terminals run it instead of this Kiri. If it's an older Kiri, remove it: rm {path}", &[("path", &p.display())])));
+        emit(notice("error", &trf("{path} comes first on your PATH, so terminals run it instead of this Stowlark. If it's an older Stowlark, remove it: rm {path}", &[("path", &p.display())])));
     }
     if let Some(v) = crate::client::request("GET", "/version", None).ok().filter(|r| r.ok()).and_then(|r| crate::client::kiri_version(&r.json()).map(str::to_owned))
         && update::newer(env!("CARGO_PKG_VERSION"), &v)
@@ -645,9 +646,10 @@ fn update_check(manual: bool) {
 
 /// Whether the feed has a newer release, and one already staged; the
 /// window's check and the 6-hourly one (recheck.rs).
-fn feed_check(manual: bool) {    // Kiri Dev is rebuilt from source, never updated from the feed, unless
-    // KIRI_UPDATE_URL names a test feed (to try the update card and What's new).
-    if crate::flavor::dev() && std::env::var_os("KIRI_UPDATE_URL").is_none() {
+fn feed_check(manual: bool) {
+    let configured = update::configured();
+    // Development builds use a feed only when one is configured explicitly.
+    if crate::flavor::dev() && !configured {
         if manual {
             emit(notice("ok", &trf("{app} doesn't update itself: rebuild it with cargo xtask app-dev", &[("app", &crate::flavor::APP)])));
         }
@@ -658,9 +660,13 @@ fn feed_check(manual: bool) {    // Kiri Dev is rebuilt from source, never updat
     // from the feed either: it would "update" back to the release it came from.
     if env!("CARGO_PKG_VERSION").contains("-dev") {
         if manual {
-            emit(notice("ok", &trf("Kiri {version} is a test build: it doesn't update itself", &[("version", &env!("CARGO_PKG_VERSION"))])));
+            emit(notice("ok", &trf("Stowlark {version} is a test build: it doesn't update itself", &[("version", &env!("CARGO_PKG_VERSION"))])));
         }
         update_state("test", None, None);
+        return;
+    }
+    if !configured {
+        update_state("unconfigured", None, None);
         return;
     }
     if let Some(v) = update::staged() {
@@ -671,7 +677,7 @@ fn feed_check(manual: bool) {    // Kiri Dev is rebuilt from source, never updat
         return;
     }
     recheck::checked();
-    // Linux's kiri comes from a .deb or .rpm: the feed only says whether a
+    // Linux's stowlark comes from a .deb or .rpm: the feed only says whether a
     // newer one exists, and About links to the releases page, so no card.
     if cfg!(target_os = "linux") {
         match update::latest() {
@@ -688,7 +694,7 @@ fn feed_check(manual: bool) {    // Kiri Dev is rebuilt from source, never updat
         Ok(_) => {
             update_state("uptodate", None, None);
             if manual {
-                emit(notice("ok", &trf("Kiri {version} is the newest version", &[("version", &env!("CARGO_PKG_VERSION"))])));
+                emit(notice("ok", &trf("Stowlark {version} is the newest version", &[("version", &env!("CARGO_PKG_VERSION"))])));
             }
         }
         Err(e) => {
@@ -758,8 +764,8 @@ fn status_event() -> String {
         cfg["currentContext"].as_str().map(str::to_owned)
     });
     // Linux: docker's default endpoint is the standard socket, which leads to
-    // Kiri while no Docker engine has it (the package links it), and the
-    // package's docker goes to Kiri's socket: that is docker using Kiri, as
+    // Stowlark while no Docker engine has it (the package links it), and the
+    // package's docker goes to Stowlark's socket: that is docker using Stowlark, as
     // the setup checklist says, not "Docker's default engine".
     #[cfg(target_os = "linux")]
     let context = if context.as_deref().is_none_or(|c| c == "default") && linux::onboarding::docker_uses_kiri() { Some(crate::flavor::CONTEXT.get().to_owned()) } else { context };
@@ -769,7 +775,7 @@ fn status_event() -> String {
 /// Which names containers answer at now.
 fn domains_event() -> String {
     let on = crate::daemon::dns::installed();
-    serde_json::json!({"type": "domains", "on": on, "suffix": if on { "kiri.local" } else { "kiri.localhost" }, "https": crate::daemon::tls::trusted()}).to_string()
+    serde_json::json!({"type": "domains", "on": on, "suffix": if on { "stowlark.local" } else { "stowlark.localhost" }, "https": crate::daemon::tls::trusted()}).to_string()
 }
 
 /// Settings → About: this build, and the engine as the daemon reports it.
@@ -947,7 +953,7 @@ fn free_on_mac(port: u16, proto: &str) -> bool {
     }
 }
 
-/// Starts `kiri daemon` in the background if it is not running. It outlives
+/// Starts `stowlark daemon` in the background if it is not running. It outlives
 /// the window: closing the window leaves containers running.
 #[cfg_attr(target_os = "linux", allow(unreachable_code))]
 fn ensure_daemon() -> io::Result<()> {
@@ -959,7 +965,7 @@ fn ensure_daemon() -> io::Result<()> {
     return Err(linux::engine_down());
     diag::info!("starting the engine");
     let exe = std::env::current_exe()?;
-    let log_dir = client::socket()?.parent().and_then(|p| p.parent()).map(std::path::Path::to_path_buf).ok_or_else(|| io::Error::other("no ~/.kiri"))?;
+    let log_dir = client::socket()?.parent().and_then(|p| p.parent()).map(std::path::Path::to_path_buf).ok_or_else(|| io::Error::other("no ~/.stowlark"))?;
     std::fs::create_dir_all(&log_dir)?;
     let log = std::fs::OpenOptions::new().create(true).append(true).open(log_dir.join("daemon.log"))?;
     let mut cmd = std::process::Command::new(exe);
@@ -979,7 +985,7 @@ fn ensure_daemon() -> io::Result<()> {
             return Ok(());
         }
     }
-    Err(io::Error::other(format!("kiri daemon did not start; see {}", log_dir.join("daemon.log").display())))
+    Err(io::Error::other(format!("stowlark daemon did not start; see {}", log_dir.join("daemon.log").display())))
 }
 
 /// Sends the page every list, from the daemon.
@@ -1034,7 +1040,7 @@ fn stop_engine() -> io::Result<()> {
     }
 }
 
-/// Whether Kiri was stopped (Stop in the window): then it stays off, even
+/// Whether Stowlark was stopped (Stop in the window): then it stays off, even
 /// when the window opens, until Start.
 fn engine_stopped() -> bool {
     client::alive() && client::get_background("/info").is_ok_and(|i| i["KiriStopped"] == true)
@@ -1356,8 +1362,8 @@ mod tests {
     fn saves_known_prefs_only() {
         let dir = std::env::temp_dir().join(format!("kiri-prefs-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("run")).unwrap();
-        // SAFETY: the only test that reads or writes KIRI_SOCKET.
-        unsafe { std::env::set_var("KIRI_SOCKET", dir.join("run/docker.sock")) };
+        // SAFETY: the only test that reads or writes STOWLARK_SOCKET.
+        unsafe { std::env::set_var("STOWLARK_SOCKET", dir.join("run/docker.sock")) };
         super::set_pref("font", "Georgia".into());
         super::set_pref("scale", 1.1.into());
         super::set_pref("script", "x".into());
@@ -1484,9 +1490,9 @@ fn handle(text: &str, tx: &Sender<Cmd>, autostart: bool, view: Option<&str>) {
             std::thread::spawn(update_restart);
             Ok(())
         }
-        // What's new: the feed names the page, so only runkiri.com's.
+        // The feed can link to a release in the Stowlark repository.
         "updatenotes" => {
-            if msg.name.strip_prefix("https://runkiri.com/").is_some_and(|rest| rest.bytes().all(|b| b.is_ascii_alphanumeric() || b"-._~/#".contains(&b))) {
+            if msg.name.strip_prefix("https://github.com/culpen90/stowlark/releases/tag/").is_some_and(|tag| !tag.is_empty() && tag.bytes().all(|b| b.is_ascii_alphanumeric() || b"-._~".contains(&b))) {
                 open(&msg.name);
             }
             Ok(())
@@ -1524,8 +1530,8 @@ fn handle(text: &str, tx: &Sender<Cmd>, autostart: bool, view: Option<&str>) {
             std::thread::spawn(move || {
                 let result = if on { crate::daemon::tls::trust() } else { crate::daemon::tls::untrust() };
                 match result {
-                    Ok(()) if on => emit(notice("ok", &tr("Kiri's certificate is trusted: containers open over HTTPS"))),
-                    Ok(()) => emit(notice("ok", &tr("Kiri's certificate is no longer trusted"))),
+                    Ok(()) if on => emit(notice("ok", &tr("Stowlark's certificate is trusted: containers open over HTTPS"))),
+                    Ok(()) => emit(notice("ok", &tr("Stowlark's certificate is no longer trusted"))),
                     Err(e) if e.to_string().contains("canceled") || e.to_string().contains("cancelled") => {}
                     Err(e) => emit(notice("error", &trf("Could not change the certificate's trust: {error}", &[("error", &e)]))),
                 }
@@ -1533,7 +1539,7 @@ fn handle(text: &str, tx: &Sender<Cmd>, autostart: bool, view: Option<&str>) {
             });
             Ok(())
         }
-        // The USB view: the computer's devices, and which are in Kiri.
+        // The USB view: the computer's devices, and which are in Stowlark.
         "usb" => {
             std::thread::spawn(|| emit(usb_words(crate::usb::ui_list()).to_string()));
             Ok(())
@@ -1761,14 +1767,14 @@ fn handle(text: &str, tx: &Sender<Cmd>, autostart: bool, view: Option<&str>) {
             });
             Ok(())
         }
-        // Which engine plain `docker` uses: Kiri, or back to the one before.
+        // Which engine plain `docker` uses: Stowlark, or back to the one before.
         "usecontext" => {
             let result = setup::use_context(&msg.name);
             emit(status_event());
             emit(serde_json::json!({"type": "usedcontext", "name": msg.name, "error": result.as_ref().err().map(|e| e.to_string())}).to_string());
             Ok(())
         }
-        // Settings → Builds: clear Kiri's builder cache (`docker builder
+        // Settings → Builds: clear Stowlark's builder cache (`docker builder
         // prune --all`), which Images and Volumes don't list.
         "buildprune" => {
             let tx = tx.clone();
@@ -1790,7 +1796,7 @@ fn handle(text: &str, tx: &Sender<Cmd>, autostart: bool, view: Option<&str>) {
             std::thread::spawn(move || {
                 if let Some(with) = with {
                     match crate::buildwith::choose(with) {
-                        // Kiri's builder made now if it wasn't yet; it takes the choice.
+                        // Stowlark's builder made now if it wasn't yet; it takes the choice.
                         Ok(()) => setup::ensure_builder(),
                         Err(e) => emit(notice("error", &trf("Couldn't change which builder docker build uses: {error}", &[("error", &e)]))),
                     }
@@ -1972,10 +1978,22 @@ fn handle(text: &str, tx: &Sender<Cmd>, autostart: bool, view: Option<&str>) {
         }
         // Only the container's own addresses: a page cannot open arbitrary URLs.
         "open" => {
-            let local = msg.name.strip_prefix("http://").or_else(|| msg.name.strip_prefix("https://")).and_then(|r| r.split(['/', ':']).next()).is_some_and(|h| h == "localhost" || h.ends_with(".kiri.localhost") || h.ends_with(".kiri.local"));
+            let local = msg.name.strip_prefix("http://").or_else(|| msg.name.strip_prefix("https://")).is_some_and(|rest| {
+                let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+                if authority.contains(['@', '\\']) {
+                    return false;
+                }
+                let host = authority.split(':').next().unwrap_or("");
+                host == "localhost" || host.ends_with(".stowlark.localhost") || host.ends_with(".stowlark.local")
+            });
             // A build warning's rule page (docs.docker.com/go/dockerfile/rule/…).
             let docs = msg.name.strip_prefix("https://docs.docker.com/go/").is_some_and(|rest| rest.bytes().all(|b| b.is_ascii_alphanumeric() || b"-/".contains(&b)));
-            if local || docs || msg.name == "https://runkiri.com" || msg.name == "https://runkiri.com/share/notice" || msg.name == "https://canestack.com" || msg.name == "https://github.com/libracoder/kiri/issues/new" || msg.name == "https://github.com/libracoder/kiri" || msg.name == "https://github.com/anchore/grype" || msg.name == "https://login.docker.com/activate" || msg.name == "https://github.com/login/device" {
+            if local || docs || matches!(msg.name.as_str(),
+                "https://github.com/culpen90/stowlark" | "https://github.com/culpen90/stowlark/issues/new" |
+                "https://github.com/culpen90/stowlark/releases" | "https://github.com/libracoder/kiri" |
+                "https://runkiri.com/share/notice" | "https://canestack.com" | "https://github.com/anchore/grype" |
+                "https://login.docker.com/activate" | "https://github.com/login/device"
+            ) {
                 open(&msg.name);
             }
             Ok(())
@@ -2079,11 +2097,11 @@ fn handle(text: &str, tx: &Sender<Cmd>, autostart: bool, view: Option<&str>) {
                 emit(ev);
             }
             emit(serde_json::json!({"type": "prefs", "prefs": prefs()}).to_string());
-            // KIRI_STAR_PROMPT=1 shows the star card now, asked before or not (for testing).
-            if std::env::var_os("KIRI_STAR_PROMPT").is_some() {
+            // STOWLARK_STAR_PROMPT=1 shows the star card now, asked before or not (for testing).
+            if std::env::var_os("STOWLARK_STAR_PROMPT").is_some() {
                 emit(r#"{"type":"starprompt"}"#.to_owned());
             }
-            // Kiri Lite: fetch the docker CLI, Compose and buildx the
+            // Stowlark Lite: fetch the docker CLI, Compose and buildx the
             // first time, unless this Mac already has a docker CLI.
             if crate::tools::lite() && !crate::tools::installed() && !other_docker_cli() {
                 setup_tools();
@@ -2104,7 +2122,7 @@ fn handle(text: &str, tx: &Sender<Cmd>, autostart: bool, view: Option<&str>) {
             std::thread::spawn(|| update_check(false));
             recheck::start(|| feed_check(false));
             ask_language();
-            // The first time the app opens: ask, once, whether to use *.kiri.local (the Mac only, so far).
+            // The first time the app opens: ask, once, whether to use *.stowlark.local (the Mac only, so far).
             if cfg!(target_os = "macos") && !crate::flavor::dev() && !crate::daemon::dns::installed() && prefs()["domainsAsked"] != true {
                 set_pref("domainsAsked", true.into());
                 emit(r#"{"type":"welcome"}"#.to_owned());
@@ -2117,9 +2135,9 @@ fn handle(text: &str, tx: &Sender<Cmd>, autostart: bool, view: Option<&str>) {
                 }
                 emit(crate::buildwith::event());
             });
-            // Linux: Kiri checks it can run containers for this account
+            // Linux: Stowlark checks it can run containers for this account
             // first; until it can, the page shows the setup checklist and
-            // nothing starts (its Open Kiri sends "onbopen").
+            // nothing starts (its Open Stowlark sends "onbopen").
             #[cfg(target_os = "linux")]
             {
                 let checks = linux::onboarding::checks();

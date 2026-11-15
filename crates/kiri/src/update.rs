@@ -1,19 +1,17 @@
 //! Updates: the newest release, downloaded, checked and installed.
 //!
 //! The release feed is one small JSON file, `{"version", "url", "sha256"}`
-//! (and optionally `notes`, Markdown for the window's What's new, and
-//! `notes_url`, a runkiri.com page on it), at
-//! `KIRI_UPDATE_URL` (default: `download.runkiri.com/latest-mac-arm64.json`,
-//! and `latest-mac-x86_64.json` for the Intel build: each Mac has its own app). The
+//! (and optionally `notes` and `notes_url`), configured by
+//! `STOWLARK_UPDATE_URL`. Each architecture needs its own feed. The
 //! download is checked against the SHA-256, the installed app's own signing
 //! identity, notarization and the version the feed promised before it is
-//! staged beside the app in `.kiri-update/`. Installing swaps the staged app
+//! staged beside the app in `.stowlark-update/`. Installing swaps the staged app
 //! in (checking it again first) and keeps the old one until the new one is
 //! in place.
 //!
 //! The window (ui) downloads in the background, then installs on Restart
 //! now, or when it quits after Later (or at its next launch, if that quit
-//! never happened). `kiri update` does it all at once; `--check` only
+//! never happened). `stowlark update` does it all at once; `--check` only
 //! reports.
 
 use std::io::{self, Read, Write};
@@ -23,17 +21,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use sha2::{Digest, Sha256};
 
-/// Each Mac reads its own feed, so a release for one never reaches the other
-/// (and check() refuses an app without code for this CPU anyway).
-#[cfg(all(not(target_os = "linux"), not(target_arch = "x86_64")))]
-const FEED: &str = "https://download.runkiri.com/latest-mac-arm64.json";
-/// Intel Macs get the Intel app (`cargo xtask release --arch x86_64`).
-#[cfg(all(not(target_os = "linux"), target_arch = "x86_64"))]
-const FEED: &str = "https://download.runkiri.com/latest-mac-x86_64.json";
-/// Linux reads only the version: its kiri is a .deb or .rpm installed from
-/// runkiri.com, so nothing is downloaded from the feed.
-#[cfg(target_os = "linux")]
-const FEED: &str = "https://download.runkiri.com/latest.json";
+const RELEASES: &str = "https://github.com/culpen90/stowlark/releases";
+
+pub fn configured() -> bool {
+    update_url().is_some()
+}
+
+fn update_url() -> Option<String> {
+    std::env::var("STOWLARK_UPDATE_URL").ok().filter(|url| !url.trim().is_empty())
+}
 /// The biggest download accepted (the app is about 60 MB packed).
 const MAX_DOWNLOAD: u64 = 2 << 30;
 
@@ -64,13 +60,16 @@ pub fn newer(candidate: &str, current: &str) -> bool {
 fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_connect(Some(std::time::Duration::from_secs(10)))
-        .user_agent(concat!("kiri/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("stowlark/", env!("CARGO_PKG_VERSION")))
         .build()
         .into()
 }
 
 pub fn latest() -> io::Result<Release> {
-    let url = std::env::var("KIRI_UPDATE_URL").unwrap_or_else(|_| FEED.to_owned());
+    let url = update_url().ok_or_else(|| io::Error::other(format!("No update feed is configured. See {RELEASES}.")))?;
+    if !url.starts_with("https://") {
+        return Err(io::Error::other("STOWLARK_UPDATE_URL must use HTTPS"));
+    }
     let release = (|| -> io::Result<Release> {
         let body = agent().get(&url).call().map_err(io::Error::other)?.body_mut().with_config().limit(64 << 10).read_to_vec().map_err(io::Error::other)?;
         serde_json::from_slice(&body).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("{url}: {e}")))
@@ -82,17 +81,17 @@ pub fn latest() -> io::Result<Release> {
     release
 }
 
-/// The running Kiri.app.
+/// The running Stowlark.app.
 pub fn app() -> io::Result<PathBuf> {
     let exe = std::env::current_exe()?.canonicalize()?;
     let app = exe.ancestors().find(|p| p.extension().is_some_and(|e| e == "app")).map(Path::to_path_buf);
-    app.ok_or_else(|| io::Error::other("Kiri updates replace Kiri.app; this binary is not running from one"))
+    app.ok_or_else(|| io::Error::other("Stowlark updates replace Stowlark.app; this binary is not running from one"))
 }
 
-/// `.kiri-update/` beside the app: on the same volume, so installing is a
+/// `.stowlark-update/` beside the app: on the same volume, so installing is a
 /// rename.
 fn stage_dir(app: &Path) -> io::Result<PathBuf> {
-    Ok(app.parent().ok_or_else(|| io::Error::other("Kiri.app has no parent directory"))?.join(".kiri-update"))
+    Ok(app.parent().ok_or_else(|| io::Error::other("Stowlark.app has no parent directory"))?.join(".stowlark-update"))
 }
 
 /// Downloads `release`, checks it and stages it for `install_staged`.
@@ -101,7 +100,7 @@ fn stage_dir(app: &Path) -> io::Result<PathBuf> {
 pub fn download(release: &Release, progress: &mut dyn FnMut(u64, Option<u64>), cancel: &AtomicBool) -> io::Result<()> {
     let app = app()?;
     if !newer(&release.version, env!("CARGO_PKG_VERSION")) {
-        return Err(io::Error::other(format!("Kiri {} is not newer than this {}", release.version, env!("CARGO_PKG_VERSION"))));
+        return Err(io::Error::other(format!("Stowlark {} is not newer than this {}", release.version, env!("CARGO_PKG_VERSION"))));
     }
     let dir = stage_dir(&app)?;
     let _ = std::fs::remove_dir_all(&dir);
@@ -121,7 +120,7 @@ pub fn download(release: &Release, progress: &mut dyn FnMut(u64, Option<u64>), c
 
 fn fetch_and_check(release: &Release, app: &Path, dir: &Path, progress: &mut dyn FnMut(u64, Option<u64>), cancel: &AtomicBool) -> io::Result<()> {
     // Download, hashing as it streams to disk.
-    let tgz = dir.join("Kiri.tar.gz");
+    let tgz = dir.join("Stowlark.tar.gz");
     let mut resp = agent().get(&release.url).call().map_err(io::Error::other)?;
     let total = resp.headers().get("content-length").and_then(|v| v.to_str().ok()?.parse::<u64>().ok());
     let mut body = resp.body_mut().with_config().limit(MAX_DOWNLOAD).reader();
@@ -154,9 +153,9 @@ fn fetch_and_check(release: &Release, app: &Path, dir: &Path, progress: &mut dyn
         return Err(io::Error::other("could not unpack the update"));
     }
     let _ = std::fs::remove_file(&tgz);
-    let new_app = unpacked.join("Kiri.app");
+    let new_app = unpacked.join("Stowlark.app");
     check(&new_app, app, &release.version)?;
-    std::fs::rename(&new_app, dir.join("Kiri.app"))?;
+    std::fs::rename(&new_app, dir.join("Stowlark.app"))?;
     let _ = std::fs::remove_dir_all(&unpacked);
     std::fs::write(dir.join("version"), &release.version)?;
     Ok(())
@@ -166,7 +165,7 @@ fn fetch_and_check(release: &Release, app: &Path, dir: &Path, progress: &mut dyn
 pub fn staged() -> Option<String> {
     let dir = stage_dir(&app().ok()?).ok()?;
     let version = std::fs::read_to_string(dir.join("version")).ok()?.trim().to_owned();
-    (dir.join("Kiri.app").is_dir() && newer(&version, env!("CARGO_PKG_VERSION"))).then_some(version)
+    (dir.join("Stowlark.app").is_dir() && newer(&version, env!("CARGO_PKG_VERSION"))).then_some(version)
 }
 
 /// Swaps the staged app in for the running one, checking it again first:
@@ -177,11 +176,11 @@ pub fn install_staged() -> io::Result<String> {
     let Some(version) = staged() else {
         return Err(io::Error::other("no update is staged"));
     };
-    let new_app = dir.join("Kiri.app");
+    let new_app = dir.join("Stowlark.app");
     check(&new_app, &app, &version).inspect_err(|e| crate::diag::error!("staged update failed its checks", version = version, error = e))?;
     // The old app moves aside, the new one takes its place, and the old one
     // is only deleted once the new one is there.
-    let old = dir.join("Kiri.old.app");
+    let old = dir.join("Stowlark.old.app");
     let _ = std::fs::remove_dir_all(&old);
     std::fs::rename(&app, &old)?;
     if let Err(e) = std::fs::rename(&new_app, &app) {
@@ -200,15 +199,15 @@ pub fn restart_engine() {
     crate::diag::info!("restarting the engine");
     // SAFETY: getuid cannot fail.
     let uid = unsafe { libc::getuid() };
-    let _ = Command::new("/bin/launchctl").args(["kickstart", "-k", &format!("gui/{uid}/dev.kiri.daemon")]).stderr(std::process::Stdio::null()).status();
+    let _ = Command::new("/bin/launchctl").args(["kickstart", "-k", &format!("gui/{uid}/dev.stowlark.daemon")]).stderr(std::process::Stdio::null()).status();
 }
 
-/// Whether `new_app` is a genuine Kiri `promised`, newer than this build.
+/// Whether `new_app` is a genuine Stowlark `promised`, newer than this build.
 fn check(new_app: &Path, app: &Path, promised: &str) -> io::Result<()> {
     // A valid signature is not enough: `--verify` alone passes for any
     // self-consistent signature, including an attacker's own Developer ID or
     // an ad-hoc one. Pin the update to the SAME signing identity as the app
-    // already installed (its designated requirement), so only a genuine Kiri
+    // already installed (its designated requirement), so only a genuine Stowlark
     // release is accepted, and require Gatekeeper/notarization acceptance.
     let dr = Command::new("/usr/bin/codesign").args(["-d", "-r", "-"]).arg(app).output()?;
     let requirement = String::from_utf8_lossy(&dr.stdout)
@@ -221,7 +220,7 @@ fn check(new_app: &Path, app: &Path, promised: &str) -> io::Result<()> {
     let mut verify = Command::new("/usr/bin/codesign");
     verify.args(["--verify", "--deep", "--strict"]).arg(format!("-R={requirement}"));
     if !verify.arg(new_app).status()?.success() {
-        return Err(io::Error::other("the update is not signed by Kiri's own signing identity"));
+        return Err(io::Error::other("the update is not signed by Stowlark's own signing identity"));
     }
     if !Command::new("/usr/sbin/spctl").args(["-a", "-t", "exec"]).arg(new_app).status()?.success() {
         return Err(io::Error::other("the update is not notarized"));
@@ -233,7 +232,7 @@ fn check(new_app: &Path, app: &Path, promised: &str) -> io::Result<()> {
     // A feed for the other kind of Mac would install an app that does not
     // open here.
     let mut head = vec![0u8; 4096];
-    let n = std::fs::File::open(new_app.join("Contents/MacOS/kiri"))?.read(&mut head)?;
+    let n = std::fs::File::open(new_app.join("Contents/MacOS/stowlark"))?.read(&mut head)?;
     if !runs_here(&head[..n]) {
         return Err(io::Error::new(io::ErrorKind::InvalidData, format!("the update is not built for this Mac ({})", std::env::consts::ARCH)));
     }
@@ -243,10 +242,10 @@ fn check(new_app: &Path, app: &Path, promised: &str) -> io::Result<()> {
     };
     let promised = promised.trim_start_matches('v');
     if version != promised {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, format!("the update is Kiri {version}, but the feed promised {promised}")));
+        return Err(io::Error::new(io::ErrorKind::InvalidData, format!("the update is Stowlark {version}, but the feed promised {promised}")));
     }
     if !newer(&version, env!("CARGO_PKG_VERSION")) {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, format!("the update is Kiri {version}, which is not newer than this {}", env!("CARGO_PKG_VERSION"))));
+        return Err(io::Error::new(io::ErrorKind::InvalidData, format!("the update is Stowlark {version}, which is not newer than this {}", env!("CARGO_PKG_VERSION"))));
     }
     Ok(())
 }
@@ -286,21 +285,21 @@ pub fn run(args: &[String]) -> io::Result<()> {
     let current = env!("CARGO_PKG_VERSION");
     let release = latest()?;
     if !newer(&release.version, current) {
-        println!("Kiri {current} is up to date");
+        println!("Stowlark {current} is up to date");
         return Ok(());
     }
-    println!("Kiri {} is available (this is {current}){}", release.version, if release.notes.is_empty() { String::new() } else { format!(": {}", release.notes) });
+    println!("Stowlark {} is available (this is {current}){}", release.version, if release.notes.is_empty() { String::new() } else { format!(": {}", release.notes) });
     if args.iter().any(|a| a == "--check") {
         return Ok(());
     }
     if cfg!(target_os = "linux") {
-        return Err(io::Error::other("download the new .deb or .rpm from https://runkiri.com/releases/ and install it as before"));
+        return Err(io::Error::other(format!("Download the new .deb or .rpm from {RELEASES} and install it as before.")));
     }
     download(&release, &mut |_, _| {}, &AtomicBool::new(false))?;
     install_staged()?;
     // The daemon runs from the app: restart it on the new binary.
     restart_engine();
-    println!("updated to Kiri {}", release.version);
+    println!("updated to Stowlark {}", release.version);
     Ok(())
 }
 
@@ -358,8 +357,8 @@ mod tests {
     fn reads_feeds_with_and_without_notes_url() {
         let r: Release = serde_json::from_str(r#"{"version":"0.1.1","url":"https://x/K.tar.gz","sha256":"ab"}"#).unwrap();
         assert_eq!(r.notes_url, "");
-        let r: Release = serde_json::from_str(r#"{"version":"0.1.1","url":"u","sha256":"ab","notes_url":"https://runkiri.com/"}"#).unwrap();
-        assert_eq!(r.notes_url, "https://runkiri.com/");
+        let r: Release = serde_json::from_str(r#"{"version":"0.1.1","url":"u","sha256":"ab","notes_url":"https://example.invalid/releases"}"#).unwrap();
+        assert_eq!(r.notes_url, "https://example.invalid/releases");
         let r: Release = serde_json::from_str(r###"{"version":"0.1.5","url":"u","sha256":"ab","notes":"## New\n- a line"}"###).unwrap();
         assert_eq!(r.notes, "## New\n- a line");
     }

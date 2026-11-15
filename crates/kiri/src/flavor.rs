@@ -1,20 +1,20 @@
-//! Kiri Dev: a second Kiri beside the installed one, for trying changes
-//! without touching it (`cargo xtask app-dev` builds `Kiri Dev.app`).
+//! Stowlark Dev: a second Stowlark beside the installed one, for trying changes
+//! without touching it (`cargo xtask app-dev` builds `Stowlark Dev.app`).
 //!
 //! It is the same binary; running from a bundle whose identifier is
-//! `dev.kiri.app.dev` makes it Dev. Everything two Kiris would share gets
-//! its own name: `~/.kiri-dev` (socket, settings, logs),
-//! `~/Library/Application Support/Kiri Dev` (images, volumes, the VM's
-//! disk), the `dev.kiri.daemon.dev` LaunchAgent, the `kiri-dev` docker and
-//! kubectl contexts and `~/Kiri Dev` in Finder. It leaves to the installed
-//! Kiri what there is one of on a Mac: `*.kiri.local`, the container-name
+//! `dev.stowlark.app.dev` makes it Dev. Everything two installations would share gets
+//! its own name: `~/.stowlark-dev` (socket, settings, logs),
+//! `~/Library/Application Support/Stowlark Dev` (images, volumes, the VM's
+//! disk), the `dev.stowlark.daemon.dev` LaunchAgent, the `stowlark-dev` docker and
+//! kubectl contexts and `~/Stowlark Dev` in Finder. It leaves to the installed
+//! Stowlark what there is one of on a Mac: `*.stowlark.local`, the container-name
 //! routers on ports 80 and 443, docker's default context, the shell PATH
 //! and updates.
 //!
-//! A feature app (`cargo xtask app-dev builds` builds `Kiri Builds.app`,
-//! identifier `dev.kiri.app.builds`) is a Kiri Dev of its own, for
+//! A feature app (`cargo xtask app-dev builds` builds `Stowlark Builds.app`,
+//! identifier `dev.stowlark.app.builds`) is a Stowlark Dev of its own, for
 //! trying one unreleased feature: every Dev name with `dev` swapped for the
-//! feature's (`~/.kiri-builds`, the `kiri-builds` context, and so on).
+//! feature's (`~/.stowlark-builds`, the `stowlark-builds` context, and so on).
 
 // Some names serve only the Mac (the app, its LaunchAgent).
 #![cfg_attr(not(target_os = "macos"), allow(dead_code))]
@@ -22,17 +22,17 @@
 use std::fmt;
 use std::sync::OnceLock;
 
-/// Kiri Dev.app's bundle identifier.
-pub const DEV_APP_ID: &str = "dev.kiri.app.dev";
+/// Stowlark Dev.app's bundle identifier.
+pub const DEV_APP_ID: &str = "dev.stowlark.app.dev";
 
-/// Whether this binary is Kiri Dev (or a feature app): it runs from a
-/// bundle (directly, or through `~/.kiri-dev/bin/kiri`, a link into it)
-/// whose identifier is `DEV_APP_ID`, or `dev.kiri.app.<feature>`.
+/// Whether this binary is Stowlark Dev (or a feature app): it runs from a
+/// bundle (directly, or through `~/.stowlark-dev/bin/stowlark`, a link into it)
+/// whose identifier is `DEV_APP_ID`, or `dev.stowlark.app.<feature>`.
 pub fn dev() -> bool {
     flavor().is_some()
 }
 
-/// `Some("")` for Kiri Dev, `Some("builds")` for Kiri Builds, `None` for Kiri.
+/// `Some("")` for Stowlark Dev, `Some("builds")` for Stowlark Builds, `None` for Stowlark.
 fn flavor() -> Option<&'static str> {
     static FLAVOR: OnceLock<Option<String>> = OnceLock::new();
     FLAVOR
@@ -43,14 +43,14 @@ fn flavor() -> Option<&'static str> {
             if id == DEV_APP_ID {
                 return Some(String::new());
             }
-            let f = id.strip_prefix("dev.kiri.app.")?;
+            let f = id.strip_prefix("dev.stowlark.app.")?;
             (!f.is_empty() && f.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())).then(|| f.to_owned())
         })
         .as_deref()
 }
 
-/// A Dev name made a feature's: `Kiri Dev` → `Kiri Builds`, `kiri-dev` →
-/// `kiri-builds`, `dev.kiri.daemon.dev` → `dev.kiri.daemon.builds`.
+/// A Dev name made a feature's: `Stowlark Dev` → `Stowlark Builds`, `stowlark-dev` →
+/// `stowlark-builds`, `dev.stowlark.daemon.dev` → `dev.stowlark.daemon.builds`.
 fn featured(dev_name: &str, feature: &str) -> String {
     let title = feature[..1].to_ascii_uppercase() + &feature[1..];
     if let Some(head) = dev_name.strip_suffix(".dev") {
@@ -88,21 +88,21 @@ impl fmt::Display for Name {
 }
 
 /// The app's name, as the window and Finder show it.
-pub const APP: Name = Name("Kiri", "Kiri Dev");
+pub const APP: Name = Name("Stowlark", "Stowlark Dev");
 /// Under HOME: the daemon's socket and state, the window's settings.
-pub const STATE: Name = Name(".kiri", ".kiri-dev");
+pub const STATE: Name = Name(".stowlark", ".stowlark-dev");
 /// The docker context, and the kubectl one.
-pub const CONTEXT: Name = Name("kiri", "kiri-dev");
-pub const AGENT: Name = Name("dev.kiri.daemon", "dev.kiri.daemon.dev");
-pub const APP_ID: Name = Name("dev.kiri.app", DEV_APP_ID);
+pub const CONTEXT: Name = Name("stowlark", "stowlark-dev");
+pub const AGENT: Name = Name("dev.stowlark.daemon", "dev.stowlark.daemon.dev");
+pub const APP_ID: Name = Name("dev.stowlark.app", DEV_APP_ID);
 
-/// Kiri Dev keeps its images, volumes and VM disk apart: `KIRI_DATA_DIR`,
+/// Stowlark Dev keeps its images, volumes and VM disk apart: `STOWLARK_DATA_DIR`,
 /// which `Store::default_root` reads, set before any thread starts.
 pub fn init() {
-    if dev() && std::env::var_os("KIRI_DATA_DIR").is_none() {
+    if dev() && std::env::var_os("STOWLARK_DATA_DIR").is_none() {
         if let Some(home) = std::env::var_os("HOME") {
             // SAFETY: called first thing in main, before any other thread.
-            unsafe { std::env::set_var("KIRI_DATA_DIR", std::path::Path::new(&home).join("Library/Application Support").join(APP.get())) };
+            unsafe { std::env::set_var("STOWLARK_DATA_DIR", std::path::Path::new(&home).join("Library/Application Support").join(APP.get())) };
         }
     }
 }
@@ -112,17 +112,17 @@ mod tests {
     #[test]
     fn a_test_binary_is_not_dev() {
         assert!(!super::dev());
-        assert_eq!((super::STATE.get(), super::CONTEXT.to_string()), (".kiri", "kiri".to_owned()));
+        assert_eq!((super::STATE.get(), super::CONTEXT.to_string()), (".stowlark", "stowlark".to_owned()));
     }
 
     #[test]
     fn a_feature_renames_every_dev_name() {
         use super::featured;
-        assert_eq!(featured("Kiri Dev", "builds"), "Kiri Builds");
-        assert_eq!(featured(".kiri-dev", "builds"), ".kiri-builds");
-        assert_eq!(featured("kiri-dev", "builds"), "kiri-builds");
-        assert_eq!(featured("kiri-dev-build", "builds"), "kiri-builds-build");
-        assert_eq!(featured("dev.kiri.daemon.dev", "builds"), "dev.kiri.daemon.builds");
-        assert_eq!(featured("dev.kiri.app.dev", "builds"), "dev.kiri.app.builds");
+        assert_eq!(featured("Stowlark Dev", "builds"), "Stowlark Builds");
+        assert_eq!(featured(".stowlark-dev", "builds"), ".stowlark-builds");
+        assert_eq!(featured("stowlark-dev", "builds"), "stowlark-builds");
+        assert_eq!(featured("stowlark-dev-build", "builds"), "stowlark-builds-build");
+        assert_eq!(featured("dev.stowlark.daemon.dev", "builds"), "dev.stowlark.daemon.builds");
+        assert_eq!(featured("dev.stowlark.app.dev", "builds"), "dev.stowlark.app.builds");
     }
 }

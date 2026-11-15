@@ -1,10 +1,10 @@
-//! `kiri host-access <user>`: everything the window's onboarding on a Linux
+//! `stowlark host-access <user>`: everything the window's onboarding on a Linux
 //! host needs root for, in one go, so the system asks for a password once.
-//! The window runs it through pkexec (the polkit action dev.kiri.host-access,
-//! packaging/linux/dev.kiri.host-access.policy); `sudo kiri host-access $USER`
+//! The window runs it through pkexec (the polkit action dev.stowlark.host-access,
+//! packaging/linux/dev.stowlark.host-access.policy); `sudo stowlark host-access $USER`
 //! does the same from a terminal.
 //!
-//! 1. The `kiri` group, if the package's install didn't make it.
+//! 1. The `stowlark` group, if the package's install didn't make it.
 //! 2. `user` in it.
 //! 3. The engine: started (and started at boot) if it isn't running,
 //!    restarted if it is but doesn't answer.
@@ -12,7 +12,7 @@
 //!    the change applies now, without signing in again.
 //!
 //! Exit status: 0 done; 10 done, but this system keeps no access lists, so
-//! `user` must log out and back in once before Kiri lets them in.
+//! `user` must log out and back in once before Stowlark lets them in.
 
 use std::io;
 use std::os::unix::net::UnixStream;
@@ -20,16 +20,16 @@ use std::path::Path;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
-const GROUP: &str = "kiri";
+const GROUP: &str = "stowlark";
 const SOCKET: &str = crate::client::SERVICE_SOCKET;
 /// The exit status that says: done, but sign in again before it applies.
 pub const SIGN_IN_AGAIN: u8 = 10;
 
 pub fn run(args: &[String]) -> io::Result<u8> {
-    let [user] = args else { return Err(io::Error::other("usage: kiri host-access USER")) };
+    let [user] = args else { return Err(io::Error::other("usage: stowlark host-access USER")) };
     // SAFETY: geteuid has no preconditions.
     if unsafe { libc::geteuid() } != 0 {
-        return Err(io::Error::other(format!("needs root: sudo kiri host-access {user}")));
+        return Err(io::Error::other(format!("needs root: sudo stowlark host-access {user}")));
     }
     if crate::daemon::access::uid(user).is_none() {
         return Err(io::Error::other(format!("no account named {user}")));
@@ -48,11 +48,11 @@ pub fn run(args: &[String]) -> io::Result<u8> {
     engine()?;
     match crate::daemon::access::grant(Path::new(SOCKET), GROUP) {
         Ok(_) => {
-            println!("{user} can use Kiri now");
+            println!("{user} can use Stowlark now");
             Ok(0)
         }
         Err(e) if crate::daemon::access::unsupported(&e) => {
-            println!("{user} can use Kiri after logging out and back in (this system keeps no access lists)");
+            println!("{user} can use Stowlark after logging out and back in (this system keeps no access lists)");
             Ok(SIGN_IN_AGAIN)
         }
         Err(e) => Err(io::Error::other(format!("couldn't give {user} the socket: {e}"))),
@@ -64,11 +64,11 @@ fn engine() -> io::Result<()> {
     if answers() {
         return Ok(());
     }
-    let active = Command::new("systemctl").args(["is-active", "--quiet", "kiri"]).status().is_ok_and(|s| s.success());
+    let active = Command::new("systemctl").args(["is-active", "--quiet", "stowlark"]).status().is_ok_and(|s| s.success());
     if active {
-        must(Command::new("systemctl").args(["restart", "kiri"]), "systemctl restart kiri")?;
+        must(Command::new("systemctl").args(["restart", "stowlark"]), "systemctl restart stowlark")?;
     } else {
-        must(Command::new("systemctl").args(["enable", "--now", "kiri"]), "systemctl enable --now kiri")?;
+        must(Command::new("systemctl").args(["enable", "--now", "stowlark"]), "systemctl enable --now stowlark")?;
     }
     let deadline = Instant::now() + Duration::from_secs(20);
     while Instant::now() < deadline {
@@ -77,7 +77,7 @@ fn engine() -> io::Result<()> {
         }
         std::thread::sleep(Duration::from_millis(200));
     }
-    Err(io::Error::other("Kiri's engine didn't start: journalctl -u kiri says why"))
+    Err(io::Error::other("Stowlark's engine didn't start: journalctl -u stowlark says why"))
 }
 
 fn answers() -> bool {

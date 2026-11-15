@@ -269,7 +269,7 @@ pub fn add_address(nl: &mut Netlink, index: i32, addr: [u8; 4], prefix: u8) -> i
 
 /// An IPv6 address, usable at once: no duplicate address detection, which
 /// would leave it tentative (not usable as a source) for about a second.
-/// Kiri hands out every address on its networks, so none can be taken.
+/// Stowlark hands out every address on its networks, so none can be taken.
 pub fn add_address6(nl: &mut Netlink, index: i32, addr: [u8; 16], prefix: u8) -> io::Result<()> {
     const IFA_F_NODAD: u8 = 0x02;
     let mut m = Msg::new(RTM_NEWADDR, NLM_F_ACK | NLM_F_CREATE | NLM_F_EXCL);
@@ -394,27 +394,27 @@ fn nft_in(family: u8, msg: u16, flags: u16) -> Msg {
 /// A nat chain on `hook` (NF_INET_*) at `priority`.
 fn nat_chain(name: &str, hook: u32, priority: i32) -> Msg {
     let mut chain = nft(NFT_MSG_NEWCHAIN, NLM_F_ACK | NLM_F_CREATE);
-    chain.attr_str(1, "kiri").attr_str(3, name);
+    chain.attr_str(1, "stowlark").attr_str(3, name);
     chain.nest(4).attr_be32(1, hook).attr_be32(2, priority as u32).end();
     chain.attr_be32(5, 1).attr_str(7, "nat");
     chain
 }
 
-/// Kiri's container bridges are kiri0, kiri1, … (the daemon names them).
-const BRIDGE_PREFIX: &[u8] = b"kiri";
+/// Stowlark's container bridges are stowlark0, stowlark1, … (the daemon names them).
+const BRIDGE_PREFIX: &[u8] = b"stowlark";
 
 /// `ip daddr <addr> tcp redirect to :<port>`: connections to `addr` (any
 /// port) go to a local listener, which can read the original port back.
-/// With `from_bridges`, only packets arriving on a Kiri bridge match
-/// (`iifname "kiri*"`): the redirect leads to the host's loopback, which
+/// With `from_bridges`, only packets arriving on a Stowlark bridge match
+/// (`iifname "stowlark*"`): the redirect leads to the host's loopback, which
 /// nothing on the uplink (the LAN, on a Linux host) may reach.
 fn redirect_rule(chain: &str, addr: [u8; 4], port: u16, from_bridges: bool) -> Msg {
     let mut rule = nft(NFT_MSG_NEWRULE, NLM_F_ACK | NLM_F_CREATE | 0x800);
-    rule.attr_str(1, "kiri").attr_str(2, chain);
+    rule.attr_str(1, "stowlark").attr_str(2, chain);
     rule.nest(4);
     if from_bridges {
         // meta iifname => reg 1 (NFT_META_IIFNAME is 6); cmp eq on its first
-        // bytes only, a prefix match as nft compiles `iifname "kiri*"`.
+        // bytes only, a prefix match as nft compiles `iifname "stowlark*"`.
         rule.nest(1).attr_str(1, "meta").nest(2).attr_be32(1, 1).attr_be32(2, 6).end().end();
         rule.nest(1).attr_str(1, "cmp").nest(2).attr_be32(1, 1).attr_be32(2, 0).nest(3).attr(1, BRIDGE_PREFIX).end().end().end();
     }
@@ -431,14 +431,14 @@ fn redirect_rule(chain: &str, addr: [u8; 4], port: u16, from_bridges: bool) -> M
     rule
 }
 
-/// `iifname "kiri*" ip daddr <addr> udp dport 53 redirect to :53`: DNS
+/// `iifname "stowlark*" ip daddr <addr> udp dport 53 redirect to :53`: DNS
 /// sent to the host's address goes to the embedded DNS on the receiving
 /// bridge's gateway. A kind node rewrites its resolv.conf from 127.0.0.11 to
 /// host.docker.internal's address for its pods, expecting the engine's DNS
 /// there, as Docker Desktop has it.
 fn dns_redirect_rule(addr: [u8; 4]) -> Msg {
     let mut rule = nft(NFT_MSG_NEWRULE, NLM_F_ACK | NLM_F_CREATE | 0x800);
-    rule.attr_str(1, "kiri").attr_str(2, "prerouting");
+    rule.attr_str(1, "stowlark").attr_str(2, "prerouting");
     rule.nest(4);
     rule.nest(1).attr_str(1, "meta").nest(2).attr_be32(1, 1).attr_be32(2, 6).end().end();
     rule.nest(1).attr_str(1, "cmp").nest(2).attr_be32(1, 1).attr_be32(2, 0).nest(3).attr(1, BRIDGE_PREFIX).end().end().end();
@@ -480,7 +480,7 @@ fn dnat_rule(chain: &str, d: &Dnat) -> Msg {
 /// from address `from.1` (`iif <uplink> ip saddr <gateway> ...`).
 fn dnat_rule_from(chain: &str, d: &Dnat, from: Option<(i32, [u8; 4])>) -> Msg {
     let mut rule = nft(NFT_MSG_NEWRULE, NLM_F_ACK | NLM_F_CREATE | 0x800);
-    rule.attr_str(1, "kiri").attr_str(2, chain);
+    rule.attr_str(1, "stowlark").attr_str(2, chain);
     rule.nest(4);
     if let Some((iif, saddr)) = from {
         // meta iif (NFT_META_IIF is 4) => reg 1; cmp eq the interface index
@@ -519,7 +519,7 @@ fn dnat_rule_from(chain: &str, d: &Dnat, from: Option<(i32, [u8; 4])>) -> Msg {
     rule
 }
 
-/// `iif <uplink> ip saddr <gateway> oifname "kiri*" masquerade random-fully`:
+/// `iif <uplink> ip saddr <gateway> oifname "stowlark*" masquerade random-fully`:
 /// in the VM, the Mac's connections to published ports reach the container
 /// from the bridge's own address on a fresh port: the container sees the
 /// bridge gateway, as it did when the agent relayed and as Docker's proxy
@@ -527,7 +527,7 @@ fn dnat_rule_from(chain: &str, d: &Dnat, from: Option<(i32, [u8; 4])>) -> Msg {
 /// TIME_WAIT never meets the old socket.
 fn published_masq_rule(uplink_index: i32, gateway: [u8; 4]) -> Msg {
     let mut rule = nft(NFT_MSG_NEWRULE, NLM_F_ACK | NLM_F_CREATE | 0x800);
-    rule.attr_str(1, "kiri").attr_str(2, "postrouting");
+    rule.attr_str(1, "stowlark").attr_str(2, "postrouting");
     rule.nest(4);
     // meta iif (NFT_META_IIF is 4) => reg 1; cmp eq the uplink
     rule.nest(1).attr_str(1, "meta").nest(2).attr_be32(1, 1).attr_be32(2, 4).end().end();
@@ -552,10 +552,10 @@ const CT_STATUS_DNAT: u32 = 1 << 5;
 ///
 /// ```text
 /// chain forward { type filter hook forward priority 0; policy accept;
-///   oifname != "kiri*" accept            # not to a container: not ours
+///   oifname != "stowlark*" accept            # not to a container: not ours
 ///   ct state established,related accept
 ///   ct status dnat accept                # a published port
-///   iifname "kiri1" oifname "kiri1" accept   # same network, one per bridge
+///   iifname "stowlark1" oifname "stowlark1" accept   # same network, one per bridge
 ///   drop
 /// }
 /// ```
@@ -563,7 +563,7 @@ const CT_STATUS_DNAT: u32 = 1 << 5;
 /// Without it, anything that can route to the engine (another VM on the
 /// NAT network, a LAN neighbour of a Linux host) reached every container
 /// port, published or not, with ip_forward on. Only traffic headed into a
-/// Kiri bridge is judged: a Linux host's other forwarding stays as it was.
+/// Stowlark bridge is judged: a Linux host's other forwarding stays as it was.
 ///
 /// Containers on different networks do not reach each other, as Docker's
 /// DOCKER-ISOLATION chains keep them apart: a packet from one bridge is
@@ -585,12 +585,12 @@ fn forward_filter(bridges: &[String]) -> Vec<Msg> {
 fn forward_filter_in(family: u8, bridges: &[String]) -> Vec<Msg> {
     let nft = |msg, flags| nft_in(family, msg, flags);
     let mut chain = nft(NFT_MSG_NEWCHAIN, NLM_F_ACK | NLM_F_CREATE);
-    chain.attr_str(1, "kiri").attr_str(3, "forward");
+    chain.attr_str(1, "stowlark").attr_str(3, "forward");
     chain.nest(4).attr_be32(1, 2).attr_be32(2, 0).end(); // NF_INET_FORWARD, priority 0
     chain.attr_be32(5, 1).attr_str(7, "filter");
     let rule = |build: &dyn Fn(&mut Msg), verdict: u32| {
         let mut rule = nft(NFT_MSG_NEWRULE, NLM_F_ACK | NLM_F_CREATE | 0x800);
-        rule.attr_str(1, "kiri").attr_str(2, "forward");
+        rule.attr_str(1, "stowlark").attr_str(2, "forward");
         rule.nest(4);
         build(&mut rule);
         // immediate verdict: dreg 0 (NFT_REG_VERDICT), NFTA_DATA_VERDICT { code }
@@ -598,7 +598,7 @@ fn forward_filter_in(family: u8, bridges: &[String]) -> Vec<Msg> {
         rule.end();
         rule
     };
-    // meta iifname/oifname (6/7) => reg 1; cmp `op` on the "kiri" prefix
+    // meta iifname/oifname (6/7) => reg 1; cmp `op` on the "stowlark" prefix
     let ifname = |key: u32, op: u32| {
         move |r: &mut Msg| {
             r.nest(1).attr_str(1, "meta").nest(2).attr_be32(1, 1).attr_be32(2, key).end().end();
@@ -642,7 +642,7 @@ fn forward_filter_in(family: u8, bridges: &[String]) -> Vec<Msg> {
 ///
 /// ```text
 /// chain input { type filter hook input priority 0; policy accept;
-///   iifname "kiri*" ip daddr 127.0.0.0/8 ct state & (established|related) == 0
+///   iifname "stowlark*" ip daddr 127.0.0.0/8 ct state & (established|related) == 0
 ///     ct status & dnat == 0 drop
 /// }
 /// ```
@@ -650,20 +650,20 @@ fn forward_filter_in(family: u8, bridges: &[String]) -> Vec<Msg> {
 /// With `route_localnet` on a bridge, the kernel would take a packet a
 /// container sends to 127.0.0.1 (raw socket, gateway MAC) as local: any
 /// service bound to the host's loopback answered (the CVE-2020-8558 hole,
-/// closed as kube-proxy does). Kiri no longer sets it (the daemon relays
+/// closed as kube-proxy does). Stowlark no longer sets it (the daemon relays
 /// the host's loopback connections to published ports), but something
 /// else on a Linux host may (kube-proxy sets `conf.all.route_localnet`),
 /// so the guard stays. Replies to established connections still pass.
 /// Harmless in the VM, which never sets `route_localnet`.
 fn localnet_guard() -> Vec<Msg> {
     let mut chain = nft(NFT_MSG_NEWCHAIN, NLM_F_ACK | NLM_F_CREATE);
-    chain.attr_str(1, "kiri").attr_str(3, "input");
+    chain.attr_str(1, "stowlark").attr_str(3, "input");
     chain.nest(4).attr_be32(1, 1).attr_be32(2, 0).end(); // NF_INET_LOCAL_IN, priority 0
     chain.attr_be32(5, 1).attr_str(7, "filter");
     let mut rule = nft(NFT_MSG_NEWRULE, NLM_F_ACK | NLM_F_CREATE | 0x800);
-    rule.attr_str(1, "kiri").attr_str(2, "input");
+    rule.attr_str(1, "stowlark").attr_str(2, "input");
     rule.nest(4);
-    // meta iifname => reg 1; cmp eq "kiri" prefix
+    // meta iifname => reg 1; cmp eq "stowlark" prefix
     rule.nest(1).attr_str(1, "meta").nest(2).attr_be32(1, 1).attr_be32(2, 6).end().end();
     rule.nest(1).attr_str(1, "cmp").nest(2).attr_be32(1, 1).attr_be32(2, 0).nest(3).attr(1, BRIDGE_PREFIX).end().end().end();
     // payload daddr => reg 1; reg 1 &= 255.0.0.0; cmp eq 127.0.0.0
@@ -700,7 +700,7 @@ fn localnet_guard() -> Vec<Msg> {
 /// now it is not even accepted. Redirected connections are DNATed and pass.
 fn host_relay_guard(port: u16) -> Msg {
     let mut rule = nft(NFT_MSG_NEWRULE, NLM_F_ACK | NLM_F_CREATE | 0x800);
-    rule.attr_str(1, "kiri").attr_str(2, "input");
+    rule.attr_str(1, "stowlark").attr_str(2, "input");
     rule.nest(4);
     // meta l4proto => reg 1; cmp eq tcp
     rule.nest(1).attr_str(1, "meta").nest(2).attr_be32(1, 1).attr_be32(2, 16).end().end();
@@ -728,13 +728,13 @@ fn dnat_rules(chain: &str, d: &Dnat, local: Option<&[[u8; 4]]>) -> Vec<Msg> {
     }
 }
 
-/// `ip6 saddr <subnet>/<prefix> oifname != "kiri*" masquerade`: an IPv6
+/// `ip6 saddr <subnet>/<prefix> oifname != "stowlark*" masquerade`: an IPv6
 /// network's traffic leaving the bridges gets the outgoing interface's
 /// address, as Docker's MASQUERADE rule per network does (NAT66). Matched by
 /// source, as Docker does: an input interface is not known in postrouting.
 fn masq6_rule(subnet: [u8; 16], prefix: u8) -> Msg {
     let mut rule = nft_in(libc::NFPROTO_IPV6 as u8, NFT_MSG_NEWRULE, NLM_F_ACK | NLM_F_CREATE | 0x800);
-    rule.attr_str(1, "kiri").attr_str(2, "postrouting");
+    rule.attr_str(1, "stowlark").attr_str(2, "postrouting");
     rule.nest(4);
     let mut mask = [0u8; 16];
     for (i, b) in mask.iter_mut().enumerate() {
@@ -746,7 +746,7 @@ fn masq6_rule(subnet: [u8; 16], prefix: u8) -> Msg {
     rule.nest(1).attr_str(1, "bitwise").nest(2).attr_be32(1, 1).attr_be32(2, 1).attr_be32(3, 16);
     rule.nest(4).attr(1, &mask).end().nest(5).attr(1, &[0; 16]).end().end().end();
     rule.nest(1).attr_str(1, "cmp").nest(2).attr_be32(1, 1).attr_be32(2, 0).nest(3).attr(1, &subnet).end().end().end();
-    // meta oifname => reg 1; cmp neq the "kiri" prefix
+    // meta oifname => reg 1; cmp neq the "stowlark" prefix
     rule.nest(1).attr_str(1, "meta").nest(2).attr_be32(1, 1).attr_be32(2, 7).end().end();
     rule.nest(1).attr_str(1, "cmp").nest(2).attr_be32(1, 1).attr_be32(2, 1).nest(3).attr(1, BRIDGE_PREFIX).end().end().end();
     rule.nest(1).attr_str(1, "masq").end();
@@ -754,13 +754,13 @@ fn masq6_rule(subnet: [u8; 16], prefix: u8) -> Msg {
     rule
 }
 
-/// Kiri's IPv6 table, for the IPv6 networks `subnets`, rebuilt whole (and
+/// Stowlark's IPv6 table, for the IPv6 networks `subnets`, rebuilt whole (and
 /// removed with the last one, so an engine with none has no IPv6 rules):
 ///
 /// ```text
-/// table ip6 kiri {
+/// table ip6 stowlark {
 ///   chain postrouting { type nat hook postrouting priority 100;
-///     ip6 saddr <subnet> oifname != "kiri*" masquerade   # one per network
+///     ip6 saddr <subnet> oifname != "stowlark*" masquerade   # one per network
 ///   }
 ///   chain forward { … }   (the IPv4 table's `forward_filter`)
 /// }
@@ -771,15 +771,15 @@ pub fn install_nat6(subnets: &[([u8; 16], u8)], bridges: &[String]) -> io::Resul
     let mut begin = Msg::new(NFNL_MSG_BATCH_BEGIN, 0);
     begin.raw(&nfgen(libc::AF_UNSPEC as u8, NFNL_SUBSYS_NFTABLES));
     let mut destroy = nft_in(v6, NFT_MSG_DESTROYTABLE, NLM_F_ACK);
-    destroy.attr_str(1, "kiri");
+    destroy.attr_str(1, "stowlark");
     let mut end = Msg::new(NFNL_MSG_BATCH_END, 0);
     end.raw(&nfgen(libc::AF_UNSPEC as u8, NFNL_SUBSYS_NFTABLES));
     let mut msgs = vec![begin, destroy];
     if !subnets.is_empty() {
         let mut table = nft_in(v6, NFT_MSG_NEWTABLE, NLM_F_ACK | NLM_F_CREATE);
-        table.attr_str(1, "kiri");
+        table.attr_str(1, "stowlark");
         let mut chain = nft_in(v6, NFT_MSG_NEWCHAIN, NLM_F_ACK | NLM_F_CREATE);
-        chain.attr_str(1, "kiri").attr_str(3, "postrouting");
+        chain.attr_str(1, "stowlark").attr_str(3, "postrouting");
         chain.nest(4).attr_be32(1, 4).attr_be32(2, 100).end();
         chain.attr_be32(5, 1).attr_str(7, "nat");
         msgs.push(table);
@@ -791,22 +791,22 @@ pub fn install_nat6(subnets: &[([u8; 16], u8)], bridges: &[String]) -> io::Resul
     nl.request(&mut msgs)
 }
 
-/// Removes Kiri's table (a Linux host's engine stopping), if there is one.
+/// Removes Stowlark's table (a Linux host's engine stopping), if there is one.
 pub fn remove_nat() -> io::Result<()> {
     let mut nl = Netlink::open(libc::NETLINK_NETFILTER)?;
     let mut begin = Msg::new(NFNL_MSG_BATCH_BEGIN, 0);
     begin.raw(&nfgen(libc::AF_UNSPEC as u8, NFNL_SUBSYS_NFTABLES));
     let mut destroy = nft(NFT_MSG_DESTROYTABLE, NLM_F_ACK);
-    destroy.attr_str(1, "kiri");
+    destroy.attr_str(1, "stowlark");
     let mut end = Msg::new(NFNL_MSG_BATCH_END, 0);
     end.raw(&nfgen(libc::AF_UNSPEC as u8, NFNL_SUBSYS_NFTABLES));
     nl.request(&mut [begin, destroy, end])
 }
 
-/// Kiri's NAT table:
+/// Stowlark's NAT table:
 ///
 /// ```text
-/// table ip kiri {
+/// table ip stowlark {
 ///   chain postrouting { type nat hook postrouting priority 100; oif <uplink> masquerade }
 ///   chain prerouting  { type nat hook prerouting priority -100; ip daddr <host> tcp redirect to :<port> }
 ///   chain output      { type nat hook output priority -100;     ip daddr <host> tcp redirect to :<port> }
@@ -832,18 +832,18 @@ pub fn install_nat_from(uplink_index: i32, host_addr: [u8; 4], host_port: u16, r
     let mut begin = Msg::new(NFNL_MSG_BATCH_BEGIN, 0);
     begin.raw(&nfgen(libc::AF_UNSPEC as u8, NFNL_SUBSYS_NFTABLES));
     let mut destroy = nft(NFT_MSG_DESTROYTABLE, NLM_F_ACK);
-    destroy.attr_str(1, "kiri");
+    destroy.attr_str(1, "stowlark");
 
     let mut table = nft(NFT_MSG_NEWTABLE, NLM_F_ACK | NLM_F_CREATE);
-    table.attr_str(1, "kiri"); // NFTA_TABLE_NAME
+    table.attr_str(1, "stowlark"); // NFTA_TABLE_NAME
 
     let mut chain = nft(NFT_MSG_NEWCHAIN, NLM_F_ACK | NLM_F_CREATE);
-    chain.attr_str(1, "kiri").attr_str(3, "postrouting"); // NFTA_CHAIN_TABLE, NFTA_CHAIN_NAME
+    chain.attr_str(1, "stowlark").attr_str(3, "postrouting"); // NFTA_CHAIN_TABLE, NFTA_CHAIN_NAME
     chain.nest(4).attr_be32(1, 4).attr_be32(2, 100).end(); // NFTA_CHAIN_HOOK: hooknum POSTROUTING, priority
     chain.attr_be32(5, 1).attr_str(7, "nat"); // NFTA_CHAIN_POLICY accept, NFTA_CHAIN_TYPE
 
     let mut rule = nft(NFT_MSG_NEWRULE, NLM_F_ACK | NLM_F_CREATE | 0x800); // NLM_F_APPEND
-    rule.attr_str(1, "kiri").attr_str(2, "postrouting"); // NFTA_RULE_TABLE, NFTA_RULE_CHAIN
+    rule.attr_str(1, "stowlark").attr_str(2, "postrouting"); // NFTA_RULE_TABLE, NFTA_RULE_CHAIN
     rule.nest(4); // NFTA_RULE_EXPRESSIONS
     // meta load oif => reg 1 (NFTA_META_DREG, NFTA_META_KEY = NFT_META_OIF, which is 5)
     rule.nest(1).attr_str(1, "meta").nest(2).attr_be32(1, 1).attr_be32(2, 5).end().end();
@@ -874,7 +874,7 @@ pub fn install_nat_from(uplink_index: i32, host_addr: [u8; 4], host_port: u16, r
     }
     let pre = nat_chain("prerouting", 0, -100); // NF_INET_PRE_ROUTING
     let out = nat_chain("output", 3, -100); // NF_INET_LOCAL_OUT
-    // Only from Kiri's own bridges: the LAN must not reach the loopback relay.
+    // Only from Stowlark's own bridges: the LAN must not reach the loopback relay.
     let pre_rule = redirect_rule("prerouting", host_addr, host_port, true);
     // The host's own connections (and `--network host` containers).
     let out_rule = redirect_rule("output", host_addr, host_port, false);
@@ -918,10 +918,10 @@ mod tests {
 
     #[test]
     fn a_bridge_is_made_with_a_mac_address_of_its_own() {
-        let m = new_bridge("kiri0", bridge_mac([0xff; 6]));
+        let m = new_bridge("stowlark0", bridge_mac([0xff; 6]));
         let a = attrs(&m.buf[32..]); // nlmsghdr, ifinfomsg
         assert_eq!(get(&a, IFLA_ADDRESS), &[0xfe, 0xff, 0xff, 0xff, 0xff, 0xff]);
-        assert_eq!(get(&a, IFLA_IFNAME), b"kiri0\0");
+        assert_eq!(get(&a, IFLA_IFNAME), b"stowlark0\0");
         // Locally administered, never multicast.
         for b in [[0u8; 6], [0x01; 6], [0xff; 6]] {
             assert_eq!(bridge_mac(b)[0] & 0x03, 0x02);
@@ -931,7 +931,7 @@ mod tests {
     /// A rule's expressions: (name, its NFTA_EXPR_DATA attributes).
     fn exprs(m: &Msg) -> Vec<(String, Vec<(u16, &[u8])>)> {
         let top = attrs(&m.buf[20..]); // nlmsghdr, nfgenmsg
-        assert_eq!(get(&top, 1), b"kiri\0");
+        assert_eq!(get(&top, 1), b"stowlark\0");
         attrs(get(&top, 4))
             .into_iter()
             .map(|(_, e)| {
@@ -956,7 +956,7 @@ mod tests {
 
     #[test]
     fn forward_keeps_networks_apart() {
-        let msgs = forward_filter(&["kiri1".to_owned(), "kiri22".to_owned()]);
+        let msgs = forward_filter(&["stowlark1".to_owned(), "stowlark22".to_owned()]);
         assert_eq!(msgs.len(), 7);
         let rules = &msgs[1..];
         // Nothing from a bridge is accepted on the interface name alone: that
@@ -968,7 +968,7 @@ mod tests {
         }
         // One rule per bridge: in by it and out by it, the whole name. No
         // fib expression anywhere (WSL2's kernel has no nft_fib_ipv6).
-        for (same, name) in rules[3..5].iter().zip([&b"kiri1"[..], b"kiri22"]) {
+        for (same, name) in rules[3..5].iter().zip([&b"stowlark1"[..], b"stowlark22"]) {
             assert_eq!(names(same), ["meta", "cmp", "meta", "cmp", "immediate"]);
             let e = exprs(same);
             let mut full = [0u8; 16];
@@ -1009,7 +1009,7 @@ mod tests {
         let e = exprs(&odd);
         assert_eq!(get(&attrs(get(&e[1].1, 4)), 1)[..8], [255, 255, 255, 255, 255, 255, 255, 0xf8]);
         // the IPv6 forward filter is the IPv4 one in another family
-        let bridges = ["kiri3".to_owned()];
+        let bridges = ["stowlark3".to_owned()];
         let f = forward_filter_in(libc::NFPROTO_IPV6 as u8, &bridges);
         assert_eq!(f.len(), forward_filter(&bridges).len());
         assert!(f[1..].iter().all(|m| !names(m).contains(&"fib".to_owned())), "no nft_fib_ipv6 needed");

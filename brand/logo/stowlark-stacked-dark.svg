@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 156 156" width="156" height="156" role="img" aria-labelledby="title">
+  <title id="title">Stowlark</title>
+  <g transform="translate(25 8) scale(1.6)"><path fill="#89F2C4" fill-rule="evenodd" d="M4 46l17-14L9 14l26 9 10-8a9 9 0 0 1 10 0l7 5-7 4a25 25 0 0 1-24 22H4ZM51.6 20.6a1.7 1.7 0 1 0-3.4 0 1.7 1.7 0 1 0 3.4 0Z"/>
+  <path fill="#EFF7F3" d="M9 14l26 9-6 12-8-3Z"/></g>
+  <g transform="translate(13 89) scale(.68)"><g fill="none" stroke="#EFF7F3" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M24 17c-2.8-2.8-6.6-4-10.7-4C7 13 3 16.4 3 21.2c0 4.9 4 7.2 10 9.2 6.1 2 11.6 4.5 11.6 10 0 5.4-4.7 8.6-11.4 8.6C8 49 4 47.2 1.5 44.2"/>
+    <path d="M35 19v23c0 4.9 2.4 7 6.5 7H44M30 28h13.5"/>
+    <path d="M60 27c-6.1 0-10.7 4.4-10.7 11s4.6 11 10.7 11 10.7-4.4 10.7-11S66.1 27 60 27Z"/>
+    <path d="M76 28l7.5 21L92 29l8.5 20 7.5-21"/>
+    <path d="M116 13v36"/>
+    <path d="M146 28v21m0-11c0-6.5-4-11-10-11s-10.5 4.5-10.5 11 4.5 11 10.5 11 10-4.5 10-11Z"/>
+    <path d="M156 28v21m0-12c1.7-6 5.2-9 11.5-9"/>
+    <path d="M177 13v36m0-9 13.5-12m-9.5 9 11 12"/>
+  </g></g>
+</svg>

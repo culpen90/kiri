@@ -1,4 +1,4 @@
-//! Linux: no VM. The guest agent (`kiri-init`) runs as a root process on the
+//! Linux: no VM. The guest agent (`stowlark-init`) runs as a root process on the
 //! host's kernel, and the vsock ports become unix sockets in a private
 //! directory: the agent listens on `g<port>.sock`, the daemon on
 //! `h<port>.sock`. Everything above this module is unchanged.
@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// The same fields as on macOS, so callers build one `Config`. On Linux,
-/// `initrd` names the agent binary (`kiri-init`); kernel, disk, shares,
+/// `initrd` names the agent binary (`stowlark-init`); kernel, disk, shares,
 /// memory and network fields do not apply: the host provides them.
 #[derive(Debug)]
 pub struct Config {
@@ -70,7 +70,7 @@ impl Vm {
         // The agent's sockets take root commands, so their folder must be
         // root's alone: /run, not an inherited XDG_RUNTIME_DIR (`sudo -E`
         // keeps the user's, where they could have put the folder first).
-        let dir = PathBuf::from("/run").join(format!("kiri-agent-{}", std::process::id()));
+        let dir = PathBuf::from("/run").join(format!("stowlark-agent-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         // Made private in one step; an existing entry (a planted folder or
         // link) fails it rather than being used.
@@ -79,19 +79,19 @@ impl Vm {
         // The agent's first dial: the host's control connection.
         let control = UnixListener::bind(dir.join(format!("h{}.sock", cfg.agent_port)))?;
         let tx = sender.clone();
-        std::thread::Builder::new().name("kiri-agent-accept".into()).spawn(move || {
+        std::thread::Builder::new().name("stowlark-agent-accept".into()).spawn(move || {
             if let Ok((s, _)) = control.accept() {
                 let _ = tx.send(Event::GuestConnected(OwnedFd::from(s)));
             }
         })?;
         let mut cmd = Command::new(&cfg.initrd);
-        cmd.env("KIRI_AGENT_DIR", &dir).env_remove("KIRI_SOCKET");
+        cmd.env("STOWLARK_AGENT_DIR", &dir).env_remove("STOWLARK_SOCKET");
         if cfg.console.is_none() {
             cmd.stdout(std::process::Stdio::null());
         }
         let child = Arc::new(Mutex::new(cmd.spawn().map_err(|e| io::Error::new(e.kind(), format!("starting {}: {e}", cfg.initrd.display())))?));
         let (waiter, tx) = (child.clone(), sender);
-        std::thread::Builder::new().name("kiri-agent-wait".into()).spawn(move || loop {
+        std::thread::Builder::new().name("stowlark-agent-wait".into()).spawn(move || loop {
             std::thread::sleep(Duration::from_millis(100));
             let status = waiter.lock().unwrap_or_else(|e| e.into_inner()).try_wait();
             match status {
@@ -131,7 +131,7 @@ impl Vm {
         let path = self.dir.join(format!("h{port}.sock"));
         let _ = std::fs::remove_file(&path);
         let l = UnixListener::bind(&path)?;
-        std::thread::Builder::new().name(format!("kiri-agent-{port}")).spawn(move || {
+        std::thread::Builder::new().name(format!("stowlark-agent-{port}")).spawn(move || {
             for s in l.incoming().flatten() {
                 handler(VsockStream { fd: OwnedFd::from(s) });
             }

@@ -1,5 +1,5 @@
 //! The Mac side of USB passthrough: finding devices in the I/O Registry,
-//! and `kiri usb serve`, the root helper that captures one with Apple's
+//! and `stowlark usb serve`, the root helper that captures one with Apple's
 //! IOUSBHost framework and puts it behind the USB/IP server (`usbip.rs`)
 //! for the guest's vhci_hcd. Transfers use the framework's synchronous
 //! calls, one endpoint thread each; an unlink aborts the pipe.
@@ -224,7 +224,7 @@ pub fn find(which: &str) -> io::Result<Device> {
     let mut found: Vec<Device> = all.into_iter().filter(|d| by_loc(d) || by_id(d) || d.name.to_ascii_lowercase().contains(&w)).collect();
     match found.len() {
         1 => Ok(found.remove(0)),
-        0 => Err(io::Error::new(io::ErrorKind::NotFound, format!("no USB device matches {which:?} (see kiri usb list)"))),
+        0 => Err(io::Error::new(io::ErrorKind::NotFound, format!("no USB device matches {which:?} (see stowlark usb list)"))),
         _ => Err(io::Error::other(format!(
             "{which:?} matches {} devices: {}",
             found.len(),
@@ -558,7 +558,7 @@ extern "C" fn on_signal(_: libc::c_int) {
     }
 }
 
-/// `kiri usb serve LOCATION --fd N --status M`, started by the helper as
+/// `stowlark usb serve LOCATION --fd N --status M`, started by the helper as
 /// root: capture the device and serve it over fd N, the connection its
 /// requester made to the daemon, until either side lets go. "ok" (or
 /// "error: …") goes to fd M once the device is captured.
@@ -578,7 +578,7 @@ pub fn serve(location: &str, fd: Option<&String>, status: Option<&String>) -> io
 fn capture_and_serve(location: &str, stream: UnixStream, status: &mut UnixStream) -> io::Result<()> {
     // SAFETY: getuid has no preconditions.
     if unsafe { libc::getuid() } != 0 {
-        return Err(io::Error::other("kiri usb serve needs root (the USB helper runs it)"));
+        return Err(io::Error::other("stowlark usb serve needs root (the USB helper runs it)"));
     }
     let loc = u32::from_str_radix(location.trim_start_matches("0x"), 16).map_err(|_| io::Error::other(format!("bad location {location:?}")))?;
     let svc = service_at(loc)?;
@@ -647,5 +647,5 @@ fn capture_and_serve(location: &str, stream: UnixStream, status: &mut UnixStream
 /// A line in the helper's log, with the time: when a device left matters
 /// as much as that it did.
 pub(super) fn log(msg: &str) {
-    eprintln!("{} kiri usb: {msg}", crate::daemon::time::rfc3339(std::time::SystemTime::now()));
+    eprintln!("{} stowlark usb: {msg}", crate::daemon::time::rfc3339(std::time::SystemTime::now()));
 }

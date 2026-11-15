@@ -1,6 +1,6 @@
 //! The window's Kubernetes section on Windows: Pods and Services of the
-//! `kiri-k8s` cluster, a pod's logs, Delete, and Start, Stop, the network
-//! settings and Delete cluster, as crates/kiri/src/ui/k8s.rs and `kiri k8s`
+//! `stowlark-k8s` cluster, a pod's logs, Delete, and Start, Stop, the network
+//! settings and Delete cluster, as crates/kiri/src/ui/k8s.rs and `stowlark k8s`
 //! (crates/kiri/src/k8s.rs) are on the Mac.
 //!
 //! Everything goes through the engine's API on the pipe. `kubectl` runs
@@ -8,9 +8,9 @@
 //! and no kubeconfig; the lists are read only while the node runs, with
 //! requests marked as the window's own, which don't count as use. The
 //! cluster is started, stopped and recreated with the containers API, as
-//! `kiri k8s` does on the Mac (there is no `kiri k8s` on Windows): its
-//! settings are in %LOCALAPPDATA%\Kiri\k8s.json and its kubeconfig beside
-//! them; its `kiri` context is put into %USERPROFILE%\.kube\config at each
+//! `stowlark k8s` does on the Mac (there is no `stowlark k8s` on Windows): its
+//! settings are in %LOCALAPPDATA%\Stowlark\k8s.json and its kubeconfig beside
+//! them; its `stowlark` context is put into %USERPROFILE%\.kube\config at each
 //! start and whenever the window finds the engine with the node running.
 
 use std::io::{self, BufRead, Read};
@@ -29,22 +29,22 @@ use crate::engine::{brand, brands, emit, notice, tr, trf};
 #[path = "../../kiri/src/ui/k8s_items.rs"]
 mod items;
 use items::{summarize, valid};
-// kubectl's own file, as the Mac's `kiri k8s` writes it.
+// kubectl's own file, as the Mac's `stowlark k8s` writes it.
 #[path = "../../kiri/src/kubeconfig.rs"]
 mod kubeconfig;
 
 const IMAGE: (&str, &str) = ("rancher/k3s", "v1.37.1-k3s1");
 /// The node container; the window reads the cluster through it.
-pub(crate) const NAME: &str = "kiri-k8s";
-const VOLUME: &str = "kiri-k8s";
+pub(crate) const NAME: &str = "stowlark-k8s";
+const VOLUME: &str = "stowlark-k8s";
 /// The API server's port in the node, and the port it is published on by default.
 const API_PORT: u16 = 6443;
 /// How many ports after the asked-for one a start tries before giving up.
 const PORT_TRIES: u16 = 20;
 /// The label that keeps the port a node was made with, for while it's stopped.
-const PORT_LABEL: &str = "dev.kiri.k8s.port";
+const PORT_LABEL: &str = "dev.stowlark.k8s.port";
 /// The label that keeps the settings a node was made with.
-const CONFIG_LABEL: &str = "dev.kiri.k8s.config";
+const CONFIG_LABEL: &str = "dev.stowlark.k8s.config";
 
 /// A list is being read: the page asks every few seconds, and a slow
 /// answer must not pile up more.
@@ -104,7 +104,7 @@ fn copy(text: &str) {
 
 // --- the cluster's settings ---------------------------------------------------------
 
-/// The cluster's settings, in %LOCALAPPDATA%\Kiri\k8s.json: whether its API
+/// The cluster's settings, in %LOCALAPPDATA%\Stowlark\k8s.json: whether its API
 /// server (and, through the engine, its LoadBalancer services) answers on
 /// every interface rather than 127.0.0.1, extra names for its certificate,
 /// and the port asked for. They are applied when the node container is
@@ -128,9 +128,9 @@ impl Config {
     }
 }
 
-/// %LOCALAPPDATA%\Kiri, where the window keeps its settings.
+/// %LOCALAPPDATA%\Stowlark, where the window keeps its settings.
 fn state_dir() -> io::Result<PathBuf> {
-    std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("Kiri")).ok_or_else(|| io::Error::other("LOCALAPPDATA is not set"))
+    std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("Stowlark")).ok_or_else(|| io::Error::other("LOCALAPPDATA is not set"))
 }
 
 fn config_path() -> io::Result<PathBuf> {
@@ -188,7 +188,7 @@ fn bound_port(info: &Value) -> Option<u16> {
     live.as_str().or(made.as_str()).and_then(|p| p.parse().ok())
 }
 
-/// A port no program on this PC holds (another Kiri's cluster, Docker
+/// A port no program on this PC holds (another Stowlark's cluster, Docker
 /// Desktop's, a tunnel): nothing answers on it and it can be bound. WSL
 /// relays the engine's published ports to Windows' localhost, so a port
 /// held in WSL answers here too.
@@ -259,7 +259,7 @@ fn kubectl(args: &[&str]) -> io::Result<(i64, String)> {
     let done = std::sync::Arc::new(AtomicBool::new(false));
     let fired = std::sync::Arc::new(AtomicBool::new(false));
     let (closer, done2, fired2) = (e.closer(), done.clone(), fired.clone());
-    spawn("kiri-k8s-kubectl-watch", move || {
+    spawn("stowlark-k8s-kubectl-watch", move || {
         for _ in 0..350 {
             std::thread::sleep(Duration::from_millis(100));
             if done2.load(Ordering::SeqCst) {
@@ -287,7 +287,7 @@ fn list() {
     if LISTING.swap(true, Ordering::SeqCst) {
         return;
     }
-    spawn("kiri-k8s-list", || {
+    spawn("stowlark-k8s-list", || {
         let event = read_lists();
         LISTING.store(false, Ordering::SeqCst);
         emit(event.to_string());
@@ -365,7 +365,7 @@ fn delete(ns: String, pod: String) {
     if !valid(&ns) || !valid(&pod) {
         return;
     }
-    spawn("kiri-k8s-delete", move || {
+    spawn("stowlark-k8s-delete", move || {
         match kubectl(&["delete", "pod", "-n", &ns, &pod, "--wait=false"]) {
             Ok((0, _)) => emit(notice("ok", &format!("Deleting pod {pod}"))),
             Ok((_, out)) => emit(notice("error", out.trim().lines().last().unwrap_or("kubectl delete failed"))),
@@ -375,7 +375,7 @@ fn delete(ns: String, pod: String) {
     });
 }
 
-/// A command on the cluster, on its own thread, as `kiri k8s` runs on the
+/// A command on the cluster, on its own thread, as `stowlark k8s` runs on the
 /// Mac: each line it says is the page's progress, and its error the toast.
 fn op(name: &'static str, run: impl FnOnce(&dyn Fn(&str)) -> io::Result<()> + Send + 'static) {
     {
@@ -385,7 +385,7 @@ fn op(name: &'static str, run: impl FnOnce(&dyn Fn(&str)) -> io::Result<()> + Se
         }
         *running = Some(name);
     }
-    spawn("kiri-k8s-op", move || {
+    spawn("stowlark-k8s-op", move || {
         let say = |line: &str| emit(json!({"type": "k8sop", "op": name, "state": "progress", "line": line.trim_end_matches('…')}).to_string());
         // Make sure the engine is up; the cluster's own requests then wake it.
         let result = crate::engine::ensure_daemon().and_then(|()| run(&say));
@@ -407,7 +407,7 @@ fn op(name: &'static str, run: impl FnOnce(&dyn Fn(&str)) -> io::Result<()> + Se
     });
 }
 
-/// `kiri k8s start`: the node container, made if need be, started and
+/// `stowlark k8s start`: the node container, made if need be, started and
 /// waited for; then the kubeconfig.
 fn start(say: &dyn Fn(&str)) -> io::Result<()> {
     let t0 = Instant::now();
@@ -453,8 +453,8 @@ fn start(say: &dyn Fn(&str)) -> io::Result<()> {
         let body = json!({
             "Image": format!("{repo}:{tag}"),
             "Cmd": cmd,
-            "Hostname": "kiri",
-            "Labels": {"dev.kiri.k8s": "1", PORT_LABEL: port.to_string(), CONFIG_LABEL: made_with(&cfg)},
+            "Hostname": "stowlark",
+            "Labels": {"dev.stowlark.k8s": "1", PORT_LABEL: port.to_string(), CONFIG_LABEL: made_with(&cfg)},
             "ExposedPorts": {"6443/tcp": {}},
             "HostConfig": {
                 "Privileged": true,
@@ -506,14 +506,14 @@ fn pull(repo: &str, tag: &str) -> io::Result<()> {
     }
 }
 
-/// `kiri k8s stop`: the node stops; its state is kept.
+/// `stowlark k8s stop`: the node stops; its state is kept.
 fn stop(say: &dyn Fn(&str)) -> io::Result<()> {
     ok(client::request("POST", &format!("/containers/{NAME}/stop"), None))?;
     say("Kubernetes stopped (its state is kept; Start resumes it)");
     Ok(())
 }
 
-/// `kiri k8s delete`: the node, its volume, the kubeconfig and the context.
+/// `stowlark k8s delete`: the node, its volume, the kubeconfig and the context.
 fn delete_cluster(say: &dyn Fn(&str)) -> io::Result<()> {
     let _ = client::request("DELETE", &format!("/containers/{NAME}?force=1"), None)?;
     let _ = client::request("DELETE", &format!("/volumes/{VOLUME}"), None)?;
@@ -525,7 +525,7 @@ fn delete_cluster(say: &dyn Fn(&str)) -> io::Result<()> {
     Ok(())
 }
 
-/// `kiri k8s set`: saves the settings and, if the cluster exists and they
+/// `stowlark k8s set`: saves the settings and, if the cluster exists and they
 /// changed, recreates its node with them.
 fn set(lan: bool, sans: Vec<String>, port: Option<u16>, say: &dyn Fn(&str)) -> io::Result<()> {
     let mut cfg = config();
@@ -579,7 +579,7 @@ fn k3s_yaml() -> io::Result<String> {
     Ok(raw)
 }
 
-/// The cluster's kubeconfig, renamed to `kiri`, at %LOCALAPPDATA%\Kiri\kubeconfig,
+/// The cluster's kubeconfig, renamed to `stowlark`, at %LOCALAPPDATA%\Stowlark\kubeconfig,
 /// and its cluster, user and context put into %USERPROFILE%\.kube\config
 /// (or the first of %KUBECONFIG%) by the Mac's own crates/kiri/src/kubeconfig.rs,
 /// with no kubectl.exe needed. Its server is 127.0.0.1 and the port: WSL
@@ -606,14 +606,14 @@ fn kubeconfig(port: u16, say: &dyn Fn(&str)) -> io::Result<bool> {
 static SYNCING: AtomicBool = AtomicBool::new(false);
 
 /// The context of a cluster that is already running, each time the window
-/// finds the engine (WSL restarted the node, or an older Kiri never wrote
+/// finds the engine (WSL restarted the node, or an older Stowlark never wrote
 /// it): in the background, once k3s has its kubeconfig, and rewritten if
 /// its port or certificate changed. Nothing when no node runs.
 pub(crate) fn sync_soon() {
     if SYNCING.swap(true, Ordering::SeqCst) {
         return;
     }
-    spawn("kiri-k8s-context", || {
+    spawn("stowlark-k8s-context", || {
         let result = (|| -> io::Result<bool> {
             let deadline = Instant::now() + Duration::from_secs(180);
             loop {
@@ -640,7 +640,7 @@ pub(crate) fn sync_soon() {
 }
 
 /// Takes the cluster's cluster, context and user out of kubectl's file:
-/// Delete cluster, and uninstalling (contrib/windows/kiri.ps1).
+/// Delete cluster, and uninstalling (contrib/windows/stowlark.ps1).
 pub(crate) fn forget() -> io::Result<()> {
     let Some(kube) = kubeconfig::path() else { return Ok(()) };
     kubeconfig::uninstall(&kube, context()).map(|_| ())
@@ -658,7 +658,7 @@ fn logs(ns: String, pod: String, container: String, previous: bool) {
     }
     let generation = LOGS_GEN.load(Ordering::SeqCst);
     let key = format!("{ns}/{pod}/{container}{}", if previous { "/previous" } else { "" });
-    spawn("kiri-k8s-logs", move || {
+    spawn("stowlark-k8s-logs", move || {
         let which = if previous { "--previous" } else { "-f" };
         // The shell says its pid first, then becomes kubectl.
         let mut r = match client::exec_start(NAME, &["sh", "-c", "echo $$; exec kubectl logs \"$@\"", "logs", which, "--tail=2000", "-n", &ns, &pod, "-c", &container], true) {
@@ -676,7 +676,7 @@ fn logs(ns: String, pod: String, container: String, previous: bool) {
         *LOGS.lock().unwrap_or_else(|e| e.into_inner()) = Some(r.closer());
         let (tx, rx) = mpsc::channel::<Vec<u8>>();
         let flush_key = key.clone();
-        spawn("kiri-k8s-logs-emit", move || {
+        spawn("stowlark-k8s-logs-emit", move || {
             let mut batch: Vec<u8> = Vec::new();
             loop {
                 let ended = match rx.recv_timeout(Duration::from_millis(60)) {
@@ -722,7 +722,7 @@ fn logs(ns: String, pod: String, container: String, previous: bool) {
 }
 
 fn kill(pid: u32) {
-    spawn("kiri-k8s-logs-kill", move || {
+    spawn("stowlark-k8s-logs-kill", move || {
         if let Ok(mut r) = client::exec_start(NAME, &["kill", &pid.to_string()], true) {
             let _ = r.read_to_end(&mut Vec::new());
         }
@@ -753,7 +753,7 @@ mod tests {
     #[test]
     fn the_node_sees_the_drives_at_their_own_paths() {
         let b = super::binds();
-        assert_eq!(b[0], "kiri-k8s:/var/lib/rancher/k3s");
+        assert_eq!(b[0], "stowlark-k8s:/var/lib/rancher/k3s");
         if let Some(d) = super::drives() {
             assert!(b.contains(&format!("{d}:{d}")), "{b:?}");
         }
@@ -761,9 +761,9 @@ mod tests {
 
     #[test]
     fn the_port_comes_from_the_binding_then_the_label() {
-        let running = serde_json::json!({"NetworkSettings": {"Ports": {"6443/tcp": [{"HostIp": "127.0.0.1", "HostPort": "6444"}]}}, "Config": {"Labels": {"dev.kiri.k8s.port": "6450"}}});
+        let running = serde_json::json!({"NetworkSettings": {"Ports": {"6443/tcp": [{"HostIp": "127.0.0.1", "HostPort": "6444"}]}}, "Config": {"Labels": {"dev.stowlark.k8s.port": "6450"}}});
         assert_eq!(super::bound_port(&running), Some(6444));
-        let stopped = serde_json::json!({"NetworkSettings": {"Ports": {}}, "Config": {"Labels": {"dev.kiri.k8s.port": "6450"}}});
+        let stopped = serde_json::json!({"NetworkSettings": {"Ports": {}}, "Config": {"Labels": {"dev.stowlark.k8s.port": "6450"}}});
         assert_eq!(super::bound_port(&stopped), Some(6450));
         assert_eq!(super::bound_port(&serde_json::json!({})), None);
     }

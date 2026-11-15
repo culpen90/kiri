@@ -629,7 +629,7 @@ mod tests {
     use std::sync::mpsc;
 
     fn tmp(name: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("kiri-logtest-{name}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("stowlark-logtest-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         d
     }

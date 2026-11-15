@@ -1,4 +1,4 @@
-//! `kiri boot`: boots the guest, times every stage, and powers it off again.
+//! `stowlark boot`: boots the guest, times every stage, and powers it off again.
 
 use std::io;
 use std::time::Duration;
@@ -30,7 +30,7 @@ pub fn run(args: &[String]) -> io::Result<()> {
 
     let ms = |d: Duration| d.as_secs_f64() * 1e3;
     let us = |d: Duration| d.as_secs_f64() * 1e6;
-    println!("kiri boot");
+    println!("stowlark boot");
     println!("  VM configured + started     {:8.1} ms", ms(t.vm_started));
     println!("  agent ready                 {:8.1} ms", ms(t.agent_ready));
     println!("  guest: kernel -> PID 1      {:8.1} ms", ms(t.kernel));

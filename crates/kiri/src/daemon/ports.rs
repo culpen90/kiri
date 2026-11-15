@@ -350,10 +350,10 @@ fn listen_addrs(b: &Binding) -> Vec<(String, bool)> {
 }
 
 /// The program that has `port` on this Mac, when it is another program:
-/// an engine left running beside Kiri (the one containers were imported
+/// an engine left running beside Stowlark (the one containers were imported
 /// from) or a server on the Mac holds the port, and "already allocated"
-/// alone reads as if Kiri had lost track of its own containers. None when
-/// Kiri itself has it, or when lsof says nothing.
+/// alone reads as if Stowlark had lost track of its own containers. None when
+/// Stowlark itself has it, or when lsof says nothing.
 #[cfg(target_os = "macos")]
 fn holder(port: u16, udp: bool) -> Option<String> {
     let spec = if udp { format!("-iUDP:{port}") } else { format!("-iTCP:{port}") };
@@ -372,10 +372,10 @@ fn holder(_port: u16, _udp: bool) -> Option<String> {
 }
 
 /// The first command in `lsof -Fc` output (`p<pid>` and `c<command>`
-/// lines) that is not Kiri's own.
+/// lines) that is not Stowlark's own.
 #[cfg_attr(not(any(target_os = "macos", test)), allow(dead_code))]
 fn holder_in(lsof: &str) -> Option<String> {
-    lsof.lines().filter_map(|l| l.strip_prefix('c')).map(str::trim).find(|c| !c.is_empty() && !c.to_ascii_lowercase().starts_with("kiri")).map(str::to_owned)
+    lsof.lines().filter_map(|l| l.strip_prefix('c')).map(str::trim).find(|c| !c.is_empty() && !c.to_ascii_lowercase().starts_with("stowlark")).map(str::to_owned)
 }
 
 /// Binds every port first (so a clash fails the start cleanly), then starts
@@ -392,14 +392,14 @@ pub fn start(vm: Arc<VmLink>, id: &str, bindings: &[Binding], target_ip: [u8; 4]
             let taken = |e: io::Error| {
                 if e.kind() == io::ErrorKind::AddrInUse {
                     let shown = if addr.is_ipv6() { format!("[{ip}]") } else { ip.clone() };
-                    // Docker's words, then who has the port when it is not Kiri.
+                    // Docker's words, then who has the port when it is not Stowlark.
                     let by = holder(b.host_port, b.proto == "udp").map(|name| format!(" (in use by {name})")).unwrap_or_default();
                     io::Error::new(e.kind(), format!("Bind for {shown}:{} failed: port is already allocated{by}", b.host_port))
                 } else {
                     e
                 }
             };
-            // Kiri's own container-domain router on this port lets it go
+            // Stowlark's own container-domain router on this port lets it go
             // (domains::step_aside), and the bind goes again.
             let bound = bind_socket(addr, b.proto == "udp").or_else(|e| {
                 if e.kind() == io::ErrorKind::AddrInUse && b.proto == "tcp" && port != 0 && super::domains::step_aside(port) { bind_socket(addr, false) } else { Err(e) }
@@ -467,7 +467,7 @@ pub fn start(vm: Arc<VmLink>, id: &str, bindings: &[Binding], target_ip: [u8; 4]
         fw.wake.push(wake_w);
         let vm = vm.clone();
         let container_port = b.container_port;
-        fw.threads.push(std::thread::Builder::new().name(format!("kiri-udp-{port}")).spawn(move || {
+        fw.threads.push(std::thread::Builder::new().name(format!("stowlark-udp-{port}")).spawn(move || {
             udp_loop(&sock, &wake_r, &vm, target_ip, container_port);
         })?);
         fw.bound.push((b, ip, port));
@@ -489,7 +489,7 @@ pub fn start(vm: Arc<VmLink>, id: &str, bindings: &[Binding], target_ip: [u8; 4]
         fw.wake.push(wake_w);
         let vm = vm.clone();
         let container_port = b.container_port;
-        fw.threads.push(std::thread::Builder::new().name(format!("kiri-port-{port}")).spawn(move || {
+        fw.threads.push(std::thread::Builder::new().name(format!("stowlark-port-{port}")).spawn(move || {
             accept_loop(&listener, &wake_r, &vm, target_ip, container_port, nat);
         })?);
         fw.bound.push((b, ip, port));
@@ -614,7 +614,7 @@ fn open_udp_session(sock: &UdpSocket, vm: &VmLink, ip: [u8; 4], port: u16, peer:
     // A clone shares the socket (and its non-blocking mode); a send to a
     // client rarely has to wait, and a dropped reply is UDP's to lose.
     let reply = sock.try_clone()?;
-    let reader = std::thread::Builder::new().name("kiri-udp-reply".into()).spawn(move || {
+    let reader = std::thread::Builder::new().name("stowlark-udp-reply".into()).spawn(move || {
         let mut len = [0u8; 2];
         let mut data = vec![0u8; 65_536];
         while from_guest.read_exact(&mut len).is_ok() {
@@ -662,7 +662,7 @@ fn accept_loop(listener: &TcpListener, wake: &OwnedFd, vm: &Arc<VmLink>, ip: [u8
                 continue;
             };
             let vm = vm.clone();
-            let _ = std::thread::Builder::new().name("kiri-conn".into()).spawn(move || {
+            let _ = std::thread::Builder::new().name("stowlark-conn".into()).spawn(move || {
                 // Held until the connection is done.
                 let _permit = permit;
                 let _ = relay(client, &vm, ip, port, nat);
@@ -730,7 +730,7 @@ fn relay(client: TcpStream, vm: &VmLink, ip: [u8; 4], port: u16, nat: Option<Soc
                     if NAT_WARNED.swap(true, Ordering::Relaxed) {
                         crate::diag::info!("the VM's NAT network is still unreachable; published ports keep going over vsock", to = addr, error = e);
                     } else {
-                        crate::diag::warn!("the VM's NAT network is unreachable, so published ports go over vsock (they still work); a VPN, or Kiri not allowed under Local Network in Privacy & Security, usually causes this", to = addr, error = e);
+                        crate::diag::warn!("the VM's NAT network is unreachable, so published ports go over vsock (they still work); a VPN, or Stowlark not allowed under Local Network in Privacy & Security, usually causes this", to = addr, error = e);
                     }
                 }
             }
@@ -743,7 +743,7 @@ fn relay(client: TcpStream, vm: &VmLink, ip: [u8; 4], port: u16, nat: Option<Soc
     let mut from_guest = std::fs::File::from(guest.fd.try_clone()?);
     let mut client_read = client.try_clone()?;
     let mut client_write = client;
-    let up = std::thread::Builder::new().name("kiri-conn-up".into()).spawn(move || {
+    let up = std::thread::Builder::new().name("stowlark-conn-up".into()).spawn(move || {
         let _ = copy(&mut client_read, &mut to_guest);
         // Pass the client's half-close on.
         // SAFETY: half-closing a socket we own.
@@ -764,7 +764,7 @@ fn relay_tcp(client: TcpStream, guest: TcpStream) -> io::Result<()> {
     guest.set_read_timeout(Some(TCP_IDLE))?;
     guest.set_write_timeout(Some(TCP_IDLE))?;
     let (mut client_read, mut guest_write) = (client.try_clone()?, guest.try_clone()?);
-    let up = std::thread::Builder::new().name("kiri-conn-up".into()).spawn(move || {
+    let up = std::thread::Builder::new().name("stowlark-conn-up".into()).spawn(move || {
         let _ = copy(&mut client_read, &mut guest_write);
         let _ = guest_write.shutdown(Shutdown::Write);
     })?;
@@ -792,7 +792,7 @@ fn relay_direct(client: TcpStream, ip: [u8; 4], port: u16) -> io::Result<()> {
     target.set_read_timeout(Some(TCP_IDLE))?;
     target.set_write_timeout(Some(TCP_IDLE))?;
     let (client_read, target_write) = (client.try_clone()?, target.try_clone()?);
-    let up = std::thread::Builder::new().name("kiri-conn-up".into()).spawn(move || {
+    let up = std::thread::Builder::new().name("stowlark-conn-up".into()).spawn(move || {
         let _ = splice_all(&client_read, &target_write);
         let _ = target_write.shutdown(Shutdown::Write);
     })?;
@@ -936,7 +936,7 @@ pub const HOST_BOUND_PORT: u32 = 1026;
 /// One host-bound connection from a container: the guest sends
 /// `ip[4] port[2]` (always 127.0.0.1 today), and we connect there on the Mac.
 pub fn serve_host_bound(stream: kiri_vmm::VsockStream) {
-    let _ = std::thread::Builder::new().name("kiri-host-bound".into()).spawn(move || {
+    let _ = std::thread::Builder::new().name("stowlark-host-bound".into()).spawn(move || {
         let _ = host_bound(stream);
     });
 }
@@ -960,7 +960,7 @@ fn host_bound(stream: kiri_vmm::VsockStream) -> io::Result<()> {
     let mut to_guest = std::fs::File::from(stream.fd.try_clone()?);
     let mut target_read = target.try_clone()?;
     let mut target_write = target;
-    let down = std::thread::Builder::new().name("kiri-host-bound-down".into()).spawn(move || {
+    let down = std::thread::Builder::new().name("stowlark-host-bound-down".into()).spawn(move || {
         let _ = copy(&mut target_read, &mut to_guest);
         // SAFETY: half-closing a socket we own.
         unsafe { libc::shutdown(to_guest.as_raw_fd(), libc::SHUT_WR) };
@@ -988,7 +988,7 @@ fn ssh_auth_sock() -> Option<std::path::PathBuf> {
 
 /// One container connection to the SSH agent, relayed to the Mac's agent.
 pub fn serve_ssh_agent(stream: kiri_vmm::VsockStream) {
-    let _ = std::thread::Builder::new().name("kiri-ssh-agent".into()).spawn(move || {
+    let _ = std::thread::Builder::new().name("stowlark-ssh-agent".into()).spawn(move || {
         let Some(path) = ssh_auth_sock() else { return };
         let Ok(agent) = std::os::unix::net::UnixStream::connect(path) else {
             return;
@@ -1018,7 +1018,7 @@ pub const ENGINE_API_PORT: u32 = 1036;
 /// One container connection to the engine's API, relayed to this daemon's
 /// own socket, so it is served like any other client.
 pub fn serve_engine_api(stream: kiri_vmm::VsockStream) {
-    let _ = std::thread::Builder::new().name("kiri-engine-api".into()).spawn(move || {
+    let _ = std::thread::Builder::new().name("stowlark-engine-api".into()).spawn(move || {
         let Ok(api) = super::socket_path().and_then(std::os::unix::net::UnixStream::connect) else { return };
         let (Ok(mut api_read), Ok(from_guest), Ok(to_guest)) = (api.try_clone(), stream.fd.try_clone(), stream.fd.try_clone()) else {
             return;
@@ -1081,14 +1081,14 @@ mod tests {
     use std::net::IpAddr;
     use std::sync::atomic::Ordering;
 
-    /// A clash names the other program holding the port, never Kiri itself.
+    /// A clash names the other program holding the port, never Stowlark itself.
     #[test]
     fn a_taken_port_names_the_program_that_has_it() {
         use super::holder_in;
         assert_eq!(holder_in("p85299\ncPython\nf3\n").as_deref(), Some("Python"));
-        assert_eq!(holder_in("p10\nckiri\nf7\np11\ncOrbStack Helper\nf9\n").as_deref(), Some("OrbStack Helper"));
-        assert_eq!(holder_in("p10\nckiri\nf7\n"), None);
-        assert_eq!(holder_in("p10\ncKiri Dev\n"), None);
+        assert_eq!(holder_in("p10\ncstowlark\nf7\np11\ncOrbStack Helper\nf9\n").as_deref(), Some("OrbStack Helper"));
+        assert_eq!(holder_in("p10\ncstowlark\nf7\n"), None);
+        assert_eq!(holder_in("p10\ncStowlark Dev\n"), None);
         assert_eq!(holder_in(""), None);
     }
 

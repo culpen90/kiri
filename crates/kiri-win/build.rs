@@ -1,13 +1,13 @@
-//! Kiri's icon and version in kiri-win.exe. The icon is for Explorer, Start
+//! Stowlark's icon and version in stowlark-win.exe. The icon is for Explorer, Start
 //! and a pinned taskbar button (the running window sets its own). The
 //! version is for Explorer's Details and for Windows Installer, which
 //! replaces a file by comparing versions: a file with none it judges by
 //! its dates, and keeps one that looks hand-written, so an upgrade could
-//! leave an old kiri-win.exe behind. Windows builds only.
+//! leave an old stowlark-win.exe behind. Windows builds only.
 
 use std::path::Path;
 
-// The Kiri Share build key, as crates/kiri/build.rs compiles it: kiri-win
+// The Kiri Share build key, as crates/kiri/build.rs compiles it: stowlark-win
 // carries share.rs too, for the window's Share.
 include!("../kiri/build_share_key.rs");
 
@@ -15,13 +15,13 @@ fn main() {
     println!("cargo:rerun-if-changed=../kiri/build_share_key.rs");
     write_share_build_key();
     // The bundle files' SHA-256s, set by `cargo xtask windows`.
-    println!("cargo:rerun-if-env-changed=KIRI_BUNDLE_SHA256");
+    println!("cargo:rerun-if-env-changed=STOWLARK_BUNDLE_SHA256");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_VERSION");
-    println!("cargo:rerun-if-changed=../../brand/icon/windows/kiri.ico");
+    println!("cargo:rerun-if-changed=../../brand/icon/windows/stowlark.ico");
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
-    let ico = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../brand/icon/windows/kiri.ico").canonicalize().expect("brand/icon/windows/kiri.ico");
+    let ico = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../brand/icon/windows/stowlark.ico").canonicalize().expect("brand/icon/windows/stowlark.ico");
     // The resource compiler takes forward slashes and no \\?\ prefix.
     let ico = ico.to_string_lossy().trim_start_matches(r"\\?\").replace('\\', "/");
     let version = std::env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION");
@@ -42,12 +42,12 @@ BEGIN
   BEGIN
     BLOCK "040904B0"
     BEGIN
-      VALUE "CompanyName", "Kiri"
-      VALUE "FileDescription", "Kiri"
+      VALUE "CompanyName", "Stowlark"
+      VALUE "FileDescription", "Stowlark"
       VALUE "FileVersion", "{version}"
-      VALUE "InternalName", "kiri-win"
-      VALUE "OriginalFilename", "kiri-win.exe"
-      VALUE "ProductName", "Kiri"
+      VALUE "InternalName", "stowlark-win"
+      VALUE "OriginalFilename", "stowlark-win.exe"
+      VALUE "ProductName", "Stowlark"
       VALUE "ProductVersion", "{version}"
     END
   END
@@ -58,7 +58,7 @@ BEGIN
 END
 "#
     );
-    let out = Path::new(&std::env::var("OUT_DIR").expect("OUT_DIR")).join("kiri-win.rc");
-    std::fs::write(&out, rc).expect("write kiri-win.rc");
-    embed_resource::compile(&out, embed_resource::NONE).manifest_optional().expect("kiri-win.rc");
+    let out = Path::new(&std::env::var("OUT_DIR").expect("OUT_DIR")).join("stowlark-win.rc");
+    std::fs::write(&out, rc).expect("write stowlark-win.rc");
+    embed_resource::compile(&out, embed_resource::NONE).manifest_optional().expect("stowlark-win.rc");
 }

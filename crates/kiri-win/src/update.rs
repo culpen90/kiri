@@ -3,18 +3,17 @@
 //!
 //! The release feed is one small JSON file, `{"version", "url", "sha256"}`
 //! (and optionally `notes_url`, the page on what's new, and `size`), at
-//! `KIRI_UPDATE_URL` (default: `download.runkiri.com/latest-windows-x86_64.json`,
-//! or `latest-windows-arm64.json` for Windows on Arm's build);
+//! `STOWLARK_UPDATE_URL`. Each architecture needs its own feed.
 //! `url` is the MSI. The download is checked against the SHA-256, then the
-//! MSI itself is read (msi.dll) and must carry Kiri's own UpgradeCode, this
+//! MSI itself is read (msi.dll) and must carry Stowlark's own UpgradeCode, this
 //! build's platform (x64 and arm64 share the UpgradeCode, so an x64 MSI
-//! would otherwise replace an arm64 Kiri) and the version the feed
+//! would otherwise replace an arm64 Stowlark) and the version the feed
 //! promised, newer than this build, before it is
-//! staged in `%LOCALAPPDATA%\Kiri\update`. Installing hands the staged MSI
+//! staged in `%LOCALAPPDATA%\Stowlark\update`. Installing hands the staged MSI
 //! to msiexec once this process has quit (the files it replaces are in
-//! use until then): `kiri.ps1 -Update` (contrib/windows, installed beside
+//! use until then): `stowlark.ps1 -Update` (contrib/windows, installed beside
 //! the exe) waits for that, runs the per-user upgrade silently, and opens
-//! the new Kiri.
+//! the new Stowlark.
 //!
 //! The window downloads in the background, then installs on Restart now,
 //! or when it quits after Later (or at its next launch, if that quit never
@@ -39,14 +38,11 @@ use serde_json::json;
 
 use crate::engine::{emit, notice, trf};
 
-#[cfg(not(target_arch = "aarch64"))]
-const FEED: &str = "https://download.runkiri.com/latest-windows-x86_64.json";
-#[cfg(target_arch = "aarch64")]
-const FEED: &str = "https://download.runkiri.com/latest-windows-arm64.json";
+const RELEASES: &str = "https://github.com/culpen90/stowlark/releases";
 /// The biggest download accepted (the MSI is about 55 MB).
 const MAX_DOWNLOAD: u64 = 2 << 30;
-/// installer/windows/kiri.wxs's UpgradeCode: what makes an MSI a Kiri one.
-const UPGRADE_CODE: &str = "{7C2E4B9A-5D13-4F8E-9B6A-0E1D3C5A7F21}";
+/// installer/windows/stowlark.wxs's UpgradeCode: what makes an MSI a Stowlark one.
+const UPGRADE_CODE: &str = "{6188925B-A60A-430D-9180-67D6A2F84F92}";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
 const CURRENT: &str = env!("CARGO_PKG_VERSION");
@@ -78,9 +74,9 @@ pub fn newer(candidate: &str, current: &str) -> bool {
     false
 }
 
-/// %LOCALAPPDATA%\Kiri, where the MSI installs and kiri-win keeps its state.
+/// %LOCALAPPDATA%\Stowlark, where the MSI installs and stowlark-win keeps its state.
 fn dir() -> PathBuf {
-    std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("Kiri")).unwrap_or_else(|| PathBuf::from("."))
+    std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("Stowlark")).unwrap_or_else(|| PathBuf::from("."))
 }
 
 /// Where a download is staged; it outlives the upgrade, which keeps the
@@ -89,12 +85,12 @@ fn stage_dir() -> PathBuf {
     dir().join("update")
 }
 
-/// curl.exe, part of Windows: kiri-win has no HTTPS client of its own.
+/// curl.exe, part of Windows: stowlark-win has no HTTPS client of its own.
 fn curl() -> Command {
     let mut c = crate::win::tool("curl.exe");
     std::os::windows::process::CommandExt::creation_flags(&mut c, CREATE_NO_WINDOW);
     c.stdin(Stdio::null());
-    c.arg("-A").arg(format!("kiri-win/{CURRENT}"));
+    c.arg("-A").arg(format!("stowlark-win/{CURRENT}"));
     // Redirects stay on HTTPS too: by default curl follows one down to HTTP.
     c.args(["--proto", if cfg!(debug_assertions) { "=https,file" } else { "=https" }, "--proto-redir", "=https"]);
     c
@@ -115,13 +111,17 @@ fn first_line(bytes: &[u8], fallback: &str) -> String {
 }
 
 pub fn latest() -> io::Result<Release> {
-    let url = std::env::var("KIRI_UPDATE_URL").unwrap_or_else(|_| FEED.to_owned());
+    let url = update_url().ok_or_else(|| io::Error::other(format!("No update feed is configured. See {RELEASES}.")))?;
     allowed_url(&url)?;
     let out = curl().args(["-fsSL", "--max-time", "20", "--max-filesize", "65536", "--"]).arg(&url).output()?;
     if !out.status.success() {
         return Err(io::Error::other(first_line(&out.stderr, "could not fetch the update feed")));
     }
     serde_json::from_slice(&out.stdout).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("{url}: {e}")))
+}
+
+fn update_url() -> Option<String> {
+    std::env::var("STOWLARK_UPDATE_URL").ok().filter(|url| !url.trim().is_empty())
 }
 
 /// The size the server says the file is, if it says.
@@ -140,7 +140,7 @@ fn content_length(url: &str) -> Option<u64> {
 /// `cancel` stops the download.
 pub fn download(release: &Release, progress: &mut dyn FnMut(u64, Option<u64>), cancel: &AtomicBool) -> io::Result<()> {
     if !newer(&release.version, CURRENT) {
-        return Err(io::Error::other(format!("Kiri {} is not newer than this {CURRENT}", release.version)));
+        return Err(io::Error::other(format!("Stowlark {} is not newer than this {CURRENT}", release.version)));
     }
     allowed_url(&release.url)?;
     let dir = stage_dir();
@@ -154,7 +154,7 @@ pub fn download(release: &Release, progress: &mut dyn FnMut(u64, Option<u64>), c
 }
 
 fn fetch_and_check(release: &Release, dir: &Path, progress: &mut dyn FnMut(u64, Option<u64>), cancel: &AtomicBool) -> io::Result<()> {
-    let part = dir.join("Kiri.msi.part");
+    let part = dir.join("Stowlark.msi.part");
     let total = if release.size > 0 { Some(release.size) } else { content_length(&release.url) };
     let mut child = curl()
         .args(["-fsSL", "--retry", "3", "--max-time", "3600", "--max-filesize", &MAX_DOWNLOAD.to_string(), "-o"])
@@ -186,7 +186,7 @@ fn fetch_and_check(release: &Release, dir: &Path, progress: &mut dyn FnMut(u64, 
     }
     let got = std::fs::metadata(&part)?.len();
     if got > MAX_DOWNLOAD {
-        return Err(io::Error::other("the update is larger than any Kiri release"));
+        return Err(io::Error::other("the update is larger than any Stowlark release"));
     }
     progress(got, Some(total.unwrap_or(got)));
     let sum = crate::setup::sha256(&part)?;
@@ -194,7 +194,7 @@ fn fetch_and_check(release: &Release, dir: &Path, progress: &mut dyn FnMut(u64, 
         return Err(io::Error::new(io::ErrorKind::InvalidData, format!("download does not match its SHA-256 (got {sum})")));
     }
     check(&part, &release.version)?;
-    let msi = dir.join(format!("Kiri-{}.msi", release.version.trim_start_matches('v')));
+    let msi = dir.join(format!("Stowlark-{}.msi", release.version.trim_start_matches('v')));
     std::fs::rename(&part, &msi)?;
     std::fs::write(dir.join("version"), release.version.trim_start_matches('v'))?;
     // A fresh stage: an earlier helper's failure no longer counts against it.
@@ -203,7 +203,7 @@ fn fetch_and_check(release: &Release, dir: &Path, progress: &mut dyn FnMut(u64, 
 }
 
 fn staged_msi(version: &str) -> PathBuf {
-    stage_dir().join(format!("Kiri-{version}.msi"))
+    stage_dir().join(format!("Stowlark-{version}.msi"))
 }
 
 /// The staged update's version, when there is one newer than this build.
@@ -224,26 +224,26 @@ fn verify_staged() -> io::Result<(String, PathBuf)> {
 
 /// A helper was left to install the staged update; it removes the stage
 /// when it is done, so this still being here at a launch means it failed
-/// (or has not run yet). Then Kiri starts as it is and the card offers
+/// (or has not run yet). Then Stowlark starts as it is and the card offers
 /// Restart now again, rather than quitting at every launch.
 pub fn attempted() -> bool {
     stage_dir().join("attempted").is_file()
 }
 
 /// Checks the staged MSI again, then leaves a helper behind that installs
-/// it as soon as this process has quit and opens the new Kiri. The caller
+/// it as soon as this process has quit and opens the new Stowlark. The caller
 /// quits. Returns the version.
 pub fn install_staged() -> io::Result<String> {
     let (version, msi) = verify_staged()?;
     std::fs::write(stage_dir().join("attempted"), "")?;
-    // The helper is kiri.ps1 -Update, installed beside this exe: it waits
-    // for this process, upgrades silently and opens the new Kiri, logging
+    // The helper is stowlark.ps1 -Update, installed beside this exe: it waits
+    // for this process, upgrades silently and opens the new Stowlark, logging
     // to helper.log in the stage. A script file, not a script in this
     // binary: a hidden PowerShell fed an encoded script that runs msiexec
     // is what malware droppers do, and Defender's heuristics quarantined a
-    // kiri-win.exe that carried one. Checked against this build's SHA-256
+    // stowlark-win.exe that carried one. Checked against this build's SHA-256
     // first, as setup checks the bundle's other files.
-    let script = crate::setup::verified("kiri.ps1")?;
+    let script = crate::setup::verified("stowlark.ps1")?;
     // A hidden console of its own (CREATE_NO_WINDOW), not none: Windows
     // PowerShell does not come up without one. Out of any job this process
     // is in, if the job allows it (a launcher that kills its children when
@@ -263,7 +263,7 @@ pub fn install_staged() -> io::Result<String> {
             .spawn()
     };
     spawn(CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB).or_else(|_| spawn(CREATE_NO_WINDOW))?;
-    crate::serve::log(&format!("update: installing Kiri {version} after quit"));
+    crate::serve::log(&format!("update: installing Stowlark {version} after quit"));
     Ok(version)
 }
 
@@ -271,21 +271,21 @@ pub fn install_staged() -> io::Result<String> {
 /// restarts the daemon (and the bridge, which serve restarts on the new
 /// binary). Running containers stop; those with a restart policy start again.
 pub fn restart_engine() -> io::Result<()> {
-    let distro = crate::setup::saved_distro().ok_or_else(|| io::Error::other("Kiri's Linux is not set up"))?;
-    let kiri = crate::setup::to_wsl(&distro, &dir().join("kiri"))?;
-    let init = crate::setup::to_wsl(&distro, &dir().join("kiri-init"))?;
-    // The pkill patterns spell "kiri" as "[k]iri": `sh -c` runs with this
+    let distro = crate::setup::saved_distro().ok_or_else(|| io::Error::other("Stowlark's Linux is not set up"))?;
+    let stowlark = crate::setup::to_wsl(&distro, &dir().join("stowlark"))?;
+    let init = crate::setup::to_wsl(&distro, &dir().join("stowlark-init"))?;
+    // The pkill patterns spell "stowlark" as "[s]towlark": `sh -c` runs with this
     // whole script on its command line, and a plain pattern would match
     // that too and kill the shell before it starts the daemon again.
-    let script = if distro == crate::setup::KIRI_DISTRO {
-        // Kiri Linux: busybox, no systemd; kiri-start starts the daemon.
+    let script = if distro == crate::setup::STOWLARK_DISTRO {
+        // Stowlark Linux: busybox, no systemd; stowlark-start starts the daemon.
         format!(
-            "cp -f '{kiri}' /usr/local/bin/kiri.new && cp -f '{init}' /usr/local/bin/kiri-init.new && chmod 755 /usr/local/bin/kiri.new /usr/local/bin/kiri-init.new && mv -f /usr/local/bin/kiri.new /usr/local/bin/kiri && mv -f /usr/local/bin/kiri-init.new /usr/local/bin/kiri-init && pkill -f '/usr/local/bin/[k]iri daemon'; pkill -f '/usr/local/bin/[k]iri bridge'; sleep 1; /usr/local/bin/kiri-start"
+            "cp -f '{stowlark}' /usr/local/bin/stowlark.new && cp -f '{init}' /usr/local/bin/stowlark-init.new && chmod 755 /usr/local/bin/stowlark.new /usr/local/bin/stowlark-init.new && mv -f /usr/local/bin/stowlark.new /usr/local/bin/stowlark && mv -f /usr/local/bin/stowlark-init.new /usr/local/bin/stowlark-init && pkill -f '/usr/local/bin/[s]towlark daemon'; pkill -f '/usr/local/bin/[s]towlark bridge'; sleep 1; /usr/local/bin/stowlark-start"
         )
     } else {
         // Ubuntu: install.sh installs the binaries and restarts the service.
         let install = crate::setup::to_wsl(&distro, &dir().join("install.sh"))?;
-        format!("sh '{install}' && pkill -f '/usr/local/bin/[k]iri bridge'; true")
+        format!("sh '{install}' && pkill -f '/usr/local/bin/[s]towlark bridge'; true")
     };
     let mut cmd = crate::win::tool("wsl.exe");
     std::os::windows::process::CommandExt::creation_flags(&mut cmd, CREATE_NO_WINDOW);
@@ -296,25 +296,25 @@ pub fn restart_engine() -> io::Result<()> {
     Ok(())
 }
 
-/// Whether `msi` is a Kiri installer of the version `promised`, newer than
+/// Whether `msi` is a Stowlark installer of the version `promised`, newer than
 /// this build: a swapped feed could otherwise point at any MSI, or at an
 /// older, genuine one and its known bugs.
 fn check(msi: &Path, promised: &str) -> io::Result<()> {
     let upgrade = msi_property(msi, "UpgradeCode")?;
     if !upgrade.trim().eq_ignore_ascii_case(UPGRADE_CODE) {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "the update is not a Kiri installer"));
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "the update is not a Stowlark installer"));
     }
     let template = msi_template(msi)?;
     if !platform_matches(&template, crate::win::BUILD_ARCH) {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, format!("the update is Kiri for {}, not for this {} Kiri", template.split(';').next().unwrap_or("another platform"), crate::win::BUILD_ARCH)));
+        return Err(io::Error::new(io::ErrorKind::InvalidData, format!("the update is Stowlark for {}, not for this {} Stowlark", template.split(';').next().unwrap_or("another platform"), crate::win::BUILD_ARCH)));
     }
     let version = msi_property(msi, "ProductVersion")?;
     let (version, promised) = (version.trim(), promised.trim_start_matches('v'));
     if version != promised {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, format!("the update is Kiri {version}, but the feed promised {promised}")));
+        return Err(io::Error::new(io::ErrorKind::InvalidData, format!("the update is Stowlark {version}, but the feed promised {promised}")));
     }
     if !newer(version, CURRENT) {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, format!("the update is Kiri {version}, which is not newer than this {CURRENT}")));
+        return Err(io::Error::new(io::ErrorKind::InvalidData, format!("the update is Stowlark {version}, which is not newer than this {CURRENT}")));
     }
     Ok(())
 }
@@ -432,8 +432,7 @@ static CANCEL: AtomicBool = AtomicBool::new(false);
 /// A download is running; a second Download waits for it.
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// About's update row: what the last check found. `state` is uptodate,
-/// available, test or error.
+/// About's update row: what the last check found.
 fn update_state(state: &str, latest: Option<&str>, error: Option<String>) {
     let checked = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64);
     emit(json!({"type": "updatestate", "state": state, "current": CURRENT, "latest": latest, "error": error, "checked": checked}).to_string());
@@ -454,7 +453,7 @@ pub fn check_now(manual: bool) {
         }
         feed_check(manual);
     });
-    // And every 6 hours while Kiri runs (recheck.rs), as on the Mac.
+    // And every 6 hours while Stowlark runs (recheck.rs), as on the Mac.
     recheck::start(|| feed_check(false));
 }
 
@@ -466,9 +465,13 @@ fn feed_check(manual: bool) {
         // updated from the feed: it would "update" back to its release.
         if CURRENT.contains("-dev") {
             if manual {
-                emit(notice("ok", &trf("Kiri {version} is a test build: it doesn't update itself", &[("version", &CURRENT)])));
+                emit(notice("ok", &trf("Stowlark {version} is a test build: it doesn't update itself", &[("version", &CURRENT)])));
             }
             update_state("test", None, None);
+            return;
+        }
+        if update_url().is_none() {
+            update_state("unconfigured", None, None);
             return;
         }
         if let Some(v) = staged() {
@@ -487,7 +490,7 @@ fn feed_check(manual: bool) {
             Ok(_) => {
                 update_state("uptodate", None, None);
                 if manual {
-                    emit(notice("ok", &trf("Kiri {version} is the newest version", &[("version", &CURRENT)])));
+                    emit(notice("ok", &trf("Stowlark {version} is the newest version", &[("version", &CURRENT)])));
                 }
             }
             Err(e) => {
@@ -507,7 +510,7 @@ pub fn download_now() {
         return;
     }
     CANCEL.store(false, Ordering::Relaxed);
-    let _ = std::thread::Builder::new().name("kiri-update".into()).spawn(|| {
+    let _ = std::thread::Builder::new().name("stowlark-update".into()).spawn(|| {
         let result = latest().and_then(|r| {
             let mut last = Instant::now() - Duration::from_secs(1);
             download(
@@ -535,7 +538,7 @@ pub fn cancel_download() {
     CANCEL.store(true, Ordering::Relaxed);
 }
 
-/// Restart now: the helper is left behind and this Kiri quits; the new one
+/// Restart now: the helper is left behind and this Stowlark quits; the new one
 /// opens once the MSI is in.
 pub fn restart_now() {
     // The staged MSI is checked here, so the card hears of a bad one; the
@@ -558,16 +561,16 @@ pub fn restart_now() {
 /// only: nothing running is stopped, so this is for an engine that isn't up.
 /// Returns whether anything was copied.
 pub fn sync_engine() -> io::Result<bool> {
-    let (kiri_src, init_src) = (dir().join("kiri"), dir().join("kiri-init"));
+    let (kiri_src, init_src) = (dir().join("stowlark"), dir().join("stowlark-init"));
     if !kiri_src.is_file() || !init_src.is_file() {
         return Ok(false); // a development build run from elsewhere
     }
-    let distro = crate::setup::saved_distro().ok_or_else(|| io::Error::other("Kiri's Linux is not set up"))?;
-    let kiri = crate::setup::to_wsl(&distro, &kiri_src)?;
+    let distro = crate::setup::saved_distro().ok_or_else(|| io::Error::other("Stowlark's Linux is not set up"))?;
+    let stowlark = crate::setup::to_wsl(&distro, &kiri_src)?;
     let init = crate::setup::to_wsl(&distro, &init_src)?;
-    // Both distros keep the engine in /usr/local/bin (kiri-start, install.sh).
+    // Both distros keep the engine in /usr/local/bin (stowlark-start, install.sh).
     let script = format!(
-        "c=0; for f in kiri kiri-init; do if [ $f = kiri ]; then s='{kiri}'; else s='{init}'; fi; \
+        "c=0; for f in stowlark stowlark-init; do if [ $f = stowlark ]; then s='{stowlark}'; else s='{init}'; fi; \
          cmp -s \"$s\" /usr/local/bin/$f && continue; \
          cp -f \"$s\" /usr/local/bin/$f.new && chmod 755 /usr/local/bin/$f.new && mv -f /usr/local/bin/$f.new /usr/local/bin/$f && c=1; done; \
          [ $c = 1 ] && echo copied; true"
@@ -613,15 +616,15 @@ mod tests {
     fn reads_feeds_with_and_without_extras() {
         let r: Release = serde_json::from_str(r#"{"version":"0.1.1","url":"https://x/K.msi","sha256":"ab"}"#).unwrap();
         assert_eq!((r.notes_url.as_str(), r.size), ("", 0));
-        let r: Release = serde_json::from_str(r#"{"version":"0.1.1","url":"u","sha256":"ab","notes_url":"https://runkiri.com/","size":5}"#).unwrap();
-        assert_eq!((r.notes_url.as_str(), r.size), ("https://runkiri.com/", 5));
+        let r: Release = serde_json::from_str(r#"{"version":"0.1.1","url":"u","sha256":"ab","notes_url":"https://example.invalid/releases","size":5}"#).unwrap();
+        assert_eq!((r.notes_url.as_str(), r.size), ("https://example.invalid/releases", 5));
     }
 
     #[test]
     fn only_https_feeds() {
-        assert!(super::allowed_url("https://download.runkiri.com/latest-windows-x86_64.json").is_ok());
+        assert!(super::allowed_url("https://example.invalid/latest-windows-x86_64.json").is_ok());
         assert_eq!(super::allowed_url("file:///C:/t/latest.json").is_ok(), cfg!(debug_assertions));
-        assert!(super::allowed_url("http://download.runkiri.com/latest-windows-x86_64.json").is_err());
+        assert!(super::allowed_url("http://example.invalid/latest-windows-x86_64.json").is_err());
         assert!(super::allowed_url("ftp://x/y").is_err());
     }
 
@@ -629,7 +632,7 @@ mod tests {
     fn reads_this_installer_when_built() {
         // The MSI cargo xtask msi built, if there is one next to this build.
         let name = if cfg!(target_arch = "aarch64") { "arm64" } else { "x86_64" };
-        let msi = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target").join(format!("Kiri-{}-{name}.msi", env!("CARGO_PKG_VERSION")));
+        let msi = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target").join(format!("Stowlark-{}-{name}.msi", env!("CARGO_PKG_VERSION")));
         if msi.is_file() {
             assert_eq!(super::msi_property(&msi, "ProductVersion").unwrap(), env!("CARGO_PKG_VERSION"));
             assert!(super::msi_property(&msi, "UpgradeCode").unwrap().eq_ignore_ascii_case(super::UPGRADE_CODE));

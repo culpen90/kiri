@@ -1,8 +1,8 @@
-//! PID 1 for Kiri's offline Linux environments on Android.
+//! PID 1 for Stowlark's offline Linux environments on Android.
 
 #[cfg(not(target_os = "linux"))]
 fn main() {
-    eprintln!("kiri-android-init runs in the Linux guest");
+    eprintln!("stowlark-android-init runs in the Linux guest");
     std::process::exit(1);
 }
 
@@ -48,7 +48,7 @@ mod guest {
             }
         });
         if let Err(error) = result {
-            eprintln!("kiri-android-init: {error}");
+            eprintln!("stowlark-android-init: {error}");
         }
         // SAFETY: PID 1 owns this guest. Neither syscall touches host state.
         unsafe {
@@ -177,7 +177,7 @@ mod guest {
             Some(c"size=32M,mode=1777"),
         )?;
         for name in ["virtio_blk", "crc16", "mbcache", "jbd2", "ext4"] {
-            let module = File::open(format!("/lib/kiri-modules/{name}.ko"))?;
+            let module = File::open(format!("/lib/stowlark-modules/{name}.ko"))?;
             // SAFETY: the exact matching module is bundled in the read-only boot input.
             check(unsafe {
                 libc::syscall(libc::SYS_finit_module, module.as_raw_fd(), c"".as_ptr(), 0)

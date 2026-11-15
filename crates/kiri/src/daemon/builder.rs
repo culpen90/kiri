@@ -3,8 +3,8 @@
 //! volume. It starts when a build wants it and stops after a few idle
 //! minutes, so between builds it costs nothing.
 //!
-//! It is the same container buildx's docker-container builder `kiri-build`
-//! uses (`buildx_buildkit_kiri-build0`, cache volume `…_state`), so caches
+//! It is the same container buildx's docker-container builder `stowlark-build`
+//! uses (`buildx_buildkit_stowlark-build0`, cache volume `…_state`), so caches
 //! from before carry over and there is one builder, not two: with buildx,
 //! `docker build` reaches it through `buildctl dial-stdio` (builds.rs sets
 //! that builder up); without buildx, the docker CLI, Compose and SDKs send
@@ -32,14 +32,14 @@ use super::http::{self, Request};
 /// image already pulled under it is used as it is.
 pub const IMAGE: &str = "moby/buildkit:buildx-stable-1";
 /// What a fresh pull fetches: that tag's index on 2026-10-30 (BuildKit
-/// 0.2x), pinned so every Kiri builds with the same BuildKit. Stored under
+/// 0.2x), pinned so every Stowlark builds with the same BuildKit. Stored under
 /// [`IMAGE`]. Moving the pin changes nothing for an image already pulled.
 const PINNED: &str = "moby/buildkit@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea";
-/// Marks the container as Kiri's builder. It stays in `docker ps`, as
+/// Marks the container as Stowlark's builder. It stays in `docker ps`, as
 /// buildx's does on any engine.
-const LABEL: &str = "dev.kiri.builder";
+const LABEL: &str = "dev.stowlark.builder";
 /// Per build: the context and registry logins, in the builder's own /tmp.
-const WORK: &str = "/tmp/kiri-build";
+const WORK: &str = "/tmp/stowlark-build";
 /// Largest bare Dockerfile (a body that isn't an archive) read into memory.
 const MAX_DOCKERFILE: u64 = 8 << 20;
 const GB: u64 = 1 << 30;
@@ -57,8 +57,8 @@ static ENSURE: Mutex<()> = Mutex::new(());
 /// the pull takes minutes, and buildx looking for its container (which it
 /// gives 20 s) or the idle watch must not wait for it.
 static PULL: Mutex<()> = Mutex::new(());
-/// `buildx_buildkit_kiri-build0`: buildx's name for the BuildKit container
-/// of builder `kiri-build`'s first node.
+/// `buildx_buildkit_stowlark-build0`: buildx's name for the BuildKit container
+/// of builder `stowlark-build`'s first node.
 pub fn container_name() -> String {
     format!("buildx_buildkit_{}0", crate::builds::BUILDER.get())
 }
@@ -105,26 +105,26 @@ fn default_cache(disk: u64) -> u64 {
     if disk == 0 { 20 * GB } else { (disk / 10).clamp(GB, 20 * GB) }
 }
 
-/// The build cache's cap in bytes: `KIRI_BUILD_CACHE_GB`, else Settings,
+/// The build cache's cap in bytes: `STOWLARK_BUILD_CACHE_GB`, else Settings,
 /// else [`default_cache`]. BuildKit's garbage collector keeps the cache under it.
 pub fn cache_limit() -> u64 {
-    let gb = std::env::var("KIRI_BUILD_CACHE_GB").ok().and_then(|v| v.parse::<u64>().ok()).or_else(|| settings()["cache_gb"].as_u64());
+    let gb = std::env::var("STOWLARK_BUILD_CACHE_GB").ok().and_then(|v| v.parse::<u64>().ok()).or_else(|| settings()["cache_gb"].as_u64());
     gb.filter(|g| *g > 0).map_or_else(|| default_cache(disk_total()), |g| g * GB)
 }
 
-/// Seconds without a build before the builder stops: `KIRI_BUILDER_IDLE_SECS`,
+/// Seconds without a build before the builder stops: `STOWLARK_BUILDER_IDLE_SECS`,
 /// else Settings, else five minutes. 0 keeps it running.
 pub fn idle_secs() -> u64 {
-    std::env::var("KIRI_BUILDER_IDLE_SECS").ok().and_then(|v| v.parse().ok()).or_else(|| settings()["idle_secs"].as_u64()).unwrap_or(300)
+    std::env::var("STOWLARK_BUILDER_IDLE_SECS").ok().and_then(|v| v.parse().ok()).or_else(|| settings()["idle_secs"].as_u64()).unwrap_or(300)
 }
 
 /// buildkitd.toml, written at each start: the garbage collector's limits.
 /// BuildKit 0.17+ keys: the cache may use up to `maxUsedSpace`, and GC never
 /// takes it below `reservedSpace`.
-/// `registries` is the mirror's part (mirror.rs): Kiri's own images for `FROM`.
+/// `registries` is the mirror's part (mirror.rs): Stowlark's own images for `FROM`.
 fn config_toml(limit: u64, registries: &str) -> String {
     format!(
-        "# Written by Kiri each time its builder starts (Settings: the build cache's size).\n[worker.oci]\n  gc = true\n  maxUsedSpace = {limit}\n  reservedSpace = {}\n{registries}",
+        "# Written by Stowlark each time its builder starts (Settings: the build cache's size).\n[worker.oci]\n  gc = true\n  maxUsedSpace = {limit}\n  reservedSpace = {}\n{registries}",
         limit / 4
     )
 }
@@ -136,7 +136,7 @@ pub fn settings_report(engine: &Engine) -> Value {
     json!({
         "cache_gb": s["cache_gb"], "default_cache_gb": default_cache(disk_total()) / GB, "cache_limit": cache_limit(),
         "idle_secs": idle_secs(), "image": IMAGE, "container": container_name(), "volume": volume_name(), "state": state,
-        "overridden": std::env::var_os("KIRI_BUILD_CACHE_GB").is_some() || std::env::var_os("KIRI_BUILDER_IDLE_SECS").is_some(),
+        "overridden": std::env::var_os("STOWLARK_BUILD_CACHE_GB").is_some() || std::env::var_os("STOWLARK_BUILDER_IDLE_SECS").is_some(),
     })
 }
 
@@ -176,7 +176,7 @@ fn ensure_image(engine: &Engine, say: &mut dyn FnMut(&str)) -> Result<kiri_image
     if let Some(i) = engine.image(IMAGE)? {
         return Ok(i);
     }
-    say(&format!("Pulling {IMAGE} for Kiri's builder"));
+    say(&format!("Pulling {IMAGE} for Stowlark's builder"));
     let reference = Reference::parse(PINNED).map_err(|e| Error::Io(io::Error::other(e.to_string())))?;
     let pulled = Client::new()
         .pull(&engine.store, &reference, &Platform::host_linux(), &|_| {})
@@ -222,7 +222,7 @@ fn create(engine: &Engine, say: &mut dyn FnMut(&str)) -> Result<String, Error> {
 /// `POST /containers/<builder>/start` from buildx (its docker-container
 /// driver starts the container itself): the config is written first, as
 /// for the daemon's own starts, so the mirror address and the cache limit
-/// are today's, not whatever the container was made with (an older Kiri's
+/// are today's, not whatever the container was made with (an older Stowlark's
 /// mirror address, a bridge gateway that has since moved).
 pub fn before_start(engine: &Engine, key: &str) {
     let Some((id, status)) = find(engine) else { return };
@@ -273,7 +273,7 @@ fn hide_amd64_qemu(engine: &Engine, id: &str) {
 /// policy and with today's config, and buildx then starts and uses it.
 /// Only a build makes it: buildx looking the container up (`docker buildx
 /// ls`, `inspect`, the window's Builds view) makes and pulls nothing, so a
-/// fresh Kiri has no builder, image or cache volume until the first build.
+/// fresh Stowlark has no builder, image or cache volume until the first build.
 /// None for any other name, or when the builder exists (the usual 409).
 pub fn create_for_buildx(engine: &Engine, name: Option<&str>) -> Option<Result<Value, Error>> {
     if name.map(|n| n.trim_start_matches('/')) != Some(container_name().as_str()) {
@@ -300,7 +300,7 @@ fn ensure_running(engine: &Engine, say: &mut dyn FnMut(&str)) -> Result<String, 
     };
     if status != Status::Running {
         write_config(engine, &id);
-        say("Starting Kiri's builder (BuildKit)");
+        say("Starting Stowlark's builder (BuildKit)");
         engine.start(&id)?;
     } else if engine.is_paused(&id) {
         engine.pause(&id, false)?;
@@ -315,7 +315,7 @@ fn ensure_running(engine: &Engine, say: &mut dyn FnMut(&str)) -> Result<String, 
             let text: Vec<u8> = engine.logs(&id, false).ok().flatten().map(|l| l.past.tail(Some(5)).flat_map(|r| r.data).collect()).unwrap_or_default();
             let text = String::from_utf8_lossy(&text);
             let tail: Vec<&str> = text.lines().collect();
-            return Err(Error::Io(io::Error::other(format!("Kiri's builder (BuildKit) did not start: {}", tail.join(" / ")))));
+            return Err(Error::Io(io::Error::other(format!("Stowlark's builder (BuildKit) did not start: {}", tail.join(" / ")))));
         }
         std::thread::sleep(Duration::from_millis(200));
     }
@@ -327,7 +327,7 @@ pub fn watch(engine: Arc<Engine>) {
     super::mirror::start(&engine);
     let me = Arc::downgrade(&engine);
     drop(engine);
-    let _ = std::thread::Builder::new().name("kiri-builder-idle".into()).spawn(move || loop {
+    let _ = std::thread::Builder::new().name("stowlark-builder-idle".into()).spawn(move || loop {
         std::thread::sleep(Duration::from_secs(15));
         let Some(engine) = me.upgrade() else { return };
         let idle = idle_secs();
@@ -507,7 +507,7 @@ impl Options {
     fn parse(req: &Request) -> Result<Options, Error> {
         if req.query("version") == Some("2") {
             return Err(Error::BadRequest(
-                "Kiri builds with the classic builder API (version 1): BuildKit sessions go to Kiri's builder through buildx (docker buildx use kiri-build)".into(),
+                "Stowlark builds with the classic builder API (version 1): BuildKit sessions go to Stowlark's builder through buildx (docker buildx use stowlark-build)".into(),
             ));
         }
         let mut tags = Vec::new();
@@ -617,7 +617,7 @@ impl Options {
         for c in &self.cache_from {
             a.extend(["--import-cache".into(), format!("type=registry,ref={c}")]);
         }
-        // An image archive on stdout, which the daemon loads into Kiri's
+        // An image archive on stdout, which the daemon loads into Stowlark's
         // store; the names are quoted, the CSV way, since there may be several.
         a.push("--output".into());
         a.push(if self.tags.is_empty() { "type=docker,dest=-".into() } else { format!("type=docker,\"name={}\",dest=-", self.tags.join(",")) });
@@ -724,7 +724,7 @@ pub fn build(req: &Request, engine: &Arc<Engine>, w: &mut UnixStream, r: &mut Bu
         }
     };
     // `host-gateway` was parsed as the Mac's address; on a Linux host it's
-    // the bridge gateway, as `docker run` gives (kiri-init maps it there).
+    // the bridge gateway, as `docker run` gives (stowlark-init maps it there).
     let host = super::mirror::host_addr(engine);
     if host != super::ports::HOST_ADDR {
         let mac = format!("={}", super::ports::HOST_ADDR);
@@ -828,7 +828,7 @@ fn send_context(engine: &Engine, id: &str, dir: &str, req: &Request, r: &mut Buf
 }
 
 /// Runs the build: its progress (stderr) to the client as it comes, the
-/// image archive (stdout) into Kiri's store as it comes.
+/// image archive (stdout) into Stowlark's store as it comes.
 fn buildctl(engine: &Engine, id: &str, dir: &str, o: &Options, env: Vec<String>, out: &mut Out<'_>, probe: &UnixStream) -> Result<Vec<kiri_image::Image>, String> {
     let argv = o.argv(dir);
     if !o.build_id.is_empty() {
@@ -913,7 +913,7 @@ fn buildctl_run(engine: &Engine, id: &str, dir: &str, o: &Options, argv: Vec<Str
     match loaded {
         Ok(images) if !images.is_empty() => Ok(images),
         Ok(_) => Err("BuildKit sent no image".into()),
-        Err(e) => Err(format!("loading the built image into Kiri: {e}")),
+        Err(e) => Err(format!("loading the built image into Stowlark: {e}")),
     }
 }
 
@@ -1075,10 +1075,10 @@ mod tests {
         assert!(o.no_cache && o.pull && o.quiet);
         assert_eq!(o.platform, "linux/amd64");
         assert_eq!(o.extra_hosts, ["db=10.0.0.2".to_owned(), format!("host.docker.internal={}", super::super::ports::HOST_ADDR)]);
-        let a = o.argv("/tmp/kiri-build/x");
+        let a = o.argv("/tmp/stowlark-build/x");
         let has = |pair: &[&str]| a.windows(pair.len()).any(|w| w == pair);
         assert!(has(&["--opt", "filename=Dockerfile.dev"]));
-        assert!(has(&["--local", "context=/tmp/kiri-build/x/context", "--local", "dockerfile=/tmp/kiri-build/x/context/docker"]));
+        assert!(has(&["--local", "context=/tmp/stowlark-build/x/context", "--local", "dockerfile=/tmp/stowlark-build/x/context/docker"]));
         assert!(has(&["--opt", "build-arg:A=1"]) && has(&["--opt", "label:team=core"]) && has(&["--opt", "target=dev"]));
         assert!(has(&["--opt", "image-resolve-mode=pull"]) && has(&["--no-cache"]) && has(&["--opt", "platform=linux/amd64"]));
         assert!(has(&["--opt", "force-network-mode=host"]) && has(&["--allow", "network.host"]));

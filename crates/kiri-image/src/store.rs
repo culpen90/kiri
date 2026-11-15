@@ -127,20 +127,20 @@ pub fn digest_hex(digest: &str) -> io::Result<&str> {
 }
 
 impl Store {
-    /// The per-user data directory: `~/Library/Application Support/Kiri` on
-    /// macOS, `$XDG_DATA_HOME/kiri` (or `~/.local/share/kiri`) elsewhere.
-    /// `KIRI_DATA_DIR` overrides both.
+    /// The per-user data directory: `~/Library/Application Support/Stowlark` on
+    /// macOS, `$XDG_DATA_HOME/stowlark` (or `~/.local/share/stowlark`) elsewhere.
+    /// `STOWLARK_DATA_DIR` overrides both.
     pub fn default_root() -> io::Result<PathBuf> {
-        if let Some(dir) = std::env::var_os("KIRI_DATA_DIR") {
+        if let Some(dir) = std::env::var_os("STOWLARK_DATA_DIR") {
             return Ok(PathBuf::from(dir));
         }
         let home = std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| io::Error::other("HOME is not set"))?;
         Ok(if cfg!(target_os = "macos") {
-            home.join("Library/Application Support/Kiri")
+            home.join("Library/Application Support/Stowlark")
         } else if let Some(xdg) = std::env::var_os("XDG_DATA_HOME") {
-            PathBuf::from(xdg).join("kiri")
+            PathBuf::from(xdg).join("stowlark")
         } else {
-            home.join(".local/share/kiri")
+            home.join(".local/share/stowlark")
         })
     }
 
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn rejects_paths_instead_of_digests() {
-        let root = std::env::temp_dir().join(format!("kiri-store-path-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("stowlark-store-path-test-{}", std::process::id()));
         let store = Store::open(&root).unwrap();
         let outside = root.with_extension("outside");
         fs::write(&outside, b"do not touch").unwrap();
@@ -397,7 +397,7 @@ mod tests {
 
     #[test]
     fn finds_a_pull_by_index_digest_by_either_digest() {
-        let root = std::env::temp_dir().join(format!("kiri-store-index-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("stowlark-store-index-test-{}", std::process::id()));
         let store = Store::open(&root).unwrap();
         let (index, manifest) = (format!("sha256:{}", "1".repeat(64)), format!("sha256:{}", "2".repeat(64)));
         let image = Image {
@@ -424,7 +424,7 @@ mod tests {
 
     #[test]
     fn a_push_leaves_the_registry_manifest_in_repo_digests() {
-        let root = std::env::temp_dir().join(format!("kiri-store-push-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("stowlark-store-push-test-{}", std::process::id()));
         let store = Store::open(&root).unwrap();
         let d = |c: &str| format!("sha256:{}", c.repeat(64));
         let image = |name: &str, config: &str, index: Option<String>| Image {

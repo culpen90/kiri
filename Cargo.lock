@@ -719,45 +719,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kiri"
-version = "0.0.0"
-dependencies = [
- "block2",
- "dispatch2",
- "flate2",
- "gtk",
- "javascriptcore-rs",
- "kiri-image",
- "kiri-proto",
- "kiri-share-proto",
- "kiri-vmm",
- "libc",
- "objc2",
- "objc2-app-kit",
- "objc2-core-foundation",
- "objc2-core-text",
- "objc2-foundation",
- "objc2-web-kit",
- "rcgen",
- "rustls",
- "serde",
- "serde_json",
- "sha2",
- "tar",
- "ureq",
- "webkit2gtk",
- "webpki-roots",
-]
-
-[[package]]
-name = "kiri-android"
-version = "0.0.0"
-dependencies = [
- "libc",
- "serde_json",
-]
-
-[[package]]
 name = "kiri-image"
 version = "0.0.0"
 dependencies = [
@@ -766,17 +727,6 @@ dependencies = [
  "sha2",
  "tar",
  "ureq",
-]
-
-[[package]]
-name = "kiri-init"
-version = "0.0.0"
-dependencies = [
- "flate2",
- "kiri-proto",
- "libc",
- "ruzstd",
- "tar",
 ]
 
 [[package]]
@@ -801,23 +751,6 @@ dependencies = [
  "objc2",
  "objc2-foundation",
  "objc2-virtualization",
-]
-
-[[package]]
-name = "kiri-win"
-version = "0.0.0"
-dependencies = [
- "embed-resource",
- "kiri-share-proto",
- "libc",
- "rustls",
- "serde",
- "serde_json",
- "sha2",
- "webpki-roots",
- "webview2-com",
- "windows",
- "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1368,6 +1301,73 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
+]
+
+[[package]]
+name = "stowlark"
+version = "0.0.0"
+dependencies = [
+ "block2",
+ "dispatch2",
+ "flate2",
+ "gtk",
+ "javascriptcore-rs",
+ "kiri-image",
+ "kiri-proto",
+ "kiri-share-proto",
+ "kiri-vmm",
+ "libc",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-foundation",
+ "objc2-core-text",
+ "objc2-foundation",
+ "objc2-web-kit",
+ "rcgen",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tar",
+ "ureq",
+ "webkit2gtk",
+ "webpki-roots",
+]
+
+[[package]]
+name = "stowlark-android"
+version = "0.0.0"
+dependencies = [
+ "libc",
+ "serde_json",
+]
+
+[[package]]
+name = "stowlark-init"
+version = "0.0.0"
+dependencies = [
+ "flate2",
+ "kiri-proto",
+ "libc",
+ "ruzstd",
+ "tar",
+]
+
+[[package]]
+name = "stowlark-win"
+version = "0.0.0"
+dependencies = [
+ "embed-resource",
+ "kiri-share-proto",
+ "libc",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "webpki-roots",
+ "webview2-com",
+ "windows",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

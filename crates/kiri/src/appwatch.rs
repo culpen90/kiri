@@ -1,14 +1,14 @@
-//! Noticing that Kiri's own program is gone from where it started: the app
+//! Noticing that Stowlark's own program is gone from where it started: the app
 //! dragged to the Trash, a development build's folder deleted, or (on
 //! Windows, where a running program can't be deleted) its folder renamed
 //! or moved. What's left running can't do its job any more (on the Mac the
 //! VM's kernel went with the app), yet it still holds what "Build with
-//! Kiri" took, buildx's builder for every context, and every `docker
-//! build` fails on it. The daemon (daemon/mod.rs) and kiri-win both watch,
+//! Stowlark" took, buildx's builder for every context, and every `docker
+//! build` fails on it. The daemon (daemon/mod.rs) and stowlark-win both watch,
 //! hand the builder back and stop.
 //!
-//! The same file serves the Mac and Linux (crates/kiri) and Windows
-//! (kiri-win includes it).
+//! The same file serves the Mac and Linux (crates/stowlark) and Windows
+//! (stowlark-win includes it).
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -28,7 +28,7 @@ pub fn watch(on_gone: impl FnOnce(&Path) + Send + 'static) {
 }
 
 fn watch_path(path: PathBuf, every: Duration, on_gone: impl FnOnce(&Path) + Send + 'static) {
-    let _ = std::thread::Builder::new().name("kiri-app-watch".into()).spawn(move || {
+    let _ = std::thread::Builder::new().name("stowlark-app-watch".into()).spawn(move || {
         let mut missing = 0;
         while missing < 2 {
             std::thread::sleep(every);
@@ -45,10 +45,10 @@ mod tests {
 
     #[test]
     fn a_program_moved_away_is_noticed_once_and_one_put_back_is_not() {
-        let dir = std::env::temp_dir().join(format!("kiri-appwatch-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-appwatch-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("app")).unwrap();
-        let exe = dir.join("app").join("kiri");
+        let exe = dir.join("app").join("stowlark");
         std::fs::write(&exe, b"program").unwrap();
         let (tx, rx) = mpsc::channel();
         super::watch_path(exe.clone(), Duration::from_millis(20), move |p| tx.send(p.to_owned()).unwrap());
@@ -62,10 +62,10 @@ mod tests {
 
     #[test]
     fn a_brief_swap_is_not_taken_for_gone() {
-        let dir = std::env::temp_dir().join(format!("kiri-appwatch-swap-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-appwatch-swap-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let exe = dir.join("kiri");
+        let exe = dir.join("stowlark");
         std::fs::write(&exe, b"old").unwrap();
         let (tx, rx) = mpsc::channel();
         super::watch_path(exe.clone(), Duration::from_millis(400), move |p| tx.send(p.to_owned()).unwrap());

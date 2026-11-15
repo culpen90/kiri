@@ -270,7 +270,7 @@ fn shared_agent() -> ureq::Agent {
         // and one to its CDN; keep them all for the next pull.
         .max_idle_connections(32)
         .max_idle_connections_per_host(PARALLEL_LAYERS * 2)
-        .user_agent(concat!("kiri/", env!("CARGO_PKG_VERSION")));
+        .user_agent(concat!("stowlark/", env!("CARGO_PKG_VERSION")));
     if let Some(p) = proxy(chosen.clone()) {
         cfg = cfg.proxy(p);
     }
@@ -833,12 +833,12 @@ impl Client {
         let secure = realm_is_secure(realm, registry);
         if !secure && self.credentials.is_some() {
             static WARNED: std::sync::Once = std::sync::Once::new();
-            WARNED.call_once(|| eprintln!("kiri: not sending {registry}'s credentials to its token realm {realm}: not https"));
+            WARNED.call_once(|| eprintln!("stowlark: not sending {registry}'s credentials to its token realm {realm}: not https"));
         }
         let creds = self.credentials.as_ref().filter(|_| secure);
         let mut resp = if let Some(c) = creds.filter(|c| !c.identity_token.is_empty()) {
             // An identity token is an OAuth refresh token.
-            let mut form = vec![("grant_type", "refresh_token"), ("refresh_token", c.identity_token.as_str()), ("service", service), ("client_id", "kiri")];
+            let mut form = vec![("grant_type", "refresh_token"), ("refresh_token", c.identity_token.as_str()), ("service", service), ("client_id", "stowlark")];
             if let Some(s) = scope {
                 form.push(("scope", s));
             }
@@ -1298,7 +1298,7 @@ mod tests {
                 let _ = c.write_all(rest);
             }
         });
-        let root = std::env::temp_dir().join(format!("kiri-stall-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("stowlark-stall-test-{}", std::process::id()));
         let store = Store::open(&root).unwrap();
         let r = Reference::parse(&format!("{host}/test/blob:1")).unwrap();
         let started = Instant::now();
@@ -1326,7 +1326,7 @@ mod tests {
                 let _ = c.write_all(&body);
             }
         });
-        let root = std::env::temp_dir().join(format!("kiri-norange-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("stowlark-norange-test-{}", std::process::id()));
         let store = Store::open(&root).unwrap();
         let r = Reference::parse(&format!("{host}/test/blob:1")).unwrap();
         assert_eq!(test_client().download(&store, &r, &digest, &|_| {}).unwrap(), data.len() as u64);
@@ -1345,7 +1345,7 @@ mod tests {
             let _ = write!(c, "HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n");
             std::thread::sleep(Duration::from_millis(400));
         });
-        let root = std::env::temp_dir().join(format!("kiri-dead-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("stowlark-dead-test-{}", std::process::id()));
         let store = Store::open(&root).unwrap();
         let r = Reference::parse(&format!("{host}/test/blob:1")).unwrap();
         assert!(test_client().download(&store, &r, &digest, &|_| {}).is_err());
@@ -1364,7 +1364,7 @@ mod tests {
             let _ = c.write_all(&body[..body.len() / 2]);
             std::thread::sleep(Duration::from_secs(5));
         });
-        let root = std::env::temp_dir().join(format!("kiri-cancel-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("stowlark-cancel-test-{}", std::process::id()));
         let store = Store::open(&root).unwrap();
         let r = Reference::parse(&format!("{host}/test/blob:1")).unwrap();
         // Stalls only give up after 10 s: the cancel must not wait for that.

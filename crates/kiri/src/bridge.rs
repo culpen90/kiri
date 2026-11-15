@@ -1,4 +1,4 @@
-//! `kiri bridge`: the WSL2 end of kiri-win.exe. The Windows docker CLI's
+//! `stowlark bridge`: the WSL2 end of stowlark-win.exe. The Windows docker CLI's
 //! connections arrive multiplexed on stdin, each relayed to the daemon's
 //! unix socket, and the replies go back on stdout. A half-close travels as
 //! a frame of its own: WSL's localhost relay drops TCP half-closes, which
@@ -11,7 +11,7 @@
 //! not reading it) or a client that stops reading its output holds up
 //! only that connection, and no queue grows past the window. The bridge
 //! says it does this with an ACK for connection 0 when it starts, and
-//! kiri-win asks for it per connection by sending 1 with OPEN; a kiri-win
+//! stowlark-win asks for it per connection by sending 1 with OPEN; a stowlark-win
 //! from before this ignores the first and never sends the second, and its
 //! connections get the old bounded queue.
 
@@ -25,7 +25,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex};
 
 /// A frame: kind, connection id (u32 BE), length (u32 BE), then the data.
-/// The same as in crates/kiri-win.
+/// The same as in crates/stowlark-win.
 const OPEN: u8 = 1;
 const DATA: u8 = 2;
 /// No more data from this side (a half-close).
@@ -68,11 +68,11 @@ struct Conn {
     /// it is `queued`, which the credit keeps under WINDOW.
     tx: Sender<Op>,
     queued: Arc<AtomicUsize>,
-    /// Credit for its replies, when kiri-win asked for flow control.
+    /// Credit for its replies, when stowlark-win asked for flow control.
     window: Option<Arc<Window>>,
 }
 
-/// Relays the frames on `input` until it ends (kiri-win has gone; its
+/// Relays the frames on `input` until it ends (stowlark-win has gone; its
 /// connections go too).
 fn serve(mut input: impl Read, out: &Out, socket: &Path) -> io::Result<()> {
     // Hello: this bridge does flow control.
@@ -89,9 +89,9 @@ fn serve(mut input: impl Read, out: &Out, socket: &Path) -> io::Result<()> {
                     let window = credit.then(|| Arc::new(Window::default()));
                     conns.insert(id, Conn { tx, queued: queued.clone(), window: window.clone() });
                     let acks = credit.then(|| out.clone());
-                    std::thread::Builder::new().name("kiri-bridge-w".into()).spawn(move || writer(id, s, &rx, &queued, acks.as_ref()))?;
+                    std::thread::Builder::new().name("stowlark-bridge-w".into()).spawn(move || writer(id, s, &rx, &queued, acks.as_ref()))?;
                     let out = out.clone();
-                    std::thread::Builder::new().name("kiri-bridge".into()).spawn(move || replies(id, reader, &out, window.as_deref()))?;
+                    std::thread::Builder::new().name("stowlark-bridge".into()).spawn(move || replies(id, reader, &out, window.as_deref()))?;
                 }
                 Err(_) => send(out, CLOSE, id, &[])?,
             },
@@ -108,7 +108,7 @@ fn serve(mut input: impl Read, out: &Out, socket: &Path) -> io::Result<()> {
                     _ => Op::Close,
                 };
                 let len = if let Op::Data(d) = &op { d.len() } else { 0 };
-                // Past the window: kiri-win sent beyond its credit, or (without
+                // Past the window: stowlark-win sent beyond its credit, or (without
                 // credit) the daemon is not taking this connection's input.
                 // Dropping the sender ends its writer, which closes it.
                 let overflow = c.queued.fetch_add(len, Ordering::SeqCst) + len > LIMIT;
@@ -139,15 +139,15 @@ fn serve(mut input: impl Read, out: &Out, socket: &Path) -> io::Result<()> {
 /// What one connection's writer is asked to do, in order.
 enum Op {
     Data(Vec<u8>),
-    /// kiri-win's client half-closed: no more input, replies may still flow.
+    /// stowlark-win's client half-closed: no more input, replies may still flow.
     Eof,
     Close,
 }
 
 /// Writes one connection's input to the daemon, acknowledging it to
-/// kiri-win (`acks`) as it goes. Ends, closing the connection, when asked
+/// stowlark-win (`acks`) as it goes. Ends, closing the connection, when asked
 /// to or when its queue's sender is dropped. Once the daemon's side has
-/// gone, input is still taken and acknowledged, unwritten, so kiri-win's
+/// gone, input is still taken and acknowledged, unwritten, so stowlark-win's
 /// sender never waits on credit that cannot come.
 fn writer(id: u32, mut s: UnixStream, rx: &Receiver<Op>, queued: &AtomicUsize, acks: Option<&Out>) {
     let mut broken = false;
@@ -179,14 +179,14 @@ fn writer(id: u32, mut s: UnixStream, rx: &Receiver<Op>, queued: &AtomicUsize, a
 }
 
 /// Copies the daemon's side of one connection to stdout, ending with EOF.
-/// With a `window`, it waits for kiri-win's credit before each piece.
+/// With a `window`, it waits for stowlark-win's credit before each piece.
 fn replies(id: u32, mut s: UnixStream, out: &Out, window: Option<&Window>) {
     let mut buf = vec![0u8; 64 * 1024];
     let end = loop {
         match s.read(&mut buf) {
             Ok(0) => break EOF,
             Ok(n) => {
-                // kiri-win closed the connection while this waited.
+                // stowlark-win closed the connection while this waited.
                 if window.is_some_and(|w| !w.take(n)) {
                     return;
                 }
@@ -300,10 +300,10 @@ mod tests {
     }
 
     /// A bridge between socket pairs, to a "daemon" on its own socket that
-    /// `daemon` serves (one connection). Returns kiri-win's ends: what it
+    /// `daemon` serves (one connection). Returns stowlark-win's ends: what it
     /// writes to the bridge, and what it reads from it.
     fn bridge(name: &str, daemon: impl FnOnce(UnixStream) + Send + 'static) -> (UnixStream, UnixStream) {
-        let dir = std::env::temp_dir().join(format!("kiri-bridge-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-bridge-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let sock = dir.join("d.sock");
@@ -396,7 +396,7 @@ mod tests {
                 (DATA, 1) => {
                     got += data.len();
                     most = most.max(got - acked);
-                    // Handed on slowly, and acknowledged as kiri-win does.
+                    // Handed on slowly, and acknowledged as stowlark-win does.
                     std::thread::sleep(Duration::from_micros(200));
                     if got - acked >= ACK_EVERY {
                         frame(&mut to_bridge, ACK, 1, &((got - acked) as u32).to_be_bytes());
@@ -411,7 +411,7 @@ mod tests {
         assert!(most <= WINDOW + (64 << 10), "{most} bytes in flight");
     }
 
-    /// A kiri-win from before flow control: no credit asked, no ACKs sent
+    /// A stowlark-win from before flow control: no credit asked, no ACKs sent
     /// for its connections, and they work as before.
     #[test]
     fn connections_without_credit() {

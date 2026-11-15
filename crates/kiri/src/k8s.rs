@@ -1,8 +1,8 @@
-//! `kiri k8s`: a single-node Kubernetes cluster (k3s) in one privileged
-//! Kiri container, as OrbStack and Docker Desktop offer. Its API server is
-//! on `127.0.0.1:6443` (or the next free port), its state in the `kiri-k8s` volume, and `kubectl`
-//! gets a `kiri` context in its own file (src/kubeconfig.rs), at each start, at the engine's
-//! start while the node runs, and by `kiri k8s status`; `delete` takes it out.
+//! `stowlark k8s`: a single-node Kubernetes cluster (k3s) in one privileged
+//! Stowlark container, as OrbStack and Docker Desktop offer. Its API server is
+//! on `127.0.0.1:6443` (or the next free port), its state in the `stowlark-k8s` volume, and `kubectl`
+//! gets a `stowlark` context in its own file (src/kubeconfig.rs), at each start, at the engine's
+//! start while the node runs, and by `stowlark k8s status`; `delete` takes it out.
 
 use std::io;
 use std::path::PathBuf;
@@ -15,17 +15,17 @@ use crate::flavor::CONTEXT;
 
 const IMAGE: (&str, &str) = ("rancher/k3s", "v1.37.1-k3s1");
 /// The node container; the window reads the cluster through it.
-pub(crate) const NAME: &str = "kiri-k8s";
-const VOLUME: &str = "kiri-k8s";
+pub(crate) const NAME: &str = "stowlark-k8s";
+const VOLUME: &str = "stowlark-k8s";
 
 fn home() -> io::Result<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| io::Error::other("HOME is not set"))
 }
 
-/// The cluster's settings, in `~/.kiri/k8s.json`: whether its API server
+/// The cluster's settings, in `~/.stowlark/k8s.json`: whether its API server
 /// (and, through the daemon, its LoadBalancer services) answers on every
 /// interface rather than 127.0.0.1, and extra names for its certificate.
-/// They are applied when the node container is created, so `kiri k8s set`
+/// They are applied when the node container is created, so `stowlark k8s set`
 /// recreates it; the cluster's state is in the volume and stays.
 #[derive(Default, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Config {
@@ -51,7 +51,7 @@ impl Config {
 }
 
 /// The label that keeps the Mac port a node was made with, for while it's stopped.
-const PORT_LABEL: &str = "dev.kiri.k8s.port";
+const PORT_LABEL: &str = "dev.stowlark.k8s.port";
 
 /// The Mac port a node container publishes its API server on: its live
 /// binding while it runs, else the one it was made with.
@@ -61,7 +61,7 @@ pub(crate) fn bound_port(info: &serde_json::Value) -> Option<u16> {
     live.as_str().or(made.as_str()).and_then(|p| p.parse().ok())
 }
 
-/// A port no program on the Mac holds (another Kiri's cluster, Docker
+/// A port no program on the Mac holds (another Stowlark's cluster, Docker
 /// Desktop's, a tunnel): nothing answers on it and it can be bound.
 fn port_free(port: u16, lan: bool) -> bool {
     let local = std::net::SocketAddr::from(([127, 0, 0, 1], port));
@@ -77,7 +77,7 @@ fn pick_port(want: u16, lan: bool) -> io::Result<u16> {
     let last = want.saturating_add(PORT_TRIES);
     (want..=last).find(|&p| port_free(p, lan)).ok_or_else(|| {
         io::Error::other(format!(
-            "ports {want}–{last} are all in use on this Mac, so the cluster's API server has none to take. Choose another in Settings → Kubernetes (or `kiri k8s set --port N`), or stop what holds them, such as another Kiri's Kubernetes"
+            "ports {want}–{last} are all in use on this Mac, so the cluster's API server has none to take. Choose another in Settings → Kubernetes (or `stowlark k8s set --port N`), or stop what holds them, such as another Stowlark's Kubernetes"
         ))
     })
 }
@@ -102,7 +102,7 @@ fn valid_san(name: &str) -> bool {
             && name.trim_start_matches("*.").split('.').all(|l| !l.is_empty() && l.len() <= 63 && !l.starts_with('-') && l.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')))
 }
 
-/// `kiri k8s set [--lan on|off] [--tls-san a,b] [--port N]`: saves the settings and, if
+/// `stowlark k8s set [--lan on|off] [--tls-san a,b] [--port N]`: saves the settings and, if
 /// the cluster exists and they changed, recreates its node with them.
 fn set(args: &[String]) -> io::Result<()> {
     let mut cfg = config();
@@ -125,7 +125,7 @@ fn set(args: &[String]) -> io::Result<()> {
                 };
                 cfg.port = (port != API_PORT).then_some(port);
             }
-            _ => return Err(io::Error::other("usage: kiri k8s set [--lan on|off] [--tls-san NAME,…] [--port N]")),
+            _ => return Err(io::Error::other("usage: stowlark k8s set [--lan on|off] [--tls-san NAME,…] [--port N]")),
         }
     }
     ensure_daemon()?;
@@ -154,7 +154,7 @@ fn set(args: &[String]) -> io::Result<()> {
 }
 
 /// The label that keeps the settings a node was made with.
-const CONFIG_LABEL: &str = "dev.kiri.k8s.config";
+const CONFIG_LABEL: &str = "dev.stowlark.k8s.config";
 
 /// What of the settings a node is made with, as its label keeps them. The
 /// host folders are in it too, so a node made before it had them (or before
@@ -183,7 +183,7 @@ fn ensure_daemon() -> io::Result<()> {
     if client::alive() {
         return Ok(());
     }
-    Err(io::Error::other("kiri daemon is not running: open Kiri.app or run `kiri daemon`"))
+    Err(io::Error::other("stowlark daemon is not running: open Stowlark.app or run `stowlark daemon`"))
 }
 
 fn ok(r: io::Result<client::Response>) -> io::Result<client::Response> {
@@ -212,13 +212,13 @@ fn run_inner(args: &[String]) -> io::Result<()> {
         Some("stop") => {
             ensure_daemon()?;
             ok(client::request("POST", &format!("/containers/{NAME}/stop"), None))?;
-            println!("Kubernetes stopped (its state is kept; `kiri k8s start` resumes it)");
+            println!("Kubernetes stopped (its state is kept; `stowlark k8s start` resumes it)");
             Ok(())
         }
         Some("status") => status(),
         Some("delete") => delete(),
         Some("set") => set(&args[1..]),
-        _ => Err(io::Error::other("usage: kiri k8s start [--use] | stop | status | delete | set [--lan on|off] [--tls-san NAME,…] [--port N]")),
+        _ => Err(io::Error::other("usage: stowlark k8s start [--use] | stop | status | delete | set [--lan on|off] [--tls-san NAME,…] [--port N]")),
     }
 }
 
@@ -274,8 +274,8 @@ fn start(use_context: bool) -> io::Result<()> {
         let body = json!({
             "Image": format!("{repo}:{tag}"),
             "Cmd": cmd,
-            "Hostname": "kiri",
-            "Labels": {"dev.kiri.k8s": "1", PORT_LABEL: port.to_string(), CONFIG_LABEL: made_with(&cfg)},
+            "Hostname": "stowlark",
+            "Labels": {"dev.stowlark.k8s": "1", PORT_LABEL: port.to_string(), CONFIG_LABEL: made_with(&cfg)},
             "ExposedPorts": {"6443/tcp": {}},
             "HostConfig": {
                 "Privileged": true,
@@ -305,7 +305,7 @@ fn start(use_context: bool) -> io::Result<()> {
             }
         }
         if Instant::now() > deadline {
-            return Err(io::Error::other(format!("the node was not ready after 3 minutes; see `docker --context kiri logs {NAME}`")));
+            return Err(io::Error::other(format!("the node was not ready after 3 minutes; see `docker --context stowlark logs {NAME}`")));
         }
         std::thread::sleep(Duration::from_secs(1));
     }
@@ -334,12 +334,12 @@ fn k3s_yaml() -> io::Result<String> {
 /// lookups go to CoreDNS, which forwards to the node's resolver, and the
 /// node is on the default bridge, which has no embedded DNS: upstream says
 /// NXDOMAIN. Docker Desktop's and OrbStack's clusters answer them.
-const HOST_NAMES: [&str; 3] = ["host.docker.internal", "host.kiri.internal", "gateway.docker.internal"];
+const HOST_NAMES: [&str; 3] = ["host.docker.internal", "host.stowlark.internal", "gateway.docker.internal"];
 /// Where k3s applies manifests from, at its start and whenever one changes.
 /// It is in the cluster's volume, so the file outlives the node container
 /// and k3s upgrades (they replace only k3s' own manifests).
 const MANIFESTS: &str = "/var/lib/rancher/k3s/server/manifests";
-const HOST_MANIFEST: &str = "kiri-host-names.yaml";
+const HOST_MANIFEST: &str = "stowlark-host-names.yaml";
 
 /// k3s' CoreDNS imports `*.server` from the `coredns-custom` ConfigMap as
 /// server blocks of their own: one for the host's names answers them with
@@ -350,14 +350,14 @@ fn host_manifest() -> String {
     let addr = crate::daemon::ports::HOST_ADDR;
     let zones: Vec<String> = HOST_NAMES.iter().map(|n| format!("{n}:53")).collect();
     format!(
-        "# Written by Kiri at each `kiri k8s start`: pods resolve the host's names, as containers do.\n\
+        "# Written by Stowlark at each `stowlark k8s start`: pods resolve the host's names, as containers do.\n\
 apiVersion: v1\n\
 kind: ConfigMap\n\
 metadata:\n\
 \x20 name: coredns-custom\n\
 \x20 namespace: kube-system\n\
 data:\n\
-\x20 kiri-host.server: |\n\
+\x20 stowlark-host.server: |\n\
 \x20   {zones} {{\n\
 \x20       hosts {{\n\
 \x20           {addr} {names}\n\
@@ -371,7 +371,7 @@ data:\n\
 /// A CoreDNS that was running before the manifest was there doesn't see it
 /// (its `reload` watches the Corefile, not what it imports), so once k3s
 /// has applied the ConfigMap, CoreDNS is restarted: only when the manifest
-/// was just written, so a cluster's first start with it, or a Kiri that
+/// was just written, so a cluster's first start with it, or a Stowlark that
 /// changes it.
 fn restart_coredns() -> io::Result<()> {
     let script = "k='kubectl -n kube-system'; for i in $(seq 90); do \
@@ -388,8 +388,8 @@ fn restart_coredns() -> io::Result<()> {
 /// it should be. Whether it was written.
 fn host_names() -> io::Result<bool> {
     let script = format!(
-        "set -e; d={MANIFESTS}; f=$d/{HOST_MANIFEST}; mkdir -p $d; printf '%s' \"$1\" > $d/.kiri-host-names.tmp; \
-         if cmp -s $d/.kiri-host-names.tmp $f; then rm -f $d/.kiri-host-names.tmp; else mv $d/.kiri-host-names.tmp $f; echo written; fi"
+        "set -e; d={MANIFESTS}; f=$d/{HOST_MANIFEST}; mkdir -p $d; printf '%s' \"$1\" > $d/.stowlark-host-names.tmp; \
+         if cmp -s $d/.stowlark-host-names.tmp $f; then rm -f $d/.stowlark-host-names.tmp; else mv $d/.stowlark-host-names.tmp $f; echo written; fi"
     );
     let manifest = host_manifest();
     let (code, out) = client::exec(NAME, &["sh", "-c", &script, "sh", &manifest])?;
@@ -399,9 +399,9 @@ fn host_names() -> io::Result<bool> {
     Ok(out.contains("written"))
 }
 
-/// The cluster's kubeconfig, renamed to `kiri`, at ~/.kiri/kubeconfig, and
+/// The cluster's kubeconfig, renamed to `stowlark`, at ~/.stowlark/kubeconfig, and
 /// its cluster, user and context put into kubectl's file (src/kubeconfig.rs),
-/// with no kubectl needed: the app's `kiri k8s start` runs with launchd's
+/// with no kubectl needed: the app's `stowlark k8s start` runs with launchd's
 /// PATH, where none is found. Whether kubectl's file changed.
 fn kubeconfig(use_context: bool, port: u16) -> io::Result<bool> {
     let ours = crate::kubeconfig::from_k3s(&k3s_yaml()?, CONTEXT.get(), port);
@@ -421,7 +421,7 @@ fn kubeconfig(use_context: bool, port: u16) -> io::Result<bool> {
 }
 
 /// The context of a cluster that is already running, as at the engine's
-/// start, which restarts the node without `kiri k8s start`: written once
+/// start, which restarts the node without `stowlark k8s start`: written once
 /// k3s has its kubeconfig (within `wait`), and rewritten if its port or
 /// certificate changed. Nothing when there is no running node.
 pub(crate) fn sync(wait: Duration) -> io::Result<bool> {
@@ -429,7 +429,7 @@ pub(crate) fn sync(wait: Duration) -> io::Result<bool> {
     if !r.ok() || r.json()["State"]["Running"] != true {
         return Ok(false);
     }
-    // A cluster made by an older Kiri gets it here too, at the engine's start.
+    // A cluster made by an older Stowlark gets it here too, at the engine's start.
     let host_names_written = host_names().unwrap_or_else(|e| {
         crate::diag::warn!("host names manifest not written", error = e);
         false
@@ -452,14 +452,14 @@ pub(crate) fn sync(wait: Duration) -> io::Result<bool> {
 
 /// The engine's start: a node it restarts gets its kubectl context, in
 /// the background. A daemon running as root (a Linux host's systemd
-/// service) has root's home, not the user's, and leaves it to `kiri k8s`.
+/// service) has root's home, not the user's, and leaves it to `stowlark k8s`.
 pub(crate) fn sync_at_start() {
     #[cfg(target_os = "linux")]
     // SAFETY: geteuid cannot fail.
     if unsafe { libc::geteuid() } == 0 {
         return;
     }
-    let _ = std::thread::Builder::new().name("kiri-k8s-context".into()).spawn(|| {
+    let _ = std::thread::Builder::new().name("stowlark-k8s-context".into()).spawn(|| {
         for _ in 0..50 {
             if client::alive() {
                 break;
@@ -487,7 +487,7 @@ pub(crate) fn forget() {
 fn status() -> io::Result<()> {
     ensure_daemon()?;
     if !exists()? {
-        println!("Kubernetes: not created (kiri k8s start)");
+        println!("Kubernetes: not created (stowlark k8s start)");
         return Ok(());
     }
     let info = client::get(&format!("/containers/{NAME}/json"))?;
@@ -497,7 +497,7 @@ fn status() -> io::Result<()> {
     let moved = if port != want { format!(" ({want} was in use)") } else { String::new() };
     println!("Kubernetes: {state}, API on 127.0.0.1:{port}{moved}");
     if state == "running" {
-        // A context missing or out of date (written by an older Kiri, or not at all) is put right.
+        // A context missing or out of date (written by an older Stowlark, or not at all) is put right.
         if let Err(e) = sync(Duration::ZERO) {
             println!("kubectl context `{CONTEXT}` not written: {e}");
         }
@@ -522,9 +522,9 @@ fn delete() -> io::Result<()> {
 mod tests {
     #[test]
     fn the_port_comes_from_the_binding_then_the_label() {
-        let running = serde_json::json!({"NetworkSettings": {"Ports": {"6443/tcp": [{"HostIp": "127.0.0.1", "HostPort": "6444"}]}}, "Config": {"Labels": {"dev.kiri.k8s.port": "6450"}}});
+        let running = serde_json::json!({"NetworkSettings": {"Ports": {"6443/tcp": [{"HostIp": "127.0.0.1", "HostPort": "6444"}]}}, "Config": {"Labels": {"dev.stowlark.k8s.port": "6450"}}});
         assert_eq!(super::bound_port(&running), Some(6444));
-        let stopped = serde_json::json!({"NetworkSettings": {"Ports": {}}, "Config": {"Labels": {"dev.kiri.k8s.port": "6450"}}});
+        let stopped = serde_json::json!({"NetworkSettings": {"Ports": {}}, "Config": {"Labels": {"dev.stowlark.k8s.port": "6450"}}});
         assert_eq!(super::bound_port(&stopped), Some(6450));
         assert_eq!(super::bound_port(&serde_json::json!({})), None);
     }
@@ -532,7 +532,7 @@ mod tests {
     #[test]
     fn the_node_sees_the_host_folders_at_their_own_paths() {
         let b = super::binds();
-        assert_eq!(b[0], "kiri-k8s:/var/lib/rancher/k3s");
+        assert_eq!(b[0], "stowlark-k8s:/var/lib/rancher/k3s");
         let home = if cfg!(target_os = "macos") { "/Users" } else { "/home" };
         assert!(b.contains(&format!("{home}:{home}")), "{b:?}");
         // A node made before the folders were bound is made again.
@@ -561,8 +561,8 @@ mod tests {
     fn pods_resolve_the_host_names_in_a_server_block_of_their_own() {
         let m = super::host_manifest();
         assert!(m.contains("\n  name: coredns-custom\n  namespace: kube-system\n"), "{m}");
-        assert!(m.contains("\n  kiri-host.server: |\n    host.docker.internal:53 host.kiri.internal:53 gateway.docker.internal:53 {\n"), "{m}");
-        assert!(m.contains(&format!("\n            {} host.docker.internal host.kiri.internal gateway.docker.internal\n", crate::daemon::ports::HOST_ADDR)), "{m}");
+        assert!(m.contains("\n  stowlark-host.server: |\n    host.docker.internal:53 host.stowlark.internal:53 gateway.docker.internal:53 {\n"), "{m}");
+        assert!(m.contains(&format!("\n            {} host.docker.internal host.stowlark.internal gateway.docker.internal\n", crate::daemon::ports::HOST_ADDR)), "{m}");
         // No `fallthrough`: the block is for these names only, and nothing else reaches it.
         assert!(!m.contains("fallthrough") && !m.contains('\t'), "{m}");
     }

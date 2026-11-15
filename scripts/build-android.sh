@@ -29,22 +29,22 @@ fi
 output=${1:-"$root/target/android-dist"}
 mkdir -p -- "$output"
 output=$(CDPATH='' cd -- "$output" && pwd)
-scratch=$(mktemp -d "$output/.kiri-android.XXXXXX")
+scratch=$(mktemp -d "$output/.stowlark-android.XXXXXX")
 trap 'rm -rf -- "$scratch"' EXIT
 trap 'exit 1' HUP INT TERM
-bundle=$scratch/kiri-android
-assets=$bundle/share/kiri-android
+bundle=$scratch/stowlark-android
+assets=$bundle/share/stowlark-android
 mkdir -p "$bundle/bin" "$assets"
 
 cd "$root"
 build_dir=${CARGO_TARGET_DIR:-"$root/target"}
 CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$linker cargo build --locked \
-    -p kiri-android --release --target aarch64-linux-android --target-dir "$build_dir"
-install -m 0755 "$build_dir/aarch64-linux-android/release/kiri-android" "$bundle/bin/"
+    -p stowlark-android --release --target aarch64-linux-android --target-dir "$build_dir"
+install -m 0755 "$build_dir/aarch64-linux-android/release/stowlark-android" "$bundle/bin/"
 python3 guest/android/build.py --output-dir "$assets"
 install -m 0644 LICENSE NOTICE "$assets/"
 
-archive=kiri-android-aarch64.tar.gz
+archive=stowlark-android-aarch64.tar.gz
 python3 - "$scratch" "$archive" <<'PY'
 import gzip
 import sys
@@ -56,13 +56,13 @@ stage = Path(sys.argv[1])
 def normalize(entry):
     entry.mtime = entry.uid = entry.gid = 0
     entry.uname = entry.gname = ""
-    entry.mode = 0o755 if entry.isdir() or entry.name == "kiri-android/bin/kiri-android" else 0o644
+    entry.mode = 0o755 if entry.isdir() or entry.name == "stowlark-android/bin/stowlark-android" else 0o644
     return entry
 
 with (stage / sys.argv[2]).open("wb") as raw:
     with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed:
         with tarfile.open(fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT) as tar:
-            tar.add(stage / "kiri-android", arcname="kiri-android", filter=normalize)
+            tar.add(stage / "stowlark-android", arcname="stowlark-android", filter=normalize)
 PY
 (
     cd "$scratch"

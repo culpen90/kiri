@@ -1,6 +1,6 @@
 //! Settings → Diagnostics on Windows: the window's log
-//! (%LOCALAPPDATA%\Kiri\kiri-win.log) and the engine's (/var/log/kiri.log in
-//! WSL), as the lines the page shows from ~/.kiri/logs on the Mac
+//! (%LOCALAPPDATA%\Stowlark\stowlark-win.log) and the engine's (/var/log/stowlark.log in
+//! WSL), as the lines the page shows from ~/.stowlark/logs on the Mac
 //! (crates/kiri/src/diag/report.rs `page_lines`); a report saved to the
 //! Desktop or sent to Kiri Cloud, and the logs folder in Explorer. A panic
 //! is a line in the window's log: there are no crash files on Windows.
@@ -24,7 +24,7 @@ const TAIL_BYTES: u64 = 512 << 10;
 const MAX_BODY: usize = 1 << 20;
 
 fn kiri_dir() -> Option<PathBuf> {
-    std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("Kiri"))
+    std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("Stowlark"))
 }
 
 fn redactor() -> redact::Redactor {
@@ -135,7 +135,7 @@ fn engine_log() -> String {
         cmd.args(["-d", &d]);
     }
     std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000);
-    let out = cmd.args(["-u", "root", "--", "tail", "-c", &TAIL_BYTES.to_string(), "/var/log/kiri.log"]).stderr(std::process::Stdio::null()).output();
+    let out = cmd.args(["-u", "root", "--", "tail", "-c", &TAIL_BYTES.to_string(), "/var/log/stowlark.log"]).stderr(std::process::Stdio::null()).output();
     let text = out.map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default();
     text.split_once('\n').map_or(String::new(), |(_, r)| r.to_owned())
 }
@@ -144,7 +144,7 @@ fn read_lines(part: &str) -> Vec<Value> {
     let mut all = Vec::new();
     if part.is_empty() || part == "ui" {
         if let Some(dir) = kiri_dir() {
-            all.extend(tail_file(&dir.join("kiri-win.log")).lines().filter_map(window_line));
+            all.extend(tail_file(&dir.join("stowlark-win.log")).lines().filter_map(window_line));
         }
     }
     if part.is_empty() || part == "daemon" {
@@ -174,7 +174,7 @@ fn windows_version() -> String {
 
 /// The report: versions, the container list if asked, and both logs.
 fn report_text(containers: bool) -> String {
-    let mut out = format!("Kiri for Windows {}\n{}\n{}\n", env!("CARGO_PKG_VERSION"), windows_version(), std::env::consts::ARCH);
+    let mut out = format!("Stowlark for Windows {}\n{}\n{}\n", env!("CARGO_PKG_VERSION"), windows_version(), std::env::consts::ARCH);
     if containers {
         out.push_str("\n== Containers ==\n");
         match crate::client::get("/containers/json?all=1") {
@@ -204,12 +204,12 @@ fn save_report(text: &str) -> io::Result<PathBuf> {
     let desktop = PathBuf::from(home).join("Desktop");
     let secs = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let t = time::rfc3339(UNIX_EPOCH + Duration::from_secs(secs));
-    let path = desktop.join(format!("Kiri report {} {}.txt", &t[..10], t[11..19].replace(':', "")));
+    let path = desktop.join(format!("Stowlark report {} {}.txt", &t[..10], t[11..19].replace(':', "")));
     std::fs::write(&path, text)?;
     Ok(path)
 }
 
-/// This install's random id, made once, as the Mac's ~/.kiri/install_id.
+/// This install's random id, made once, as the Mac's ~/.stowlark/install_id.
 fn install_id() -> String {
     let Some(dir) = kiri_dir() else { return String::new() };
     let path = dir.join("install_id");
@@ -239,7 +239,7 @@ fn send_report(text: &str) -> io::Result<String> {
             "kind": "report",
             "part": "ui",
             "app_version": env!("CARGO_PKG_VERSION"),
-            "flavor": if crate::flavor::dev() { "kiri-dev" } else { "kiri" },
+            "flavor": if crate::flavor::dev() { "stowlark-dev" } else { "stowlark" },
             "os": windows_version(),
             "arch": std::env::consts::ARCH,
             "install_id": install_id(),

@@ -1,4 +1,4 @@
-//! Moving to Kiri from OrbStack or Docker Desktop: images, volumes and
+//! Moving to Stowlark from OrbStack or Docker Desktop: images, volumes and
 //! containers, copied through the docker CLI so each engine speaks its own
 //! API. The source is only read: `docker save` for images, `inspect` for
 //! containers, and for a volume a short-lived helper container that mounts
@@ -13,11 +13,11 @@ use serde_json::{Value, json};
 
 use crate::client;
 
-/// The engines Kiri can import from: docker context name, label.
+/// The engines Stowlark can import from: docker context name, label.
 pub const SOURCES: [(&str, &str); 2] = [("orbstack", "OrbStack"), ("desktop-linux", "Docker Desktop")];
 
 fn docker() -> io::Result<PathBuf> {
-    client::docker_cli().ok_or_else(|| io::Error::other("no docker CLI found (Kiri.app bundles one)"))
+    client::docker_cli().ok_or_else(|| io::Error::other("no docker CLI found (Stowlark.app bundles one)"))
 }
 
 fn known(source: &str) -> io::Result<&'static str> {
@@ -51,7 +51,7 @@ fn anonymous(name: &str) -> bool {
     name.len() == 64 && name.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
-/// What the source has, and which of it Kiri already has.
+/// What the source has, and which of it Stowlark already has.
 pub fn inventory(source: &str) -> io::Result<Value> {
     let ctx = known(source)?;
     let mine = |args: &[&str], key: &str| -> Vec<String> {
@@ -87,7 +87,7 @@ pub fn inventory(source: &str) -> io::Result<Value> {
     Ok(json!({"source": ctx, "images": images, "volumes": volumes, "containers": containers}))
 }
 
-/// `docker --context src save IMAGE | docker --context kiri load`.
+/// `docker --context src save IMAGE | docker --context stowlark load`.
 pub fn image(source: &str, name: &str) -> io::Result<()> {
     let ctx = known(source)?;
     let d = docker()?;
@@ -99,7 +99,7 @@ pub fn image(source: &str, name: &str) -> io::Result<()> {
         return Err(io::Error::other(format!("{ctx}: {}", String::from_utf8_lossy(&saved.stderr).trim())));
     }
     if !load.status.success() {
-        return Err(io::Error::other(format!("kiri: {}", String::from_utf8_lossy(&load.stderr).trim())));
+        return Err(io::Error::other(format!("stowlark: {}", String::from_utf8_lossy(&load.stderr).trim())));
     }
     Ok(())
 }
@@ -119,7 +119,7 @@ fn helper_image(ctx: &str) -> io::Result<&'static str> {
 }
 
 /// A volume's files, owners kept: tar in a read-only helper on the source,
-/// untar in a helper on Kiri. Both helpers remove themselves.
+/// untar in a helper on Stowlark. Both helpers remove themselves.
 pub fn volume(source: &str, name: &str) -> io::Result<()> {
     let ctx = known(source)?;
     let d = docker()?;
@@ -128,7 +128,7 @@ pub fn volume(source: &str, name: &str) -> io::Result<()> {
     let src_mount = format!("{name}:/from:ro");
     let dst_mount = format!("{name}:/to");
     let mut read = Command::new(&d)
-        .args(["--context", ctx, "run", "--rm", "--network", "none", "--label", "dev.kiri.import-helper=1", "-v", &src_mount, img, "tar", "-C", "/from", "-cf", "-", "."])
+        .args(["--context", ctx, "run", "--rm", "--network", "none", "--label", "dev.stowlark.import-helper=1", "-v", &src_mount, img, "tar", "-C", "/from", "-cf", "-", "."])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
@@ -144,14 +144,14 @@ pub fn volume(source: &str, name: &str) -> io::Result<()> {
         return Err(io::Error::other(format!("{ctx}: {}", String::from_utf8_lossy(&r.stderr).trim())));
     }
     if !write.status.success() {
-        return Err(io::Error::other(format!("kiri: {}", String::from_utf8_lossy(&write.stderr).trim())));
+        return Err(io::Error::other(format!("stowlark: {}", String::from_utf8_lossy(&write.stderr).trim())));
     }
     Ok(())
 }
 
-/// The container, made again in Kiri from the source's `inspect`, stopped:
+/// The container, made again in Stowlark from the source's `inspect`, stopped:
 /// command, environment, labels, ports, mounts, restart policy and its
-/// networks (made in Kiri first if missing). Its image must be in Kiri.
+/// networks (made in Stowlark first if missing). Its image must be in Stowlark.
 pub fn container(source: &str, name: &str) -> io::Result<()> {
     let ctx = known(source)?;
     let info = json_lines(ctx, &["inspect", "--type", "container", "--format", "{{json .}}", name])?.into_iter().next().ok_or_else(|| io::Error::other(format!("{name}: not found in {ctx}")))?;
@@ -166,7 +166,7 @@ pub fn container(source: &str, name: &str) -> io::Result<()> {
         if !["bridge", "host", "none", "default"].contains(&net.as_str()) {
             let _ = Command::new(docker()?).args(["--context", crate::flavor::CONTEXT.get(), "network", "create", net]).stdout(Stdio::null()).stderr(Stdio::null()).status();
         }
-        // The source's own short ID is no name in Kiri.
+        // The source's own short ID is no name in Stowlark.
         let short = info["Id"].as_str().unwrap_or("").get(..12).unwrap_or("").to_owned();
         let aliases: Vec<&Value> = ep["Aliases"].as_array().into_iter().flatten().filter(|a| a.as_str() != Some(short.as_str())).collect();
         networks.insert(net.clone(), json!({"Aliases": aliases}));
@@ -194,8 +194,8 @@ pub fn container(source: &str, name: &str) -> io::Result<()> {
     Ok(())
 }
 
-/// `kiri import [orbstack|desktop-linux] [--list | image|volume|container NAME]`:
-/// one item, or every image, named volume and container Kiri lacks.
+/// `stowlark import [orbstack|desktop-linux] [--list | image|volume|container NAME]`:
+/// one item, or every image, named volume and container Stowlark lacks.
 pub fn run(args: &[String]) -> io::Result<()> {
     let words: Vec<&str> = args.iter().filter(|a| !a.starts_with('-')).map(String::as_str).collect();
     let source = words.first().copied().unwrap_or("orbstack");
@@ -214,7 +214,7 @@ pub fn run(args: &[String]) -> io::Result<()> {
         for k in ["images", "volumes", "containers"] {
             println!("{k}:");
             for v in list(k) {
-                println!("  {}{}", v["name"].as_str().unwrap_or(""), if v["have"] == true { "  (already in Kiri)" } else { "" });
+                println!("  {}{}", v["name"].as_str().unwrap_or(""), if v["have"] == true { "  (already in Stowlark)" } else { "" });
             }
         }
         return Ok(());

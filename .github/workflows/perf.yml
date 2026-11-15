@@ -1,4 +1,4 @@
-# Kiri's speed check on every pull request: main and the change, built the
+# Stowlark's speed check on every pull request: main and the change, built the
 # same way and run side by side on one machine (scripts/perf-run.sh), with
 # requests alternating between them. The table lands in the run's summary;
 # the check fails when the change is slower than main past the limits in
@@ -56,9 +56,14 @@ jobs:
             find "$e" -type f -exec touch {} +
             mkdir -p "$RUNNER_TEMP/$e-bin"
             docker run --rm -v "$PWD/$e:/src" -v "$RUNNER_TEMP/$e-bin:/out" \
-              -v kiri-perf-target:/t -v kiri-perf-cargo:/usr/local/cargo/registry \
+              -v stowlark-perf-target:/t -v stowlark-perf-cargo:/usr/local/cargo/registry \
               -w /src -e CARGO_TARGET_DIR=/t rust:1-alpine sh -c \
-              'apk add -q musl-dev && cargo build --release --locked -p kiri -p kiri-init && cp /t/release/kiri /t/release/kiri-init /out/'
+              'set -e
+               apk add -q musl-dev
+               brand=stowlark
+               if grep -q "^name = \"kiri\"" crates/kiri/Cargo.toml; then brand=kiri; fi
+               cargo build --release --locked -p "$brand" -p "$brand-init"
+               cp "/t/release/$brand" "/t/release/$brand-init" /out/'
           done
           ls -l "$RUNNER_TEMP"/base-bin "$RUNNER_TEMP"/head-bin
       - name: Install strace
@@ -69,8 +74,14 @@ jobs:
         run: |
           scripts=base/scripts
           [ -f "$scripts/perf.py" ] || scripts=head/scripts
+          runner="$scripts/perf-run.sh"
+          if [ -x "$RUNNER_TEMP/base-bin/kiri" ] && [ -x "$RUNNER_TEMP/head-bin/stowlark" ]; then
+            # Main still uses the old executable and state names. Run both
+            # names with the new launcher, using main's existing limits.
+            runner=head/scripts/perf-run.sh
+          fi
           set +e
-          sh "$scripts/perf-run.sh" "$RUNNER_TEMP/base-bin" "$RUNNER_TEMP/head-bin" "$RUNNER_TEMP/perf"
+          STOWLARK_PERF_POLICY="$scripts/perf.py" sh "$runner" "$RUNNER_TEMP/base-bin" "$RUNNER_TEMP/head-bin" "$RUNNER_TEMP/perf"
           status=$?
           if [ -f "$RUNNER_TEMP/perf/report.md" ]; then
             [ -n "$PR" ] && echo "Pull request #$PR" >> "$GITHUB_STEP_SUMMARY"

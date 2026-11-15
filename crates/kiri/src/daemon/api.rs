@@ -1,6 +1,6 @@
 //! The Docker Engine API: the subset `docker run`, `ps`, `logs`, `stop`,
 //! `rm`, `images`, `pull`, `rmi`, `version` and `info` use. Anything else
-//! answers 404 with a message saying Kiri does not support it yet.
+//! answers 404 with a message saying Stowlark does not support it yet.
 
 use std::io::{self, BufReader};
 use std::os::fd::AsRawFd;
@@ -27,7 +27,7 @@ pub fn serve(stream: UnixStream, engine: Arc<Engine>) -> io::Result<()> {
         // for it carry the same op.
         let _op = req.header("X-Kiri-Op").filter(|o| crate::diag::valid_op(o)).map(|o| crate::diag::enter_op(o.to_owned()));
         http::serving(&req.method, &req.path);
-        // Kiri's own window checks in every few seconds; that isn't use, and
+        // Stowlark's own window checks in every few seconds; that isn't use, and
         // counting it would keep the VM from ever sleeping while it's open.
         if req.header("X-Kiri-Background").is_none() {
             engine.touch();
@@ -97,16 +97,16 @@ fn route(req: &Request, engine: &Arc<Engine>, w: &mut UnixStream, r: &mut BufRea
     let m = req.method.as_str();
     match (m, p) {
         ("GET" | "HEAD", "/_ping") => {
-            // Builder-Version 1: the classic POST /build, which Kiri serves
+            // Builder-Version 1: the classic POST /build, which Stowlark serves
             // with its managed BuildKit (builder.rs). "2" would tell older
             // CLIs and Compose to use BuildKit inside the engine (/session,
-            // /grpc), which Kiri doesn't have.
+            // /grpc), which Stowlark doesn't have.
             http::respond_with(w, 200, "text/plain; charset=utf-8", "Builder-Version: 1\r\n", if m == "HEAD" { b"" } else { b"OK" })?;
             return Ok(Next::KeepAlive);
         }
         ("GET", "/version") => return reply(w, Ok(version()), 200),
         ("POST", "/auth") => return reply(w, auth(req), 200),
-        // Kiri's own: the window's Start and Stop.
+        // Stowlark's own: the window's Start and Stop.
         // Start: no longer stopped, and the VM up.
         ("POST", "/kiri/wake") => {
             engine.unstop();
@@ -122,7 +122,7 @@ fn route(req: &Request, engine: &Arc<Engine>, w: &mut UnixStream, r: &mut BufRea
         // Settings → Domains: the container-domain routers' ports.
         ("GET", "/kiri/domains") => return reply(w, Ok(super::domains::report()), 200),
         ("POST", "/kiri/domains") => return reply(w, set_domain_ports(req, engine), 200),
-        // USB passthrough (macOS: the root helper `kiri usb serve` connects here).
+        // USB passthrough (macOS: the root helper `stowlark usb serve` connects here).
         #[cfg(target_os = "macos")]
         ("POST", "/kiri/usb") => return super::usb::attach(req, engine, w, r),
         #[cfg(target_os = "macos")]
@@ -139,14 +139,14 @@ fn route(req: &Request, engine: &Arc<Engine>, w: &mut UnixStream, r: &mut BufRea
             let id = p.strip_prefix("/kiri/containers/").and_then(|r| r.strip_suffix("/ports")).unwrap_or_default();
             return reply(w, set_ports(req, engine, id), 204);
         }
-        // Kiri's own: the TCP ports a container listens on, for publishing
+        // Stowlark's own: the TCP ports a container listens on, for publishing
         // ones its image never declared. `local` are the ones only it can
         // reach (bound to loopback).
         ("GET", p) if p.strip_prefix("/kiri/containers/").and_then(|r| r.strip_suffix("/listening")).is_some_and(|id| !id.is_empty()) => {
             let id = p.strip_prefix("/kiri/containers/").and_then(|r| r.strip_suffix("/listening")).unwrap_or_default();
             return reply(w, engine.listening(id).map(|(tcp, local)| json!({"tcp": tcp, "local": local})), 200);
         }
-        // Kiri's own: a loopback port reaching a Kubernetes service or pod,
+        // Stowlark's own: a loopback port reaching a Kubernetes service or pod,
         // for Share. `{"ip": "10.43.0.5", "port": 80}` → `{"port": 50123}`.
         ("POST", "/kiri/k8s/forward") => return reply(w, k8s_forward(req, engine), 200),
         ("DELETE", p) if p.strip_prefix("/kiri/k8s/forward/").is_some_and(|n| n.parse::<u16>().is_ok()) => {
@@ -157,7 +157,7 @@ fn route(req: &Request, engine: &Arc<Engine>, w: &mut UnixStream, r: &mut BufRea
             let id = p.strip_prefix("/kiri/containers/").and_then(|r| r.strip_suffix("/env")).unwrap_or_default();
             return reply(w, set_env(req, engine, id), 204);
         }
-        // An image's page for kiri-win, whose window can't read the store
+        // An image's page for stowlark-win, whose window can't read the store
         // inside WSL: its layers and its Grype scans (crate::scan), as the
         // Mac's window reads them itself.
         ("GET", "/kiri/images/layers") => return reply(w, crate::builds::image_layers(req.query("name").unwrap_or_default()).map_err(Error::Io), 200),
@@ -229,7 +229,7 @@ fn route(req: &Request, engine: &Arc<Engine>, w: &mut UnixStream, r: &mut BufRea
         match (m, action) {
             ("GET", "json") => return reply(w, container_inspect(engine, id), 200),
             ("POST", "start") => {
-                // An idle BuildKit container that Kiri paused itself counts
+                // An idle BuildKit container that Stowlark paused itself counts
                 // as running: the next build resumes it.
                 match engine.with(id, |c| (c.status == Status::Running, c.paused && !super::engine::is_builder(c))) {
                     Ok((_, true)) => return reply(w, Err(Error::Conflict("cannot start a paused container, try unpause instead".into())), 204),
@@ -305,7 +305,7 @@ fn route(req: &Request, engine: &Arc<Engine>, w: &mut UnixStream, r: &mut BufRea
         }
     }
     crate::diag::warn!("unsupported request", method = m, path = p);
-    http::error(w, 404, &format!("Kiri does not support {m} {p} yet"))?;
+    http::error(w, 404, &format!("Stowlark does not support {m} {p} yet"))?;
     Ok(Next::KeepAlive)
 }
 
@@ -321,7 +321,7 @@ fn go_arch() -> &'static str {
 }
 
 /// On an Intel Mac the VM is x86-64 and there is no Rosetta for Linux:
-/// amd64 images run natively, and Kiri does not emulate Arm (no qemu), so
+/// amd64 images run natively, and Stowlark does not emulate Arm (no qemu), so
 /// an image with no amd64 build is refused with the reason rather than
 /// failing later with `exec format error`. `None` elsewhere, and when
 /// `platforms` has a linux/amd64 one.
@@ -336,15 +336,15 @@ fn amd64_only_refusal(image: &str, platforms: &[String]) -> Option<String> {
     if platforms.iter().any(|p| p == "linux/amd64" || p.starts_with("linux/amd64/")) {
         return None;
     }
-    let built = if platforms.is_empty() { "no platform Kiri can run".to_owned() } else { platforms.join(", ") };
+    let built = if platforms.is_empty() { "no platform Stowlark can run".to_owned() } else { platforms.join(", ") };
     Some(format!(
-        "{image} is built for {built}, and this Intel Mac runs linux/amd64 images (Kiri does not emulate Arm): use an image with a linux/amd64 build"
+        "{image} is built for {built}, and this Intel Mac runs linux/amd64 images (Stowlark does not emulate Arm): use an image with a linux/amd64 build"
     ))
 }
 
 /// The kernel containers run on, as `uname -r` prints it. On Linux (native
 /// and WSL 2) the engine runs straight on the host kernel, so that is read;
-/// on macOS it is Kiri's own guest kernel in the VM.
+/// on macOS it is Stowlark's own guest kernel in the VM.
 fn kernel_version() -> String {
     #[cfg(target_os = "linux")]
     if let Some(release) = linux_kernel_release() {
@@ -366,23 +366,23 @@ fn parse_release(raw: &str) -> Option<String> {
     (!release.is_empty()).then(|| release.to_owned())
 }
 
-/// The Docker Engine release whose API Kiri serves (`http::API_VERSION`,
+/// The Docker Engine release whose API Stowlark serves (`http::API_VERSION`,
 /// 1.47: Docker 27.3 to 27.5), reported as the engine's `Version`. Clients
 /// gate on it as a Docker version (Testcontainers wants at least 1.6.0), so
-/// Kiri's own version there read as an ancient engine. Kiri's own version is
-/// `KiriVersion`, and a component named "Kiri". Moves with `API_VERSION`.
+/// Stowlark's own version there read as an ancient engine. Stowlark's own version is
+/// `KiriVersion`, and a component named "Stowlark". Moves with `API_VERSION`.
 pub const ENGINE_VERSION: &str = "27.5.1";
 
 fn version() -> Value {
-    let kiri = env!("CARGO_PKG_VERSION");
+    let stowlark = env!("CARGO_PKG_VERSION");
     json!({
-        "Platform": {"Name": "Kiri"},
+        "Platform": {"Name": "Stowlark"},
         "Components": [
             {"Name": "Engine", "Version": ENGINE_VERSION, "Details": {"ApiVersion": http::API_VERSION, "MinAPIVersion": "1.24", "Arch": go_arch(), "Os": "linux", "KernelVersion": kernel_version(), "GoVersion": "n/a (Rust)", "GitCommit": ""}},
-            {"Name": "Kiri", "Version": kiri, "Details": {}},
+            {"Name": "Stowlark", "Version": stowlark, "Details": {}},
         ],
         "Version": ENGINE_VERSION,
-        "KiriVersion": kiri,
+        "KiriVersion": stowlark,
         "ApiVersion": http::API_VERSION,
         "MinAPIVersion": "1.24",
         "Os": "linux",
@@ -399,8 +399,8 @@ fn info(engine: &Engine) -> Value {
     let images = engine.store.images().map(|v| v.len()).unwrap_or(0);
     let (mem_total, _) = engine.guest_memory().unwrap_or((0, 0));
     json!({
-        "ID": "kiri",
-        "Name": "kiri",
+        "ID": "stowlark",
+        "Name": "stowlark",
         "Containers": states.len(),
         "ContainersRunning": running,
         "ContainersPaused": 0,
@@ -409,17 +409,17 @@ fn info(engine: &Engine) -> Value {
         "Driver": "overlayfs",
         "ServerVersion": ENGINE_VERSION,
         "KiriVersion": env!("CARGO_PKG_VERSION"),
-        "OperatingSystem": "Kiri",
+        "OperatingSystem": "Stowlark",
         "OSType": "linux",
         "Architecture": std::env::consts::ARCH,
         "KernelVersion": kernel_version(),
         "NCPU": engine.cpus(),
         "MemTotal": mem_total,
-        "DockerRootDir": "/var/lib/kiri",
+        "DockerRootDir": "/var/lib/stowlark",
         "CgroupDriver": "cgroupfs",
         "CgroupVersion": "2",
-        "DefaultRuntime": "kiri",
-        "Runtimes": {"kiri": {"path": "kiri-init"}},
+        "DefaultRuntime": "stowlark",
+        "Runtimes": {"stowlark": {"path": "stowlark-init"}},
         "SecurityOptions": ["name=cgroupns"],
         // Not in Docker's /info (the ping's Builder-Version header is), but
         // tools print it: the classic builder API, served by builder.rs.
@@ -623,18 +623,18 @@ fn resources(engine: &Engine) -> Value {
         "awake": engine.is_awake(),
         "max_cpus": e::max_cpus(),
         "max_memory_mib": e::physical_memory_bytes() >> 20,
-        "overridden": std::env::var_os("KIRI_CPUS").is_some() || std::env::var_os("KIRI_MEMORY_MIB").is_some(),
+        "overridden": std::env::var_os("STOWLARK_CPUS").is_some() || std::env::var_os("STOWLARK_MEMORY_MIB").is_some(),
     })
 }
 
-/// The host's system proxy, from kiri-win on Windows: `{http, https,
+/// The host's system proxy, from stowlark-win on Windows: `{http, https,
 /// no_proxy: [..], pac}`, used while the mode is "system".
 fn set_host_proxy(req: &Request) -> Result<Value, Error> {
     let body: Value = serde_json::from_slice(&req.body).map_err(|e| Error::BadRequest(format!("invalid JSON: {e}")))?;
     let url = |k: &str| body[k].as_str().map(str::trim).filter(|v| !v.is_empty()).map(|v| if v.contains("://") { v.to_owned() } else { format!("http://{v}") });
     let no_proxy = body["no_proxy"].as_array().into_iter().flatten().filter_map(|v| v.as_str()).map(str::to_owned).collect();
     super::proxy::set_host(super::proxy::Effective { http: url("http"), https: url("https"), no_proxy, pac: body["pac"].as_bool().unwrap_or(false) });
-    // kiri-win's relay to Windows' loopback: {"7892": 41234}. A kiri-win
+    // stowlark-win's relay to Windows' loopback: {"7892": 41234}. A stowlark-win
     // without one sends none, and proxies are dialled as set.
     if let Some(relay) = body["relay"].as_object() {
         super::proxy::set_relay(relay.iter().filter_map(|(k, v)| Some((k.parse().ok()?, u16::try_from(v.as_u64()?).ok()?))).collect());
@@ -690,7 +690,7 @@ fn set_ports(req: &Request, engine: &Engine, id: &str) -> Result<Value, Error> {
     Ok(Value::Null)
 }
 
-/// Kiri's own: a container's whole environment, `NAME=value` each. A running
+/// Stowlark's own: a container's whole environment, `NAME=value` each. A running
 /// container restarts with it; its files are kept.
 fn k8s_forward(req: &Request, engine: &Engine) -> Result<Value, Error> {
     let body: Value = serde_json::from_slice(&req.body).map_err(|e| Error::BadRequest(format!("invalid JSON: {e}")))?;
@@ -911,7 +911,7 @@ fn port_bindings(body: &Value, engine: &Engine, image: &kiri_image::Image) -> Re
         let (port, proto) = key.split_once('/').unwrap_or((key, "tcp"));
         let port = port.parse().map_err(|_| Error::BadRequest(format!("invalid port {key}")))?;
         if proto != "tcp" && proto != "udp" {
-            return Err(Error::BadRequest(format!("Kiri forwards TCP and UDP ports, not {key}")));
+            return Err(Error::BadRequest(format!("Stowlark forwards TCP and UDP ports, not {key}")));
         }
         Ok((port, proto.to_owned()))
     };
@@ -996,7 +996,7 @@ fn mac_shared(src: &str) -> bool {
 /// /etc is the Mac's link to /private/etc, and Compose files written for a
 /// Linux host mount paths in it:
 /// - /etc/passwd, /etc/os-release and the others in `hostetc::FILES` are
-///   expected to be Linux's, so they are the ones Kiri keeps; and /etc
+///   expected to be Linux's, so they are the ones Stowlark keeps; and /etc
 ///   itself is the folder of them.
 /// - anything else the Mac has there (/etc/hosts, /etc/localtime) is the
 ///   Mac's.
@@ -1012,7 +1012,7 @@ fn mac_source(src: &str) -> Option<String> {
         _ => None,
     };
     if let Some(kept) = kept {
-        // Kiri's data folder is in the person's home, which is shared. If
+        // Stowlark's data folder is in the person's home, which is shared. If
         // it cannot be written, the path is the VM's, as it was.
         return kept.ok().and_then(|p| p.into_os_string().into_string().ok()).filter(|p| mac_shared(p));
     }
@@ -1054,7 +1054,7 @@ pub(super) fn fresh_bind_sources(guest: &[String], info: &[Value]) -> Vec<String
 /// `host.docker.internal` is the Mac, as it is for containers.
 fn resolve_server(host: &str) -> Option<String> {
     use std::net::ToSocketAddrs;
-    if cfg!(target_os = "macos") && matches!(host, "host.docker.internal" | "host.kiri.internal") {
+    if cfg!(target_os = "macos") && matches!(host, "host.docker.internal" | "host.stowlark.internal") {
         return Some(super::ports::HOST_ADDR.to_owned());
     }
     let addrs: Vec<std::net::SocketAddr> = (host, 0).to_socket_addrs().ok()?.collect();
@@ -1083,7 +1083,7 @@ fn mounts(body: &Value, engine: &Engine, image: &kiri_image::Image) -> Result<Mo
             f.join(",")
         };
         // The engine's own socket (Testcontainers' Ryuk, CI runners): the VM's
-        // relay to this daemon on a Mac, or Kiri's socket on a Linux host.
+        // relay to this daemon on a Mac, or Stowlark's socket on a Linux host.
         let engine_sock = if kind == "bind" { super::binds::engine_socket(src) } else { None };
         match kind {
             "bind" if engine_sock.is_some() => {
@@ -1099,7 +1099,7 @@ fn mounts(body: &Value, engine: &Engine, image: &kiri_image::Image) -> Result<Mo
                     return Err(Error::BadRequest(format!("invalid mount source {src}: must be an absolute path")));
                 }
                 // Where the source is on this machine: itself, or on a Mac
-                // the path it leads to (a file Kiri keeps for /etc/passwd).
+                // the path it leads to (a file Stowlark keeps for /etc/passwd).
                 let here = if cfg!(target_os = "macos") { mac_source(src) } else { Some(src.to_owned()) };
                 let Some(here) = here else {
                     // The guest makes a missing source itself, as Docker does on Linux.
@@ -1140,7 +1140,7 @@ fn mounts(body: &Value, engine: &Engine, image: &kiri_image::Image) -> Result<Mo
                 out.guest.push(format!("tmpfs\t{dst}\t{}", flag(&format!("tmpfs,noexec,nosuid,nodev,{extra}"))));
                 out.info.push(json!({"Type": "tmpfs", "Source": "", "Destination": dst, "Mode": "", "RW": !ro, "Propagation": ""}));
             }
-            other => return Err(Error::BadRequest(format!("Kiri does not support {other} mounts"))),
+            other => return Err(Error::BadRequest(format!("Stowlark does not support {other} mounts"))),
         }
         Ok(())
     };
@@ -1191,7 +1191,7 @@ fn mounts(body: &Value, engine: &Engine, image: &kiri_image::Image) -> Result<Mo
         if kind == "volume" && !src.is_empty() && engine.volume_get(src).is_none() && !driver_opts.is_null() {
             match driver_opts["Name"].as_str().unwrap_or("") {
                 "" | "local" => {}
-                d => return Err(Error::BadRequest(format!("Kiri supports only local volumes, not {d}"))),
+                d => return Err(Error::BadRequest(format!("Stowlark supports only local volumes, not {d}"))),
             }
             let options = super::volumes::local_options(&driver_opts["Options"]).map_err(Error::BadRequest)?;
             engine.volume_ensure_with(src, m["VolumeOptions"]["Labels"].clone(), options)?;
@@ -1241,7 +1241,7 @@ fn volume_create(req: &Request, engine: &Engine) -> Result<Value, Error> {
     let body: Value = serde_json::from_slice(&req.body).unwrap_or(Value::Null);
     match body["Driver"].as_str().unwrap_or("local") {
         "" | "local" => {}
-        d => return Err(Error::BadRequest(format!("Kiri supports only local volumes, not {d}"))),
+        d => return Err(Error::BadRequest(format!("Stowlark supports only local volumes, not {d}"))),
     }
     let name = match body["Name"].as_str().unwrap_or("") {
         "" => super::engine::random_hex(32),
@@ -1513,7 +1513,7 @@ pub(super) fn create(req: &Request, engine: &Engine) -> Result<Value, Error> {
             return Err(Error::NotFound(format!("No such image: {image_name} for {p}")));
         }
     }
-    // The image's own config, for what Kiri's image model does not keep.
+    // The image's own config, for what Stowlark's image model does not keep.
     let image_cfg: Value = engine.store.read_config(&image.config_digest).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     // Checked before mounts, which may create volumes.
     let healthcheck = healthcheck_from(&body, &image_cfg)?;
@@ -1728,7 +1728,7 @@ fn healthcheck_from(body: &Value, image_cfg: &Value) -> Result<Option<super::hea
     Ok(super::health::merge(mine, Healthcheck::from_json(&image_cfg["config"]["Healthcheck"])))
 }
 
-/// The image's HEALTHCHECK, which Kiri's image model does not keep.
+/// The image's HEALTHCHECK, which Stowlark's image model does not keep.
 fn image_healthcheck(engine: &Engine, i: &kiri_image::Image) -> Value {
     let cfg: Value = engine.store.read_config(&i.config_digest).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     cfg["config"]["Healthcheck"].clone()
@@ -1879,7 +1879,7 @@ fn list(req: &Request, engine: &Engine) -> Result<Value, Error> {
                 "Created": time::unix(c.created),
                 "State": state_word(c),
                 "Status": ps_status(c, health.get(&c.id)),
-                // Kiri's own: the window counts "Up 3 s" from these every second.
+                // Stowlark's own: the window counts "Up 3 s" from these every second.
                 // Docker clients ignore fields they don't know.
                 "KiriStartedAt": c.started.map(time::unix),
                 "KiriFinishedAt": c.finished.map(time::unix),
@@ -1978,7 +1978,7 @@ fn network_settings(c: &Container, nets: &[super::network::Network]) -> Value {
         return json!({"IPAddress": "", "IPPrefixLen": 0, "MacAddress": "", "Ports": {}, "Networks": {}});
     }
     let prefix_of = |name: &str, has_ip: bool| if has_ip { nets.iter().find(|n| n.name == name).map_or(16, |n| n.prefix) } else { 0 };
-    // An IPv6-only network's IPv4 addresses are Kiri's own, not shown.
+    // An IPv6-only network's IPv4 addresses are Stowlark's own, not shown.
     let v4_on = |name: &str| !nets.iter().any(|n| n.name == name && n.no_ipv4);
     let ip = c.ip.filter(|_| v4_on(&c.spec.network_mode)).map(super::network::ip_str).unwrap_or_default();
     let v6 = |name: &str, ip6: Option<[u8; 16]>| {
@@ -2044,7 +2044,7 @@ fn network_json(engine: &Engine, n: &super::network::Network, with_members: bool
         if !n.aux.is_empty() {
             c["AuxiliaryAddresses"] = n.aux.iter().map(|(k, ip)| (k.clone(), Value::from(super::network::ip_str(*ip)))).collect::<serde_json::Map<_, _>>().into();
         }
-        // An IPv6-only network's IPv4 subnet is Kiri's own, not shown.
+        // An IPv6-only network's IPv4 subnet is Stowlark's own, not shown.
         let mut configs = if n.no_ipv4 { Vec::new() } else { vec![c] };
         if let Some(v) = &n.v6 {
             let mut c = json!({"Subnet": v.subnet_str(), "Gateway": super::network::ip6_str(v.gateway)});
@@ -2106,7 +2106,7 @@ fn network_create(req: &Request, engine: &Engine) -> Result<Value, Error> {
     let name = body["Name"].as_str().unwrap_or_default();
     match body["Driver"].as_str().unwrap_or("bridge") {
         "" | "bridge" => {}
-        d => return Err(Error::BadRequest(format!("Kiri supports only bridge networks, not {d}"))),
+        d => return Err(Error::BadRequest(format!("Stowlark supports only bridge networks, not {d}"))),
     }
     let (ipam, ipam6) = super::network::parse_ipam_both(&body["IPAM"]).map_err(Error::BadRequest)?;
     let settings = super::network::Settings {
@@ -2185,7 +2185,7 @@ fn forward_stdin(engine: Arc<Engine>, id: String, r: &mut BufReader<UnixStream>)
     // Anything the client sent right behind the request is already buffered.
     let early = r.buffer().to_vec();
     let mut stream = r.get_ref().try_clone()?;
-    std::thread::Builder::new().name("kiri-stdin".into()).spawn(move || {
+    std::thread::Builder::new().name("stowlark-stdin".into()).spawn(move || {
         if !early.is_empty() && engine.input(&id, &early).is_err() {
             return;
         }
@@ -2710,13 +2710,13 @@ mod tests {
         assert_eq!(v["Components"][0]["Name"], "Engine");
         assert_eq!(v["Components"][0]["Version"], ENGINE_VERSION);
         assert_eq!(v["KiriVersion"], env!("CARGO_PKG_VERSION"));
-        assert!(v["Components"].as_array().unwrap().iter().any(|c| c["Name"] == "Kiri" && c["Version"] == env!("CARGO_PKG_VERSION")));
+        assert!(v["Components"].as_array().unwrap().iter().any(|c| c["Name"] == "Stowlark" && c["Version"] == env!("CARGO_PKG_VERSION")));
         // The docker CLI reads every component's Details as strings.
         for c in v["Components"].as_array().unwrap() {
             assert!(c["Details"].as_object().unwrap().values().all(Value::is_string), "{c}");
         }
         assert_eq!(crate::client::kiri_version(&v), Some(env!("CARGO_PKG_VERSION")));
-        // An engine from before KiriVersion: its Version was Kiri's.
+        // An engine from before KiriVersion: its Version was Stowlark's.
         assert_eq!(crate::client::kiri_version(&json!({"Version": "0.2.0"})), Some("0.2.0"));
     }
 
@@ -2864,19 +2864,19 @@ mod tests {
         assert!(tz.starts_with("/private/var/db/timezone/"), "{tz}");
         assert_eq!(mac_source("/private/etc/localtime").as_deref(), Some(tz.as_str()));
         // What the Mac lacks, and paths outside the shares, stay the VM's.
-        for p in ["/etc/fstab", "/etc/kiri-no-such-file", "/lib/modules", "/var/lib/docker", "/var/run", "/etcetera"] {
+        for p in ["/etc/fstab", "/etc/stowlark-no-such-file", "/lib/modules", "/var/lib/docker", "/var/run", "/etcetera"] {
             assert_eq!(mac_source(p), None, "{p} should be the VM's");
             assert_eq!(guest_bind_source(p), p);
         }
         // A link inside a share to another place in the shares is followed;
         // a missing path under a share is passed as given.
-        let dir = std::env::temp_dir().join(format!("kiri-mac-source-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-mac-source-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("real")).unwrap();
         std::os::unix::fs::symlink(dir.join("real"), dir.join("link")).unwrap();
         let real = std::fs::canonicalize(dir.join("real")).unwrap();
         assert_eq!(mac_source(dir.join("link").to_str().unwrap()).as_deref(), real.to_str());
-        assert_eq!(mac_source("/tmp/kiri-no-such-path").as_deref(), Some("/tmp/kiri-no-such-path"));
+        assert_eq!(mac_source("/tmp/stowlark-no-such-path").as_deref(), Some("/tmp/stowlark-no-such-path"));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -2885,7 +2885,7 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn bind_links_are_followed_again_at_start() {
-        let dir = std::env::temp_dir().join(format!("kiri-fresh-binds-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-fresh-binds-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         for r in ["r1", "r2"] {
             std::fs::create_dir_all(dir.join(r)).unwrap();

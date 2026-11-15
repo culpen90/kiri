@@ -1,4 +1,4 @@
-//! The window and `kiri` subcommands talk to `kiri daemon` the way the docker CLI does: HTTP over
+//! The window and `stowlark` subcommands talk to `stowlark daemon` the way the docker CLI does: HTTP over
 //! the daemon's unix socket. One short connection per request, and one
 //! long-lived one for `/events`.
 
@@ -13,10 +13,10 @@ use std::time::Duration;
 use serde_json::Value;
 
 pub fn socket() -> io::Result<PathBuf> {
-    if let Some(s) = std::env::var_os("KIRI_SOCKET") {
+    if let Some(s) = std::env::var_os("STOWLARK_SOCKET") {
         return Ok(PathBuf::from(s));
     }
-    // Linux: the engine is the `kiri` system service (contrib/linux/kiri.service).
+    // Linux: the engine is the `stowlark` system service (contrib/linux/stowlark.service).
     #[cfg(target_os = "linux")]
     if std::path::Path::new(SERVICE_SOCKET).exists() {
         return Ok(PathBuf::from(SERVICE_SOCKET));
@@ -25,9 +25,9 @@ pub fn socket() -> io::Result<PathBuf> {
     Ok(home.join(crate::flavor::STATE.get()).join("run/docker.sock"))
 }
 
-/// Where the Linux service's engine listens, for members of the `kiri` group.
+/// Where the Linux service's engine listens, for members of the `stowlark` group.
 #[cfg(target_os = "linux")]
-pub const SERVICE_SOCKET: &str = "/run/kiri/docker.sock";
+pub const SERVICE_SOCKET: &str = "/run/stowlark/docker.sock";
 
 /// An answer: status and body.
 pub struct Response {
@@ -119,7 +119,7 @@ fn send(method: &str, path: &str, body: Option<&Value>, extra: &str) -> io::Resu
     let op = crate::diag::op_header();
     write!(
         s,
-        "{method} {path} HTTP/1.1\r\nHost: kiri\r\nConnection: close\r\n{extra}{op}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{payload}",
+        "{method} {path} HTTP/1.1\r\nHost: stowlark\r\nConnection: close\r\n{extra}{op}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{payload}",
         payload.len()
     )?;
     let mut r = BufReader::new(s);
@@ -142,8 +142,8 @@ fn send(method: &str, path: &str, body: Option<&Value>, extra: &str) -> io::Resu
     Ok(Response { status, body })
 }
 
-/// Kiri's own version from a `/version` answer: `KiriVersion`, or `Version`
-/// from an engine older than that field (it reported Kiri's version there;
+/// Stowlark's own version from a `/version` answer: `KiriVersion`, or `Version`
+/// from an engine older than that field (it reported Stowlark's version there;
 /// it is now the Docker Engine version clients gate on).
 pub fn kiri_version(version: &Value) -> Option<&str> {
     version["KiriVersion"].as_str().or_else(|| version["Version"].as_str())
@@ -174,7 +174,7 @@ pub fn post_lines_closable(path: &str, auth: Option<&str>, opened: impl FnOnce(&
     let auth = auth.map(|a| format!("X-Registry-Auth: {a}\r\n")).unwrap_or_default();
     let mut s = connect(Some(Duration::from_secs(120)))?;
     opened(&s);
-    write!(s, "POST {path} HTTP/1.1\r\nHost: kiri\r\nConnection: close\r\n{auth}{}Content-Type: application/json\r\nContent-Length: 0\r\n\r\n", crate::diag::op_header())?;
+    write!(s, "POST {path} HTTP/1.1\r\nHost: stowlark\r\nConnection: close\r\n{auth}{}Content-Type: application/json\r\nContent-Length: 0\r\n\r\n", crate::diag::op_header())?;
     let mut r = BufReader::new(s);
     let (status, len, chunked) = head(&mut r)?;
     let mut pending = Vec::new();
@@ -206,7 +206,7 @@ pub fn post_lines_closable(path: &str, auth: Option<&str>, opened: impl FnOnce(&
 /// Calls `on_event` for each event until the connection ends or it returns false.
 pub fn events(mut on_event: impl FnMut(Value) -> bool) -> io::Result<()> {
     let mut s = connect(None)?;
-    write!(s, "GET /events HTTP/1.1\r\nHost: kiri\r\nX-Kiri-Background: 1\r\n\r\n")?;
+    write!(s, "GET /events HTTP/1.1\r\nHost: stowlark\r\nX-Kiri-Background: 1\r\n\r\n")?;
     let mut r = BufReader::new(s);
     let (status, _, chunked) = head(&mut r)?;
     if status != 200 || !chunked {
@@ -236,7 +236,7 @@ pub struct Stream {
 impl Stream {
     pub fn open(path: &str) -> io::Result<Stream> {
         let mut s = connect(None)?;
-        write!(s, "GET {path} HTTP/1.1\r\nHost: kiri\r\n\r\n")?;
+        write!(s, "GET {path} HTTP/1.1\r\nHost: stowlark\r\n\r\n")?;
         let mut reader = BufReader::new(s);
         let (status, _, chunked) = head(&mut reader)?;
         if status != 200 || !chunked {
@@ -267,7 +267,7 @@ pub fn exec(container: &str, cmd: &[&str]) -> io::Result<(i64, String)> {
     let body = r#"{"Detach":false,"Tty":true}"#;
     write!(
         s,
-        "POST /exec/{id}/start HTTP/1.1\r\nHost: kiri\r\nConnection: Upgrade\r\nUpgrade: tcp\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+        "POST /exec/{id}/start HTTP/1.1\r\nHost: stowlark\r\nConnection: Upgrade\r\nUpgrade: tcp\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
         body.len()
     )?;
     let mut r = BufReader::new(s);
@@ -281,7 +281,7 @@ pub fn exec(container: &str, cmd: &[&str]) -> io::Result<(i64, String)> {
     Ok((code, String::from_utf8_lossy(&out).replace("\r\n", "\n")))
 }
 
-/// A docker CLI: on PATH, else the one bundled in Kiri.app.
+/// A docker CLI: on PATH, else the one bundled in Stowlark.app.
 pub fn docker_cli() -> Option<PathBuf> {
     let on_path = std::env::var_os("PATH").and_then(|p| std::env::split_paths(&p).map(|d| d.join("docker")).find(|d| d.is_file()));
     on_path
@@ -292,7 +292,7 @@ pub fn docker_cli() -> Option<PathBuf> {
         .or_else(lite_cli)
 }
 
-/// Kiri Lite's downloaded CLI.
+/// Stowlark Lite's downloaded CLI.
 #[cfg(target_os = "macos")]
 fn lite_cli() -> Option<PathBuf> {
     crate::tools::dir().ok().map(|d| d.join("docker")).filter(|d| d.is_file())

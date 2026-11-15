@@ -10,6 +10,6 @@ fn main() -> std::process::ExitCode {
 
 #[cfg(not(unix))]
 fn main() -> std::process::ExitCode {
-    eprintln!("kiri-android runs on ARM64 Android in Termux (or Unix for development)");
+    eprintln!("stowlark-android runs on ARM64 Android in Termux (or Unix for development)");
     std::process::ExitCode::FAILURE
 }

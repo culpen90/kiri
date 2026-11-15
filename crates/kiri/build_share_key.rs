@@ -1,10 +1,10 @@
 // Compiles the Kiri Share build key into official releases: `include!`d
-// by the build scripts of `kiri` and `kiri-win`, which both carry
+// by the build scripts of `stowlark` and `stowlark-win`, which both carry
 // `share.rs`.
 // 
-// Release builds set `KIRI_SHARE_BUILD_KEY=id:hex` (64 hex digits); the
+// Release builds set `STOWLARK_SHARE_BUILD_KEY=id:hex` (64 hex digits); the
 // edge uses it to tell official builds from forks (see
-// `kiri-share-proto::attest`). Without it Kiri builds and works the same,
+// `kiri-share-proto::attest`). Without it Stowlark builds and works the same,
 // and its tunnels show as unverified. The key is stored masked, so it isn't
 // a plain string in the binary; that only slows down someone looking.
 
@@ -13,17 +13,17 @@ fn write_share_build_key() {
     use std::fmt::Write as _;
     use std::hash::{DefaultHasher, Hash, Hasher};
 
-    println!("cargo:rerun-if-env-changed=KIRI_SHARE_BUILD_KEY");
+    println!("cargo:rerun-if-env-changed=STOWLARK_SHARE_BUILD_KEY");
     let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR")).join("share_build_key.rs");
-    let code = match std::env::var("KIRI_SHARE_BUILD_KEY").ok().filter(|v| !v.trim().is_empty()) {
+    let code = match std::env::var("STOWLARK_SHARE_BUILD_KEY").ok().filter(|v| !v.trim().is_empty()) {
         None => "const BUILD_KEY: Option<(&str, [u8; 32], [u8; 32])> = None;\n".to_owned(),
         Some(v) => {
-            let (id, key) = parse_share_key(&v).unwrap_or_else(|| panic!("KIRI_SHARE_BUILD_KEY must be id:hex with 64 hex digits"));
+            let (id, key) = parse_share_key(&v).unwrap_or_else(|| panic!("STOWLARK_SHARE_BUILD_KEY must be id:hex with 64 hex digits"));
             // A pad derived from the id, so builds stay reproducible.
             let mut pad = [0u8; 32];
             for (i, chunk) in pad.chunks_mut(8).enumerate() {
                 let mut h = DefaultHasher::new();
-                (id, i, "kiri share pad").hash(&mut h);
+                (id, i, "stowlark share pad").hash(&mut h);
                 chunk.copy_from_slice(&h.finish().to_le_bytes());
             }
             let masked: Vec<u8> = key.iter().zip(pad).map(|(k, p)| k ^ p).collect();

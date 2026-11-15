@@ -1,13 +1,13 @@
 //! Docker networks and address assignment (IPAM).
 //!
-//! `bridge` (the default, `kiri0`, 172.17.0.0/16), `host` and `none` always
+//! `bridge` (the default, `stowlark0`, 172.17.0.0/16), `host` and `none` always
 //! exist. User-defined bridge networks get their own bridge and a /16 from
 //! 172.18.0.0 up, as Docker picks them, and are saved to `networks.json`.
 //! `IPAM.Config` (`--subnet`, `--gateway`, `--ip-range`, `--aux-address`)
 //! picks them instead, and containers may then ask for fixed addresses.
 //!
 //! `--ipv6` (Compose `enable_ipv6`) adds an IPv6 subnet beside the IPv4 one:
-//! an IPv6 `IPAM.Config` entry, or a /64 from Kiri's own ULA pool (a /48
+//! an IPv6 `IPAM.Config` entry, or a /64 from Stowlark's own ULA pool (a /48
 //! under fd00::/8 per engine), as Docker's default address pools hand out.
 //! The default `bridge` stays IPv4-only, as Docker's does.
 
@@ -52,7 +52,7 @@ pub struct Network {
     #[serde(default)]
     pub attachable: bool,
     /// An IPv6-only network (`--ipv4=false --ipv6`). It still has an IPv4
-    /// subnet, inside Kiri only: each container's address there is the
+    /// subnet, inside Stowlark only: each container's address there is the
     /// name the guest keeps it by (DNS, MAC), but nothing is given it, the
     /// bridge or the container, and inspect shows none, as with Docker.
     #[serde(default)]
@@ -290,7 +290,7 @@ fn ula_prefix(root: &std::path::Path) -> [u8; 6] {
 
 /// The /64 an `--ipv6` network without a subnet gets: subnet ID from a hash
 /// of the name, so a network made again gets the same one, moved on past
-/// any taken one (by Kiri, or routed on a Linux host).
+/// any taken one (by Stowlark, or routed on a Linux host).
 fn free_subnet6(ula: [u8; 6], name: &str, taken: &[([u8; 16], u8)]) -> Option<([u8; 16], u8)> {
     use sha2::Digest;
     let h = sha2::Sha256::digest(name.as_bytes());
@@ -434,7 +434,7 @@ fn parse_ipam6(c: &serde_json::Value, subnet: &str) -> Result<Ipam6, String> {
     let (net, prefix) = parse_cidr6(subnet, "subnet")?;
     // A network needs room for the gateway and at least one container.
     if !(1..=126).contains(&prefix) {
-        return Err(format!("invalid subnet {subnet}: Kiri supports IPv6 prefixes from /1 to /126"));
+        return Err(format!("invalid subnet {subnet}: Stowlark supports IPv6 prefixes from /1 to /126"));
     }
     let inside = |ip: [u8; 16]| in_subnet6(ip, net, prefix);
     let ip_range = match field("IPRange") {
@@ -477,7 +477,7 @@ pub fn parse_ipam(v: &serde_json::Value) -> Result<Option<Ipam>, String> {
 pub fn parse_ipam_both(v: &serde_json::Value) -> Result<(Option<Ipam>, Option<Ipam6>), String> {
     match v["Driver"].as_str().unwrap_or("") {
         "" | "default" => {}
-        d => return Err(format!("Kiri supports only the default IPAM driver, not {d}")),
+        d => return Err(format!("Stowlark supports only the default IPAM driver, not {d}")),
     }
     let configs = v["Config"].as_array().map(Vec::as_slice).unwrap_or(&[]);
     let mut out: Option<Ipam> = None;
@@ -487,7 +487,7 @@ pub fn parse_ipam_both(v: &serde_json::Value) -> Result<(Option<Ipam>, Option<Ip
         let subnet = field("Subnet");
         if subnet.contains(':') {
             if out6.is_some() {
-                return Err("Kiri supports one IPv6 subnet per network".into());
+                return Err("Stowlark supports one IPv6 subnet per network".into());
             }
             out6 = Some(parse_ipam6(c, &subnet)?);
             continue;
@@ -499,11 +499,11 @@ pub fn parse_ipam_both(v: &serde_json::Value) -> Result<(Option<Ipam>, Option<Ip
             return Err("invalid network config: an IP range or gateway needs a subnet".into());
         }
         if out.is_some() {
-            return Err("Kiri supports one IPv4 subnet per network".into());
+            return Err("Stowlark supports one IPv4 subnet per network".into());
         }
         let (net, prefix) = parse_cidr(&subnet, "subnet")?;
         if prefix > 30 || prefix < 8 {
-            return Err(format!("invalid subnet {subnet}: Kiri supports prefixes from /8 to /30"));
+            return Err(format!("invalid subnet {subnet}: Stowlark supports prefixes from /8 to /30"));
         }
         let inside = |ip: [u8; 4]| in_subnet(ip, net, prefix);
         let ip_range = match field("IPRange") {
@@ -547,16 +547,16 @@ impl Networks {
             Err(e) => return Err(e),
         };
         // 172.17.0.0/16 as Docker uses, unless the host already routes it
-        // (Kiri on a Linux host inside another engine's container) or a
+        // (Stowlark on a Linux host inside another engine's container) or a
         // saved network has it.
         let taken: Vec<([u8; 4], u8)> = saved.iter().map(|n| (n.subnet, n.prefix)).collect();
         let (subnet, prefix) = free_subnet(&taken, true).unwrap_or(([172, 17, 0, 0], 16));
-        let mut bridge = builtin("bridge", "bridge", "kiri0", subnet, [subnet[0], subnet[1], subnet[2], 1]);
+        let mut bridge = builtin("bridge", "bridge", "stowlark0", subnet, [subnet[0], subnet[1], subnet[2], 1]);
         bridge.prefix = prefix;
-        // `KIRI_BRIDGE_IPV6=1`, as Docker's daemon.json `"ipv6": true`: the
+        // `STOWLARK_BRIDGE_IPV6=1`, as Docker's daemon.json `"ipv6": true`: the
         // default bridge gets an IPv6 /64 too. Off by default, as Docker's.
         let ula = ula_prefix(root);
-        if std::env::var("KIRI_BRIDGE_IPV6").is_ok_and(|v| v == "1" || v == "true") {
+        if std::env::var("STOWLARK_BRIDGE_IPV6").is_ok_and(|v| v == "1" || v == "true") {
             let taken6: Vec<([u8; 16], u8)> = saved.iter().filter_map(|n| n.v6.as_ref()).map(|v| (v.subnet, v.prefix)).collect();
             if let Some((s6, p6)) = free_subnet6(ula, "bridge", &taken6) {
                 let gateway = (u128::from_be_bytes(s6) + 1).to_be_bytes();
@@ -655,12 +655,12 @@ impl Networks {
             }
             None
         };
-        let index = (1..).find(|i| !self.list.iter().any(|n| n.bridge == format!("kiri{i}"))).expect("unbounded");
+        let index = (1..).find(|i| !self.list.iter().any(|n| n.bridge == format!("stowlark{i}"))).expect("unbounded");
         let n = Network {
             id: super::engine::random_hex(32),
             name: name.into(),
             driver: "bridge".into(),
-            bridge: format!("kiri{index}"),
+            bridge: format!("stowlark{index}"),
             subnet: subnet.0,
             prefix: subnet.1,
             gateway,
@@ -741,7 +741,7 @@ impl Networks {
 }
 
 /// The first free subnet: 172.17.0.0/16 (only for the default bridge), then
-/// 172.18.0.0/16 … 172.31.0.0/16, then 10.89.N.0/24, skipping ones Kiri
+/// 172.18.0.0/16 … 172.31.0.0/16, then 10.89.N.0/24, skipping ones Stowlark
 /// already uses and ones the host routes.
 fn free_subnet(taken: &[([u8; 4], u8)], default_bridge: bool) -> Option<([u8; 4], u8)> {
     let routes = host_routes();
@@ -755,9 +755,9 @@ fn free_subnet(taken: &[([u8; 4], u8)], default_bridge: bool) -> Option<([u8; 4]
         })
 }
 
-/// The host's own IPv6 routes, outside Kiri's bridges, the default route
+/// The host's own IPv6 routes, outside Stowlark's bridges, the default route
 /// and link-local and multicast ones. Only a Linux host shares its routing
-/// table with Kiri.
+/// table with Stowlark.
 #[cfg(target_os = "linux")]
 fn host_routes6() -> Vec<([u8; 16], u8)> {
     let text = std::fs::read_to_string("/proc/net/ipv6_route").unwrap_or_default();
@@ -765,7 +765,7 @@ fn host_routes6() -> Vec<([u8; 16], u8)> {
         .filter_map(|l| {
             // dest prefix src srcprefix next-hop metric ref use flags iface, in hex
             let f: Vec<&str> = l.split_whitespace().collect();
-            if f.len() < 10 || f[9].starts_with("kiri") || f[9] == "lo" {
+            if f.len() < 10 || f[9].starts_with("stowlark") || f[9] == "lo" {
                 return None;
             }
             let dest = u128::from_str_radix(f[0], 16).ok()?.to_be_bytes();
@@ -781,8 +781,8 @@ fn host_routes6() -> Vec<([u8; 16], u8)> {
     Vec::new()
 }
 
-/// The host's own routes as (network, mask), outside Kiri's bridges and the
-/// default route. Only a Linux host shares its routing table with Kiri.
+/// The host's own routes as (network, mask), outside Stowlark's bridges and the
+/// default route. Only a Linux host shares its routing table with Stowlark.
 #[cfg(target_os = "linux")]
 fn host_routes() -> Vec<(u32, u32)> {
     let text = std::fs::read_to_string("/proc/net/route").unwrap_or_default();
@@ -790,7 +790,7 @@ fn host_routes() -> Vec<(u32, u32)> {
         .skip(1)
         .filter_map(|l| {
             let f: Vec<&str> = l.split_whitespace().collect();
-            if f.len() < 8 || f[0].starts_with("kiri") {
+            if f.len() < 8 || f[0].starts_with("stowlark") {
                 return None;
             }
             // Little-endian hex, as the kernel prints them.
@@ -811,7 +811,7 @@ mod tests {
     use super::*;
 
     fn net(ipam: Option<Ipam>) -> Network {
-        let mut n = builtin("x", "bridge", "kiri9", [10, 5, 0, 0], [10, 5, 0, 1]);
+        let mut n = builtin("x", "bridge", "stowlark9", [10, 5, 0, 0], [10, 5, 0, 1]);
         n.name = "app".into();
         n.prefix = 24;
         if let Some(i) = ipam {
@@ -872,14 +872,14 @@ mod tests {
     }
 
     fn nets() -> (Networks, std::path::PathBuf) {
-        let dir = std::env::temp_dir().join(format!("kiri-net-test-{}-{}", std::process::id(), now_ns()));
+        let dir = std::env::temp_dir().join(format!("stowlark-net-test-{}-{}", std::process::id(), now_ns()));
         std::fs::create_dir_all(&dir).unwrap();
         (Networks::load(&dir).unwrap(), dir)
     }
 
     #[test]
     fn ipv6_only_networks_need_ipv6_and_no_ipv4_subnet() {
-        let dir = std::env::temp_dir().join(format!("kiri-net6only-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-net6only-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let mut n = Networks::load(&dir).unwrap();
         let only = n.create("only6", Settings { no_ipv4: true, ..v6(None) }).unwrap();

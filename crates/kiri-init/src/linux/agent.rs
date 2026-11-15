@@ -48,14 +48,14 @@ pub fn serve(mut conn: File, paths: &Paths) -> io::Result<()> {
     let host_dns = if host_process { super::transport::host_dns() } else { Vec::new() };
     let mut dhcp: Option<Dhcp> = if host_process {
         if let Err(e) = net::host_uplink() {
-            eprintln!("kiri-init: no uplink: {e}");
+            eprintln!("stowlark-init: no uplink: {e}");
         }
         None
     } else {
         match net::uplink() {
             Ok(d) => d,
             Err(e) => {
-                eprintln!("kiri-init: no uplink: {e}");
+                eprintln!("stowlark-init: no uplink: {e}");
                 None
             }
         }
@@ -78,11 +78,11 @@ pub fn serve(mut conn: File, paths: &Paths) -> io::Result<()> {
     let engine_api = if host_process {
         None
     } else {
-        super::relay::listen_engine().inspect_err(|e| eprintln!("kiri-init: no engine socket for containers: {e}")).ok()
+        super::relay::listen_engine().inspect_err(|e| eprintln!("stowlark-init: no engine socket for containers: {e}")).ok()
     };
     let copies = super::copy::listen()?;
     // USB passthrough (VM only: on a Linux host containers see the host's devices).
-    let usb = if host_process { None } else { super::usb::listen().inspect_err(|e| eprintln!("kiri-init: no USB passthrough: {e}")).ok() };
+    let usb = if host_process { None } else { super::usb::listen().inspect_err(|e| eprintln!("stowlark-init: no USB passthrough: {e}")).ok() };
     let udp = super::relay::listen_udp()?;
     let pressure = memory_pressure_trigger();
     let mut last_pressure = std::time::Instant::now() - std::time::Duration::from_secs(1);
@@ -162,15 +162,15 @@ pub fn serve(mut conn: File, paths: &Paths) -> io::Result<()> {
                 match d.on_readable() {
                     Ok(true) => {
                         if let Some(l) = &d.lease {
-                            eprintln!("kiri-init: {} is {}/{} via {}", net::UPLINK, net::ip_str(l.ip), l.prefix, net::ip_str(l.gateway));
+                            eprintln!("stowlark-init: {} is {}/{} via {}", net::UPLINK, net::ip_str(l.ip), l.prefix, net::ip_str(l.gateway));
                         }
                     }
                     Ok(false) => {}
-                    Err(e) => eprintln!("kiri-init: dhcp: {e}"),
+                    Err(e) => eprintln!("stowlark-init: dhcp: {e}"),
                 }
             }
             if let Err(e) = d.on_timer() {
-                eprintln!("kiri-init: dhcp: {e}");
+                eprintln!("stowlark-init: dhcp: {e}");
             }
         }
 
@@ -472,7 +472,7 @@ pub fn serve(mut conn: File, paths: &Paths) -> io::Result<()> {
                         let all = published.iter().map(|(_, d)| *d).collect::<Vec<_>>();
                         let gateway = dhcp.as_ref().and_then(|d| d.lease.as_ref()).map_or([0; 4], |l| l.gateway);
                         if let Err(e) = if host_process { net::publish(&all) } else { net::publish_vm(&all, gateway) } {
-                            eprintln!("kiri-init: unpublish {id}: {e}");
+                            eprintln!("stowlark-init: unpublish {id}: {e}");
                         }
                     }
                     continue;
@@ -496,8 +496,8 @@ pub fn serve(mut conn: File, paths: &Paths) -> io::Result<()> {
                     continue;
                 }
                 Ok(Msg::RemoveBridge { bridge }) => {
-                    // Only Kiri's own bridges, never another interface.
-                    if bridge.starts_with("kiri") && bridge != "kiri0" {
+                    // Only Stowlark's own bridges, never another interface.
+                    if bridge.starts_with("stowlark") && bridge != "stowlark0" {
                         dns.forget_bridge(bridge);
                         bridges.remove(bridge);
                     }
@@ -658,7 +658,7 @@ fn wait_for_lease(dhcp: &mut Option<Dhcp>, max: std::time::Duration) {
     while d.lease.is_none() {
         let left = deadline.saturating_duration_since(std::time::Instant::now());
         if left.is_zero() {
-            eprintln!("kiri-init: no DHCP lease yet; starting the container without waiting longer");
+            eprintln!("stowlark-init: no DHCP lease yet; starting the container without waiting longer");
             return;
         }
         let mut pfd = libc::pollfd { fd: d.fd(), events: libc::POLLIN, revents: 0 };
@@ -730,7 +730,7 @@ fn flush_input(procs: &mut HashMap<libc::pid_t, Proc>, fd: RawFd, conn: &mut Fil
 }
 
 /// This process's resident memory, from /proc/self/statm (in pages).
-/// What Kiri's Linux holds, in KiB. In the VM, where this process is init,
+/// What Stowlark's Linux holds, in KiB. In the VM, where this process is init,
 /// it is the root cgroup: the whole guest. On a Linux host it is the
 /// containers' cgroup and this process; the daemon adds itself.
 fn held_kib(paths: &Paths, agent_rss_kib: u64) -> u64 {

@@ -1,4 +1,4 @@
-//! USB passthrough, the daemon's part: a pipe between `kiri usb serve` (the
+//! USB passthrough, the daemon's part: a pipe between `stowlark usb serve` (the
 //! root helper that owns the captured device and speaks USB/IP for it) and
 //! the guest's vhci_hcd, plus the list of what is attached.
 //!
@@ -205,7 +205,7 @@ fn attach_claimed(location: &str, name: &str, speed: u32, devid: u32, engine: &A
             guest: stream.fd.try_clone()?,
             asked: asked.clone(),
         });
-        // Back in Kiri: no longer waited for. Marked here, as the session
+        // Back in Stowlark: no longer waited for. Marked here, as the session
         // starts and before it can end, so a board that leaves again at once
         // is waited for again (`note_left` clears it) rather than lost.
         if let Some(ident) = &ident {
@@ -222,7 +222,7 @@ fn attach_claimed(location: &str, name: &str, speed: u32, devid: u32, engine: &A
     let mut to_guest = File::from(stream.fd.try_clone()?);
     let mut from_helper = r.get_ref().try_clone()?;
     let ended = guest_ended.clone();
-    let up = std::thread::Builder::new().name("kiri-usb-up".into()).spawn(move || {
+    let up = std::thread::Builder::new().name("stowlark-usb-up".into()).spawn(move || {
         let _ = to_guest.write_all(&early).and_then(|()| io::copy(&mut from_helper, &mut to_guest));
         let helper_first = !ended.load(Ordering::SeqCst);
         // SAFETY: shutting down a socket we own.
@@ -314,7 +314,7 @@ impl Wanted {
 
 const QUICK: Duration = Duration::from_secs(5);
 const MAX_QUICK: u32 = 5;
-/// Attaches that fail in a row before Kiri leaves the device to the Mac.
+/// Attaches that fail in a row before Stowlark leaves the device to the Mac.
 const MAX_FAILURES: u32 = 5;
 
 static WANTED: Mutex<Vec<Wanted>> = Mutex::new(Vec::new());
@@ -337,7 +337,7 @@ fn left(ident: Ident, name: &str, lasted: Duration) {
         return;
     }
     drop(w);
-    crate::diag::info!("USB device left the Mac's bus while attached; Kiri attaches it again when it comes back", name = name);
+    crate::diag::info!("USB device left the Mac's bus while attached; Stowlark attaches it again when it comes back", name = name);
     watch();
 }
 
@@ -390,7 +390,7 @@ fn watch() {
     if WATCHING.swap(true, Ordering::SeqCst) {
         return;
     }
-    let spawned = std::thread::Builder::new().name("kiri-usb-rejoin".into()).spawn(|| {
+    let spawned = std::thread::Builder::new().name("stowlark-usb-rejoin".into()).spawn(|| {
         loop {
             std::thread::sleep(Duration::from_millis(500));
             let busy: Vec<Ident> = SESSIONS.lock().unwrap_or_else(|e| e.into_inner()).iter().filter_map(|s| s.ident.clone()).collect();

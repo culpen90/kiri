@@ -133,7 +133,7 @@ pub unsafe fn clone3(args: &CloneArgs) -> io::Result<libc::pid_t> {
 /// Writes `msg` straight to `fd` and exits without unwinding or running any
 /// destructors. Only for the child between clone and exec.
 pub fn child_fail(fd: RawFd, what: &str, err: io::Error) -> ! {
-    let msg = format!("kiri: cannot start container: {what}: {err}\n");
+    let msg = format!("stowlark: cannot start container: {what}: {err}\n");
     // SAFETY: writing a valid buffer to a descriptor we hold, then exiting.
     unsafe {
         libc::write(fd, msg.as_ptr().cast(), msg.len());
@@ -153,7 +153,7 @@ pub fn exec_fail(fd: RawFd, exe: &CStr, err: io::Error, init: bool) -> ! {
     let (code, why) = exec_failure(&exe, &err, found, init);
     // runc reports what it refuses before the start as the daemon's error,
     // and a failed exec after it on the container's stderr, as is.
-    let msg = if code == 255 { format!("{why}\n") } else { format!("kiri: cannot start container: {why}\n") };
+    let msg = if code == 255 { format!("{why}\n") } else { format!("stowlark: cannot start container: {why}\n") };
     // SAFETY: writing a valid buffer to a descriptor we hold, then exiting.
     unsafe {
         libc::write(fd, msg.as_ptr().cast(), msg.len());
@@ -334,7 +334,7 @@ mod tests {
     /// EACCES, which is 126.
     #[test]
     fn exec_of_a_plain_file_is_126() {
-        let dir = std::env::temp_dir().join(format!("kiri-exec-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-exec-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("plain");
         std::fs::write(&file, b"not a program").unwrap();

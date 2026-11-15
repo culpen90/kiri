@@ -1,17 +1,17 @@
 [package]
-name = "kiri-init"
-description = "PID 1 and agent of the Kiri guest VM"
+name = "stowlark-init"
+description = "PID 1 and agent of the Stowlark guest VM"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-default-run = "kiri-init"
+default-run = "stowlark-init"
 
 [features]
 android-guest = []
 
 [[bin]]
-name = "kiri-android-init"
+name = "stowlark-android-init"
 path = "src/bin/kiri-android-init.rs"
 required-features = ["android-guest"]
 

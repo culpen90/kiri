@@ -1,5 +1,5 @@
 //! Bind sources as clients send them. The docker CLI and Compose on Windows
-//! (through kiri-win's pipe into WSL) send `C:\src:/app`, and tools that
+//! (through stowlark-win's pipe into WSL) send `C:\src:/app`, and tools that
 //! drive the engine mount its socket into containers (Testcontainers' Ryuk,
 //! CI runners). Both are made into paths this daemon can mount.
 
@@ -17,7 +17,7 @@ pub struct Wsl {
     pub distro: Option<String>,
 }
 
-/// The WSL the daemon runs in (kiri-win's engine), or None on a Mac or a
+/// The WSL the daemon runs in (stowlark-win's engine), or None on a Mac or a
 /// Linux host, where a Windows path is never a path.
 pub fn wsl() -> Option<&'static Wsl> {
     static WSL: OnceLock<Option<Wsl>> = OnceLock::new();
@@ -152,7 +152,7 @@ pub fn source(src: &str, wsl: &Wsl) -> Result<String, Error> {
             return Err(bad("no WSL distro named"));
         }
         if let Some(ours) = wsl.distro.as_deref().filter(|d| !d.eq_ignore_ascii_case(distro)) {
-            return Err(bad(&format!("it is in the WSL distro {distro}, and Kiri runs in {ours}; use a path on a Windows drive or in {ours}")));
+            return Err(bad(&format!("it is in the WSL distro {distro}, and Stowlark runs in {ours}; use a path on a Windows drive or in {ours}")));
         }
         return Ok(clean(&format!("/{inner}")));
     }
@@ -163,7 +163,7 @@ pub fn source(src: &str, wsl: &Wsl) -> Result<String, Error> {
     if !src.contains('\\') && host != "." && host != "?" && !host.is_empty() && !path.is_empty() {
         return Ok(clean(&format!("/{rest}")));
     }
-    Err(bad("Kiri's WSL can reach the Windows drives (C:\\…) and its own files, not network shares or devices"))
+    Err(bad("Stowlark's WSL can reach the Windows drives (C:\\…) and its own files, not network shares or devices"))
 }
 
 /// A path on drive `letter`, under WSL's automount root.
@@ -193,7 +193,7 @@ const VM_ENGINE_SOCK: &str = "/run/host-services/docker.sock";
 
 /// The paths clients mean as "the engine" when they mount it into a
 /// container: Docker's own, and on the Mac the socket the client was given
-/// (`DOCKER_HOST=unix://~/.kiri/run/docker.sock`, which Testcontainers
+/// (`DOCKER_HOST=unix://~/.stowlark/run/docker.sock`, which Testcontainers
 /// mounts into Ryuk).
 const ENGINE_SOCKS: &[&str] = &["/var/run/docker.sock", "/run/docker.sock", "/private/var/run/docker.sock"];
 
@@ -201,7 +201,7 @@ const ENGINE_SOCKS: &[&str] = &["/var/run/docker.sock", "/run/docker.sock", "/pr
 /// Mac the VM's relay to this daemon, as Docker Desktop and OrbStack give
 /// the VM's engine. On a Linux host (and WSL) a socket at that path is
 /// mounted as it is, as Docker does (Docker's own, or the package's link to
-/// Kiri); a missing `/var/run/docker.sock` is Kiri's, rather than a new
+/// Stowlark); a missing `/var/run/docker.sock` is Stowlark's, rather than a new
 /// empty directory.
 pub fn engine_socket(src: &str) -> Option<String> {
     let own = super::socket_path().ok()?;
@@ -227,7 +227,7 @@ mod tests {
     use super::*;
 
     fn wsl() -> Wsl {
-        Wsl { root: "/mnt/".into(), distro: Some("kiri".into()) }
+        Wsl { root: "/mnt/".into(), distro: Some("stowlark".into()) }
     }
 
     fn ok(spec: &str) -> (String, String, String) {
@@ -265,12 +265,12 @@ mod tests {
 
     #[test]
     fn wsl_and_pipe_sources() {
-        assert_eq!(ok(r"\\wsl$\kiri\home\me:/app"), t("/home/me", "/app", ""));
-        assert_eq!(ok(r"\\wsl.localhost\Kiri\home\me\:/app:ro"), t("/home/me", "/app", "ro"));
-        assert_eq!(ok("//wsl.localhost/kiri/srv:/srv"), t("/srv", "/srv", ""));
+        assert_eq!(ok(r"\\wsl$\stowlark\home\me:/app"), t("/home/me", "/app", ""));
+        assert_eq!(ok(r"\\wsl.localhost\Stowlark\home\me\:/app:ro"), t("/home/me", "/app", "ro"));
+        assert_eq!(ok("//wsl.localhost/stowlark/srv:/srv"), t("/srv", "/srv", ""));
         assert_eq!(ok(r"\\.\pipe\docker_engine:/var/run/docker.sock"), t("/var/run/docker.sock", "/var/run/docker.sock", ""));
         assert_eq!(ok("//var/run/docker.sock:/var/run/docker.sock:rw"), t("/var/run/docker.sock", "/var/run/docker.sock", "rw"));
-        // Distro unknown: taken as Kiri's own.
+        // Distro unknown: taken as Stowlark's own.
         let any = Wsl { root: "/mnt/".into(), distro: None };
         assert_eq!(split(r"\\wsl$\Ubuntu\home:/h", Some(&any)).unwrap(), t("/home", "/h", ""));
     }
@@ -299,14 +299,14 @@ mod tests {
         assert_eq!(automount_root("[Automount]\n  Root=\"/\"  # all drives at /c, /d\n"), "/");
         assert_eq!(split(r"E:\x:/x", Some(&Wsl { root: "/".into(), distro: None })).unwrap().0, "/e/x");
         assert_eq!(automount_root("[automount]\nroot = /win"), "/win/");
-        assert_eq!(automount_root("[boot]\nroot = /nope/\ncommand = kiri daemon\n"), "/mnt/");
+        assert_eq!(automount_root("[boot]\nroot = /nope/\ncommand = stowlark daemon\n"), "/mnt/");
         assert_eq!(automount_root(""), "/mnt/");
         assert_eq!(automount_root("[automount]\nroot = relative\n"), "/mnt/");
     }
 
     #[test]
     fn distro_from_wslpath() {
-        assert_eq!(distro_of(r"\\wsl.localhost\kiri\"), Some("kiri".into()));
+        assert_eq!(distro_of(r"\\wsl.localhost\stowlark\"), Some("stowlark".into()));
         assert_eq!(distro_of(r"\\wsl$\Ubuntu-24.04\"), Some("Ubuntu-24.04".into()));
         assert_eq!(distro_of(r"C:\"), None);
     }
@@ -332,18 +332,18 @@ mod tests {
         let all = |_: &str| true;
         #[cfg(target_os = "macos")]
         {
-            let own = "/Users/me/.kiri/run/docker.sock";
-            for s in ["/var/run/docker.sock", "/private/var/run/docker.sock", "/run/docker.sock", own, "/Users/me/.kiri/run//docker.sock"] {
+            let own = "/Users/me/.stowlark/run/docker.sock";
+            for s in ["/var/run/docker.sock", "/private/var/run/docker.sock", "/run/docker.sock", own, "/Users/me/.stowlark/run//docker.sock"] {
                 assert_eq!(engine_socket_for(s, own, all).as_deref(), Some(VM_ENGINE_SOCK), "{s}");
             }
             assert_eq!(engine_socket_for("/Users/me/.orbstack/run/docker.sock", own, none), None);
         }
         #[cfg(not(target_os = "macos"))]
         {
-            let own = "/run/kiri/docker.sock";
+            let own = "/run/stowlark/docker.sock";
             assert_eq!(engine_socket_for("/var/run/docker.sock", own, none).as_deref(), Some(own));
             assert_eq!(engine_socket_for("/run/docker.sock", own, none).as_deref(), Some(own));
-            // Docker's socket, or the package's link to Kiri's: mounted as it is.
+            // Docker's socket, or the package's link to Stowlark's: mounted as it is.
             assert_eq!(engine_socket_for("/var/run/docker.sock", own, all), None);
             assert_eq!(engine_socket_for(own, own, all), None);
         }

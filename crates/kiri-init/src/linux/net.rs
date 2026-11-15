@@ -128,7 +128,7 @@ pub fn host_uplink() -> io::Result<()> {
     install_nat(Nat { uplink: index, redirect: false, dnat: Vec::new(), gateway: [0; 4] })
 }
 
-/// What Kiri's IPv4 table was last built from, so it can be rebuilt when a
+/// What Stowlark's IPv4 table was last built from, so it can be rebuilt when a
 /// bridge comes or goes (the forward filter has a rule per bridge).
 struct Nat {
     uplink: i32,
@@ -142,7 +142,7 @@ static NAT: std::sync::Mutex<Option<Nat>> = std::sync::Mutex::new(None);
 /// published on every address are matched per address of this machine.
 static NO_FIB4: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-/// Builds Kiri's IPv4 table from `nat` and the bridges made so far, and
+/// Builds Stowlark's IPv4 table from `nat` and the bridges made so far, and
 /// keeps `nat` for `refresh_nat`.
 fn install_nat(nat: Nat) -> io::Result<()> {
     use std::sync::atomic::Ordering;
@@ -154,7 +154,7 @@ fn install_nat(nat: Nat) -> io::Result<()> {
     } else {
         match install(None) {
             Err(e) if any_addr && e.raw_os_error() == Some(libc::ENOENT) => {
-                eprintln!("kiri-init: no nft_fib_ipv4 in this kernel; ports published on every address match this machine's addresses one by one");
+                eprintln!("stowlark-init: no nft_fib_ipv4 in this kernel; ports published on every address match this machine's addresses one by one");
                 NO_FIB4.store(true, Ordering::Relaxed);
                 install(Some(&local_addrs()))
             }
@@ -167,7 +167,7 @@ fn install_nat(nat: Nat) -> io::Result<()> {
     r
 }
 
-/// Rebuilds Kiri's IPv4 table as last built, for the bridges there are now.
+/// Rebuilds Stowlark's IPv4 table as last built, for the bridges there are now.
 fn refresh_nat() -> io::Result<()> {
     let nat = NAT.lock().unwrap_or_else(|e| e.into_inner()).take();
     match nat {
@@ -465,7 +465,7 @@ pub struct Bridges {
 
 impl Bridges {
     /// Creates the bridge (once) with its gateway address (and IPv6 one)
-    /// and brings it up, with its rules in Kiri's tables. All or nothing: on
+    /// and brings it up, with its rules in Stowlark's tables. All or nothing: on
     /// an error the bridge is gone again and not recorded, so the next
     /// container tries afresh rather than starting with half the rules.
     pub fn ensure(&mut self, name: &str, gateway: Option<[u8; 4]>, prefix: u8, v6: Option<Ip6>) -> io::Result<i32> {
@@ -533,11 +533,11 @@ impl Bridges {
         }
         MADE_BRIDGES.lock().unwrap_or_else(|e| e.into_inner()).retain(|m| m != name);
         if let Err(e) = refresh_nat() {
-            eprintln!("kiri-init: NAT: {e}");
+            eprintln!("stowlark-init: NAT: {e}");
         }
         if let Some((.., Some(_))) = self.made.remove(name) {
             if let Err(e) = self.update_v6(None) {
-                eprintln!("kiri-init: IPv6 NAT: {e}");
+                eprintln!("stowlark-init: IPv6 NAT: {e}");
             }
         }
     }
@@ -588,7 +588,7 @@ fn ipv6_forwarding(on: bool) -> io::Result<()> {
         let mut raised = Vec::new();
         for entry in std::fs::read_dir(conf)?.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
-            if matches!(name.as_str(), "all" | "default" | "lo") || name.starts_with("kiri") || name.starts_with("kv") {
+            if matches!(name.as_str(), "all" | "default" | "lo") || name.starts_with("stowlark") || name.starts_with("kv") {
                 continue;
             }
             let path = format!("{conf}/{name}/accept_ra");
@@ -613,7 +613,7 @@ fn ipv6_forwarding(on: bool) -> io::Result<()> {
 static MADE_BRIDGES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 
 /// Linux host, stopping: removes the bridges this agent brought up (only
-/// those: another engine's may share the network namespace) and Kiri's
+/// those: another engine's may share the network namespace) and Stowlark's
 /// nftables table, so nothing of the engine is left in the host's network.
 pub fn remove_host_network() {
     let names = std::mem::take(&mut *MADE_BRIDGES.lock().unwrap_or_else(|e| e.into_inner()));
@@ -623,7 +623,7 @@ pub fn remove_host_network() {
         }
     }
     if let Err(e) = netlink::remove_nat() {
-        eprintln!("kiri-init: removing the nftables table: {e}");
+        eprintln!("stowlark-init: removing the nftables table: {e}");
     }
     let _ = netlink::install_nat6(&[], &[]);
     let _ = ipv6_forwarding(false);
@@ -749,7 +749,7 @@ mod tests {
     #[test]
     fn ipv6_settings_come_from_the_options() {
         let mut buf = Vec::new();
-        kiri_proto::encode_net_attach(&mut buf, "c1", "eth1", "kiri2", [10, 5, 0, 2], 24, [10, 5, 0, 1], &["web"], &["ip6=fd00:1::2/64", "gw6=fd00:1::1"]);
+        kiri_proto::encode_net_attach(&mut buf, "c1", "eth1", "stowlark2", [10, 5, 0, 2], 24, [10, 5, 0, 1], &["web"], &["ip6=fd00:1::2/64", "gw6=fd00:1::1"]);
         let Ok(kiri_proto::Msg::NetAttach { net, .. }) = kiri_proto::decode(&buf) else { panic!() };
         let v = Ip6::from_opts(net.opts).unwrap();
         assert_eq!(ip6_str(v.ip), "fd00:1::2");
@@ -757,7 +757,7 @@ mod tests {
         assert_eq!(v.prefix, 64);
         assert_eq!(ip6_str(v.subnet()), "fd00:1::");
         let mut buf = Vec::new();
-        kiri_proto::encode_net_attach::<&str>(&mut buf, "c1", "eth1", "kiri2", [10, 5, 0, 2], 24, [10, 5, 0, 1], &[], &[]);
+        kiri_proto::encode_net_attach::<&str>(&mut buf, "c1", "eth1", "stowlark2", [10, 5, 0, 2], 24, [10, 5, 0, 1], &[], &[]);
         let Ok(kiri_proto::Msg::NetAttach { net, .. }) = kiri_proto::decode(&buf) else { panic!() };
         assert_eq!(Ip6::from_opts(net.opts), None);
     }

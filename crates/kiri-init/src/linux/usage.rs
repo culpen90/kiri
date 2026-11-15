@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn counts_files_once_and_lists_each_kind() {
-        let root = std::env::temp_dir().join(format!("kiri-usage-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("stowlark-usage-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         let (layers, containers, volumes) = (root.join("layers"), root.join("containers"), root.join("volumes"));
         fs::create_dir_all(layers.join("ab12")).unwrap();

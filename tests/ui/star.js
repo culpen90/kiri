@@ -1,4 +1,4 @@
-// Star Kiri is asked once: the first thing that works, after the settings
+// Star Stowlark is asked once: the first thing that works, after the settings
 // are in and only if ui.json doesn't say it was asked; Star opens the repo.
 const R = [];
 const t = (name, fn) => { try { fn(); R.push("PASS " + name); } catch (e) { R.push("FAIL " + name + ": " + e.message); } };
@@ -8,7 +8,7 @@ t("nothing before the settings are in", () => {
 });
 t("already asked: never again", () => {
   kiri.on({ type: "prefs", prefs: { starAsked: true } });
-  kiri.on({ type: "k8sop", op: "start", state: "done", context: "kiri" });
+  kiri.on({ type: "k8sop", op: "start", state: "done", context: "stowlark" });
   if (starTimer) throw new Error("asked twice");
 });
 t("the first success asks, once", () => {
@@ -25,7 +25,7 @@ t("the first success asks, once", () => {
 });
 t("Star opens the repo and the card goes", () => {
   document.querySelector("#toasts .toast.star [data-star]").click();
-  if (!sent.some((m) => m.type === "open" && m.name === "https://github.com/libracoder/kiri")) throw new Error("didn't open");
+  if (!sent.some((m) => m.type === "open" && m.name === "https://github.com/culpen90/stowlark")) throw new Error("didn't open");
   if (!document.querySelector("#toasts .toast.star.leaving")) throw new Error("stayed");
 });
 t("a container newly running counts; ones already up don't", () => {

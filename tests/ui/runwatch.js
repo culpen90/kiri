@@ -1,7 +1,7 @@
 // Run only says a container started once it stays up: a container that stops
 // with an error in its first seconds is said to have failed, with why; and
-// Run on a Kubernetes image points to Kiri's own cluster instead of starting
-// a copy. kiri-k8s is marked Kubernetes, and stopping or removing it says it
+// Run on a Kubernetes image points to Stowlark's own cluster instead of starting
+// a copy. stowlark-k8s is marked Kubernetes, and stopping or removing it says it
 // turns Kubernetes off.
 const R = [];
 const t = (name, fn) => { try { fn(); R.push("PASS " + name); } catch (e) { R.push("FAIL " + name + ": " + e.message); } };
@@ -67,7 +67,7 @@ t("Run on a Kubernetes image doesn't start a copy", () => {
   sent.length = 0;
   runImage("rancher/k3s:v1.31.4-k3s1");
   if (sent.some((m) => m.type === "run")) throw new Error("sent run");
-  if (!/This is Kubernetes. Kiri runs it for you/.test(dialog()?.textContent)) throw new Error(dialog()?.textContent);
+  if (!/This is Kubernetes. Stowlark runs it for you/.test(dialog()?.textContent)) throw new Error(dialog()?.textContent);
 });
 t("Kubernetes off: Turn on Kubernetes opens its settings", () => {
   const go = dialog().querySelector("[data-go]");
@@ -75,7 +75,7 @@ t("Kubernetes off: Turn on Kubernetes opens its settings", () => {
   go.click();
   if (ui.view !== "settings" || prefs.tab !== "kubernetes") throw new Error(ui.view + " " + prefs.tab);
 });
-const kk = C("k8sid", "rancher/k3s:v1.31.4-k3s1", "running", { Names: ["/kiri-k8s"] });
+const kk = C("k8sid", "rancher/k3s:v1.31.4-k3s1", "running", { Names: ["/stowlark-k8s"] });
 t("Kubernetes on: Open Pods", () => {
   lists([kk]);
   runImage("rancher/k3s:v1.31.4-k3s1");
@@ -84,7 +84,7 @@ t("Kubernetes on: Open Pods", () => {
   go.click();
   if (ui.view !== "pods") throw new Error(ui.view);
 });
-t("kiri-k8s is marked Kubernetes in Containers", () => {
+t("stowlark-k8s is marked Kubernetes in Containers", () => {
   show("containers");
   const row = document.querySelector('#content tr[data-key="k8sid"]');
   // The Kubernetes logo beside its name, named for screen readers.
@@ -95,16 +95,16 @@ t("kiri-k8s is marked Kubernetes in Containers", () => {
   if (document.querySelector('#content tr[data-key="plain"] .k8s-mark')) throw new Error("another container is marked too");
   lists([kk]);
 });
-t("stopping kiri-k8s says it turns Kubernetes off, then stops it", () => {
+t("stopping stowlark-k8s says it turns Kubernetes off, then stops it", () => {
   sent.length = 0;
   containerAction("stop", "k8sid");
   if (sent.some((m) => m.type === "container") || !/turns Kubernetes off/.test(dialog()?.textContent)) throw new Error(dialog()?.textContent);
   dialog().querySelector("[data-go]").click();
   if (!sent.some((m) => m.type === "container" && m.action === "stop" && m.id === "k8sid")) throw new Error(JSON.stringify(sent));
 });
-t("removing kiri-k8s says what stays", () => {
+t("removing stowlark-k8s says what stays", () => {
   containerAction("remove", "k8sid");
-  if (!/turns Kubernetes off/.test(dialog()?.textContent) || !/stays in the kiri-k8s volume/.test(dialog()?.textContent)) throw new Error(dialog()?.textContent);
+  if (!/turns Kubernetes off/.test(dialog()?.textContent) || !/stays in the stowlark-k8s volume/.test(dialog()?.textContent)) throw new Error(dialog()?.textContent);
   dialog().querySelector("[data-close]").click();
 });
 report(R);

@@ -1,6 +1,6 @@
-//! `kiri ps`, `kiri run`, `kiri compose up`…: Docker's own commands, run
-//! by the docker CLI against Kiri's daemon, whatever docker context is
-//! selected. `kiri run -d --name web nginx` is `docker --context kiri run
+//! `stowlark ps`, `stowlark run`, `stowlark compose up`…: Docker's own commands, run
+//! by the docker CLI against Stowlark's daemon, whatever docker context is
+//! selected. `stowlark run -d --name web nginx` is `docker --context stowlark run
 //! -d --name web nginx`.
 
 use std::io;
@@ -10,7 +10,7 @@ use std::os::unix::process::CommandExt;
 #[cfg(unix)]
 use crate::client;
 
-/// The docker commands `kiri` answers. `import` is left out: `kiri import`
+/// The docker commands `stowlark` answers. `import` is left out: `stowlark import`
 /// brings things over from OrbStack and Docker Desktop.
 pub const COMMANDS: &[&str] = &[
     "attach", "build", "builder", "buildx", "commit", "compose", "container", "cp", "create", "diff", "events", "exec", "export", "history", "image", "images",
@@ -26,16 +26,16 @@ pub fn handles(command: &str) -> bool {
 /// the exit code are docker's own. Returns only if that fails.
 #[cfg(unix)]
 pub fn run(args: &[String]) -> io::Result<()> {
-    let docker = client::docker_cli().ok_or_else(|| io::Error::other("no docker CLI found; open Kiri once to set it up"))?;
+    let docker = client::docker_cli().ok_or_else(|| io::Error::other("no docker CLI found; open Stowlark once to set it up"))?;
     let socket = client::socket()?;
     if !client::alive() {
-        return Err(io::Error::other("Kiri isn't running. Open Kiri, or start it with `kiri daemon`"));
+        return Err(io::Error::other("Stowlark isn't running. Open Stowlark, or start it with `stowlark daemon`"));
     }
     let mut cmd = std::process::Command::new(docker);
     cmd.args(args).env("DOCKER_HOST", format!("unix://{}", socket.display())).env_remove("DOCKER_CONTEXT");
     // With DOCKER_HOST and no context, buildx would pick the endpoint's own
     // docker-driver builder, which needs BuildKit inside the engine: name
-    // Kiri's, if buildx knows it (the window sets it up) and the person
+    // Stowlark's, if buildx knows it (the window sets it up) and the person
     // hasn't picked one.
     if std::env::var_os("BUILDX_BUILDER").is_none() && buildx_knows(crate::builds::BUILDER.get()) {
         cmd.env("BUILDX_BUILDER", crate::builds::BUILDER.get());
@@ -43,9 +43,9 @@ pub fn run(args: &[String]) -> io::Result<()> {
     Err(cmd.exec())
 }
 
-/// On Windows: Kiri's docker.exe, beside this kiri.exe in
-/// %LOCALAPPDATA%\Kiri\bin (else one on PATH), with the `kiri` context
-/// setup made, which reaches the engine in WSL through kiri-win's pipe.
+/// On Windows: Stowlark's docker.exe, beside this stowlark.exe in
+/// %LOCALAPPDATA%\Stowlark\bin (else one on PATH), with the `stowlark` context
+/// setup made, which reaches the engine in WSL through stowlark-win's pipe.
 /// Exits with docker's exit code.
 #[cfg(windows)]
 pub fn run(args: &[String]) -> io::Result<()> {
@@ -56,7 +56,7 @@ pub fn run(args: &[String]) -> io::Result<()> {
         .env_remove("DOCKER_HOST")
         .env_remove("DOCKER_CONTEXT")
         .status()
-        .map_err(|e| io::Error::other(format!("could not run docker.exe ({e}); open Kiri once to set it up")))?;
+        .map_err(|e| io::Error::other(format!("could not run docker.exe ({e}); open Stowlark once to set it up")))?;
     std::process::exit(status.code().unwrap_or(1))
 }
 

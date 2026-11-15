@@ -4,7 +4,7 @@
 //! /etc/group, /etc/resolv.conf, /etc/os-release, /etc/machine-id and
 //! /etc/timezone, and expect Linux's. The VM keeps next to nothing in /etc,
 //! and the Mac's own are macOS's: its passwd has neither the person's
-//! account (those are in Directory Services) nor Linux's `nobody`. So Kiri
+//! account (those are in Directory Services) nor Linux's `nobody`. So Stowlark
 //! keeps plain Linux ones in its data folder, written again whenever one is
 //! mounted, and a mount of those paths gets them. /etc/hosts and
 //! /etc/localtime are the Mac's own (see `api::mac_source`).
@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 /// The files kept, by their name in /etc.
 pub const FILES: &[&str] = &["passwd", "group", "resolv.conf", "os-release", "machine-id", "timezone"];
 
-/// The person running Kiri, who gets a line in passwd and group: what
+/// The person running Stowlark, who gets a line in passwd and group: what
 /// `--user $(id -u):$(id -g)` with a mounted /etc/passwd is for.
 pub struct Who {
     pub user: String,
@@ -29,11 +29,11 @@ impl Who {
         // SAFETY: getuid and getgid take no arguments and cannot fail.
         let (uid, gid) = unsafe { (libc::getuid(), libc::getgid()) };
         let var = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty() && !v.contains([':', '\n']));
-        Who { user: var("USER").unwrap_or_else(|| "kiri".into()), uid, gid, home: var("HOME").unwrap_or_else(|| "/".into()) }
+        Who { user: var("USER").unwrap_or_else(|| "stowlark".into()), uid, gid, home: var("HOME").unwrap_or_else(|| "/".into()) }
     }
 }
 
-/// Where the files are kept: `etc` in Kiri's data folder, which the VM
+/// Where the files are kept: `etc` in Stowlark's data folder, which the VM
 /// sees with the rest of the Mac.
 pub fn dir() -> io::Result<PathBuf> {
     Ok(kiri_image::Store::default_root()?.join("etc"))
@@ -51,7 +51,7 @@ pub fn all() -> io::Result<PathBuf> {
         file_in(&dir, name, &who)?;
     }
     // The VM's own name, as its /etc/hostname has it.
-    put(&dir.join("hostname"), "kiri\n")?;
+    put(&dir.join("hostname"), "stowlark\n")?;
     Ok(dir)
 }
 
@@ -127,7 +127,7 @@ fn contents(name: &str, who: &Who) -> Option<String> {
         "resolv.conf" => format!("nameserver {}\n", super::ports::HOST_ADDR),
         "os-release" => {
             let v = env!("CARGO_PKG_VERSION");
-            format!("NAME=\"Kiri\"\nID=kiri\nID_LIKE=linux\nVERSION_ID=\"{v}\"\nPRETTY_NAME=\"Kiri {v}\"\n")
+            format!("NAME=\"Stowlark\"\nID=stowlark\nID_LIKE=linux\nVERSION_ID=\"{v}\"\nPRETTY_NAME=\"Stowlark {v}\"\n")
         }
         _ => return None,
     })
@@ -153,7 +153,7 @@ mod tests {
         let groups = contents("group", &me()).unwrap();
         assert!(groups.contains("root:x:0:\n") && groups.contains("nogroup:x:65534:\n"), "Linux's groups are listed");
         assert!(groups.ends_with("staff:x:20:ada\n"), "the person's group comes last");
-        // root running Kiri (a Linux host's layout, or sudo) is not listed twice.
+        // root running Stowlark (a Linux host's layout, or sudo) is not listed twice.
         let root = Who { user: "root".into(), uid: 0, gid: 0, home: "/root".into() };
         assert_eq!(contents("passwd", &root).unwrap().matches("\nroot:").count() + 1, 1);
         assert_eq!(contents("group", &root).unwrap().lines().filter(|l| l.split(':').nth(2) == Some("0")).count(), 1);
@@ -163,7 +163,7 @@ mod tests {
     fn the_rest_say_what_a_linux_host_would() {
         assert_eq!(contents("resolv.conf", &me()).unwrap(), format!("nameserver {}\n", super::super::ports::HOST_ADDR));
         let os = contents("os-release", &me()).unwrap();
-        assert!(os.contains("ID=kiri\n") && os.contains("PRETTY_NAME=\"Kiri "), "{os}");
+        assert!(os.contains("ID=stowlark\n") && os.contains("PRETTY_NAME=\"Stowlark "), "{os}");
         assert_eq!(contents("hosts", &me()), None);
         assert_eq!(zone_of(Some(Path::new("/var/db/timezone/zoneinfo/Africa/Lagos"))), "Africa/Lagos");
         assert_eq!(zone_of(Some(Path::new("/usr/share/zoneinfo/UTC"))), "UTC");
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn files_are_written_once_and_the_machine_id_is_kept() {
-        let dir = std::env::temp_dir().join(format!("kiri-hostetc-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-hostetc-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         for name in FILES {
             let path = file_in(&dir, name, &me()).unwrap();

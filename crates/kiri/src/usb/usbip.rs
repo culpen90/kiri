@@ -301,14 +301,14 @@ fn read_loop<B: Backend + ?Sized>(
                     let (tx, rx) = mpsc::channel::<Urb>();
                     let s = session.clone();
                     let done = finished.clone();
-                    let spawned = std::thread::Builder::new().name(format!("kiri-usb-ep{key:02x}")).spawn(move || {
+                    let spawned = std::thread::Builder::new().name(format!("stowlark-usb-ep{key:02x}")).spawn(move || {
                         for u in rx {
                             s.run(u);
                         }
                         let _ = done.send(());
                     });
                     if let Err(e) = spawned {
-                        eprintln!("kiri usb: no thread for endpoint {key:02x}: {e}");
+                        eprintln!("stowlark usb: no thread for endpoint {key:02x}: {e}");
                     }
                     tx
                 });
@@ -333,7 +333,7 @@ pub fn connect(socket: &Path, location: &str, name: &str, speed: u32, devid: u32
     let name: String = name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '+' }).collect();
     write!(
         &stream,
-        "POST /kiri/usb?location={location}&name={name}&speed={speed}&devid={devid} HTTP/1.1\r\nHost: kiri\r\nConnection: Upgrade\r\nUpgrade: tcp\r\nContent-Length: 0\r\n\r\n"
+        "POST /kiri/usb?location={location}&name={name}&speed={speed}&devid={devid} HTTP/1.1\r\nHost: stowlark\r\nConnection: Upgrade\r\nUpgrade: tcp\r\nContent-Length: 0\r\n\r\n"
     )?;
     let mut r = BufReader::new(stream.try_clone()?);
     let mut line = String::new();
@@ -354,7 +354,7 @@ pub fn connect(socket: &Path, location: &str, name: &str, speed: u32, devid: u32
         let _ = r.read_exact(&mut body);
         let text = String::from_utf8_lossy(&body);
         let msg = serde_json::from_str::<serde_json::Value>(&text).ok().and_then(|v| v["message"].as_str().map(str::to_owned)).unwrap_or_else(|| text.trim().to_owned());
-        return Err(io::Error::other(format!("Kiri did not take the device: {msg}")));
+        return Err(io::Error::other(format!("Stowlark did not take the device: {msg}")));
     }
     stream.set_read_timeout(None)?;
     Ok((stream, r))

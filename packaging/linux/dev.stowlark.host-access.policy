@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- The password prompt the window's setup checklist shows on a Linux host:
+     `pkexec /usr/bin/stowlark host-access USER` starts Stowlark's engine and lets USER
+     use it (crates/kiri/src/hostaccess.rs). -->
+<policyconfig>
+  <vendor>Stowlark</vendor>
+  <vendor_url>https://github.com/culpen90/stowlark</vendor_url>
+  <action id="dev.stowlark.host-access">
+    <description>Set up Stowlark for an account</description>
+    <message>Stowlark needs your password to start its engine and let your account run containers.</message>
+    <icon_name>stowlark</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/stowlark</annotate>
+  </action>
+</policyconfig>

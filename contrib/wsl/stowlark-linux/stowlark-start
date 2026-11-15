@@ -1,0 +1,17 @@
+#!/bin/sh
+# Starts Stowlark's engine after setup or when stowlark-win wakes the distro.
+# The daemon serves its unix socket; stowlark-win carries the Windows docker CLI
+# to it over `stowlark bridge`.
+export HOME=/var/lib/stowlark-daemon
+mkdir -p "$HOME" /var/log
+pgrep -f '/usr/local/bin/stowlark daemon' >/dev/null 2>&1 && exit 0
+rm -f "$HOME/.stowlark/run/docker.sock"
+nohup /usr/local/bin/stowlark daemon >>/var/log/stowlark.log 2>&1 &
+i=0
+while [ "$i" -lt 50 ]; do
+  [ -S "$HOME/.stowlark/run/docker.sock" ] && exit 0
+  sleep 0.1
+  i=$((i + 1))
+done
+echo "stowlark daemon did not create its socket; see /var/log/stowlark.log" >&2
+exit 1

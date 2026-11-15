@@ -1,6 +1,6 @@
 //! Software USB devices for testing passthrough end to end without
-//! hardware or root: `kiri usb fake serial|mouse` attaches one through the
-//! daemon, exactly as `kiri usb serve` attaches a captured device, and the
+//! hardware or root: `stowlark usb fake serial|mouse` attaches one through the
+//! daemon, exactly as `stowlark usb serve` attaches a captured device, and the
 //! guest's real USB stack and drivers take it from there.
 //!
 //! - `serial`: a CDC ACM serial port (the class of most Zigbee/Z-Wave
@@ -105,9 +105,9 @@ const REPORT: [u8; 52] = [
 fn string_descriptor(index: u8, kind: Kind) -> Option<Vec<u8>> {
     let text = match index {
         0 => return Some(vec![4, 3, 0x09, 0x04]),
-        1 => "Kiri",
-        2 if kind == Kind::Serial => "Kiri test serial",
-        2 => "Kiri test mouse",
+        1 => "Stowlark",
+        2 if kind == Kind::Serial => "Stowlark test serial",
+        2 => "Stowlark test mouse",
         3 => "KIRI0001",
         _ => return None,
     };
@@ -257,13 +257,13 @@ impl Backend for Fake {
     }
 }
 
-/// `kiri usb fake serial|mouse [--location L] [--unplug-after BYTES]
+/// `stowlark usb fake serial|mouse [--location L] [--unplug-after BYTES]
 /// [--stall-once] [--reports N]`: runs until detached.
 pub fn run(args: &[String]) -> io::Result<()> {
     let kind = match args.first().map(String::as_str) {
         Some("serial") => Kind::Serial,
         Some("mouse") => Kind::Mouse,
-        _ => return Err(io::Error::other("usage: kiri usb fake serial|mouse [--location L] [--unplug-after BYTES] [--stall-once] [--reports N]")),
+        _ => return Err(io::Error::other("usage: stowlark usb fake serial|mouse [--location L] [--unplug-after BYTES] [--stall-once] [--reports N]")),
     };
     let opt = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned();
     let location = opt("--location").unwrap_or_else(|| format!("fake-{}", std::process::id()));
@@ -281,12 +281,12 @@ pub fn run(args: &[String]) -> io::Result<()> {
         unplug_after: opt("--unplug-after").and_then(|n| n.parse().ok()),
         session: Mutex::new(None),
     });
-    let name = if kind == Kind::Serial { "Kiri test serial" } else { "Kiri test mouse" };
+    let name = if kind == Kind::Serial { "Stowlark test serial" } else { "Stowlark test mouse" };
     let (stream, reader) = usbip::connect(&crate::client::socket()?, &location, name, FULL_SPEED, 0x7f << 16 | (std::process::id() & 0x7f))?;
     *fake.session.lock().unwrap_or_else(|e| e.into_inner()) = Some(stream.try_clone()?);
-    eprintln!("kiri usb: {name} attached as {location}");
+    eprintln!("stowlark usb: {name} attached as {location}");
     let r = usbip::serve(fake.clone(), reader, stream);
     let st = fake.st.lock().unwrap_or_else(|e| e.into_inner());
-    eprintln!("kiri usb: {name} detached ({} bytes echoed, {} halts cleared)", st.echoed, st.halts_cleared);
+    eprintln!("stowlark usb: {name} detached ({} bytes echoed, {} halts cleared)", st.echoed, st.halts_cleared);
     r
 }

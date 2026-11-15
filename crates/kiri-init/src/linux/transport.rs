@@ -1,6 +1,6 @@
 //! How the agent reaches the host. In the VM that is vsock. On a Linux host
 //! the agent runs as an ordinary root process beside the daemon (no VM), and
-//! the same ports are unix sockets in `KIRI_AGENT_DIR`: the agent listens
+//! the same ports are unix sockets in `STOWLARK_AGENT_DIR`: the agent listens
 //! on `g<port>.sock` and dials the daemon's `h<port>.sock`.
 
 use std::io;
@@ -15,7 +15,7 @@ const VMADDR_CID_HOST: u32 = 2;
 /// The unix-socket directory when running as a host process.
 pub fn host_dir() -> Option<&'static PathBuf> {
     static DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
-    DIR.get_or_init(|| std::env::var_os("KIRI_AGENT_DIR").map(PathBuf::from)).as_ref()
+    DIR.get_or_init(|| std::env::var_os("STOWLARK_AGENT_DIR").map(PathBuf::from)).as_ref()
 }
 
 /// True when the agent runs on a Linux host rather than as the VM's PID 1.

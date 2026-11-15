@@ -2,7 +2,7 @@
 //! is: go-winio (the docker CLI's pipe client) then reads an empty message
 //! as EOF and sends one for CloseWrite, so half-closes work. Overlapped, so
 //! one thread can read while another writes. The client end (`open`), for
-//! kiri-win's own requests, is overlapped too, so `cancel` can end a read
+//! stowlark-win's own requests, is overlapped too, so `cancel` can end a read
 //! that waits on a log stream.
 
 use std::io;
@@ -40,7 +40,7 @@ unsafe impl Sync for Pipe {}
 
 impl Pipe {
     /// A new instance of `name`. `first` fails if another process already
-    /// serves it (another kiri-win).
+    /// serves it (another stowlark-win).
     pub fn create(name: &str, first: bool) -> io::Result<Pipe> {
         let wide: Vec<u16> = name.encode_utf16().chain([0]).collect();
         let open = PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED | if first { FILE_FLAG_FIRST_PIPE_INSTANCE } else { 0 };
@@ -62,8 +62,8 @@ impl Pipe {
         if h == INVALID_HANDLE_VALUE {
             let e = io::Error::last_os_error();
             // FILE_FLAG_FIRST_PIPE_INSTANCE answers with these when some
-            // process already serves the name: another kiri-win, or anything
-            // squatting it to pose as Kiri. Name the case for the caller.
+            // process already serves the name: another stowlark-win, or anything
+            // squatting it to pose as Stowlark. Name the case for the caller.
             if first && e.raw_os_error().is_some_and(|c| c == ERROR_ACCESS_DENIED as i32 || c == ERROR_PIPE_BUSY as i32) {
                 return Err(io::Error::new(io::ErrorKind::AddrInUse, format!("{name} is already served by another process ({e})")));
             }
@@ -239,7 +239,7 @@ fn overlapped_within(h: HANDLE, timeout: Option<std::time::Duration>, call: impl
             Err(io::Error::last_os_error())
         } else if GetOverlappedResult(h, &ov, &mut n, 1) == 0 {
             let e = io::Error::last_os_error();
-            if timed_out { Err(io::Error::new(io::ErrorKind::TimedOut, "Kiri did not answer in time")) } else { Err(e) }
+            if timed_out { Err(io::Error::new(io::ErrorKind::TimedOut, "Stowlark did not answer in time")) } else { Err(e) }
         } else {
             Ok(n)
         }

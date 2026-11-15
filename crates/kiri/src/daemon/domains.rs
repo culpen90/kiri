@@ -1,7 +1,7 @@
-//! Container domains: `http://<name>.kiri.local` reaches a running
+//! Container domains: `http://<name>.stowlark.local` reaches a running
 //! container's HTTP port, and Compose services answer at
-//! `<service>.<project>.kiri.local`. dns.rs points those names at loopback;
-//! `*.kiri.localhost` works too, with no setup, since macOS resolves
+//! `<service>.<project>.stowlark.local`. dns.rs points those names at loopback;
+//! `*.stowlark.localhost` works too, with no setup, since macOS resolves
 //! `*.localhost` by itself. An unprivileged process may listen on port 80 on
 //! the wildcard address, so serving needs no root. Only connections from
 //! this Mac are served.
@@ -62,7 +62,7 @@ impl Router {
             listener.set_nonblocking(true)?;
             let (wake_r, wake_w) = super::ports::pipe()?;
             let me = self.clone();
-            let name = if self.tls.is_some() { "kiri-domains-tls" } else { "kiri-domains" };
+            let name = if self.tls.is_some() { "stowlark-domains-tls" } else { "stowlark-domains" };
             out.push((wake_w, std::thread::Builder::new().name(name.into()).spawn(move || me.accept(&listener, &wake_r))?));
         }
         Ok(out)
@@ -90,7 +90,7 @@ impl Router {
                 // A client that never finishes its request must not hold a thread forever.
                 let _ = conn.set_read_timeout(Some(Duration::from_secs(30)));
                 let (engine, tls) = (self.engine.clone(), self.tls.clone());
-                let _ = std::thread::Builder::new().name("kiri-domain-conn".into()).spawn(move || {
+                let _ = std::thread::Builder::new().name("stowlark-domain-conn".into()).spawn(move || {
                     let _ = match tls {
                         Some(config) => serve_tls(conn, &engine, config),
                         None => serve(conn, &engine),
@@ -150,7 +150,7 @@ fn reclaim() {
 fn register(router: Arc<Router>) -> io::Result<()> {
     let mut routers = ROUTERS.lock().unwrap_or_else(PoisonError::into_inner);
     if routers.is_empty() {
-        std::thread::Builder::new().name("kiri-domains-reclaim".into()).spawn(reclaim)?;
+        std::thread::Builder::new().name("stowlark-domains-reclaim".into()).spawn(reclaim)?;
     }
     routers.push(router);
     Ok(())
@@ -173,14 +173,14 @@ fn start_router(engine: Arc<Engine>, kind: Kind, tls: Option<Arc<rustls::ServerC
 }
 
 /// Starts the HTTPS router on port 443, or the port Settings → Domains (or
-/// `KIRI_HTTPS_PORT`) gives: the same routing, behind TLS with certificates
+/// `STOWLARK_HTTPS_PORT`) gives: the same routing, behind TLS with certificates
 /// from tls.rs. Returns the port.
 pub fn start_tls(engine: Arc<Engine>) -> io::Result<u16> {
     start_router(engine, Kind::Https, Some(super::tls::server_config()?))
 }
 
 /// Starts the router on port 80, or the port Settings → Domains (or
-/// `KIRI_HTTP_PORT`) gives. Returns the port.
+/// `STOWLARK_HTTP_PORT`) gives. Returns the port.
 pub fn start(engine: Arc<Engine>) -> io::Result<u16> {
     start_router(engine, Kind::Http, None)
 }
@@ -195,8 +195,8 @@ enum Kind {
 impl Kind {
     fn var(self) -> &'static str {
         match self {
-            Kind::Http => "KIRI_HTTP_PORT",
-            Kind::Https => "KIRI_HTTPS_PORT",
+            Kind::Http => "STOWLARK_HTTP_PORT",
+            Kind::Https => "STOWLARK_HTTPS_PORT",
         }
     }
     fn key(self) -> &'static str {
@@ -212,7 +212,7 @@ impl Kind {
         }
     }
     /// The port it should use: the environment variable, then Settings →
-    /// Domains (`~/.kiri/domains.json`), then 80 or 443.
+    /// Domains (`~/.stowlark/domains.json`), then 80 or 443.
     fn port(self) -> u16 {
         env_port(self.var()).or_else(|| saved_port(self)).unwrap_or(self.default())
     }
@@ -236,8 +236,8 @@ fn saved_port(kind: Kind) -> Option<u16> {
     v[kind.key()].as_u64().and_then(|p| u16::try_from(p).ok()).filter(|&p| p != 0)
 }
 
-/// Whether this engine has router ports of its own: Kiri Dev starts its
-/// routers only then, leaving 80 and 443 to the installed Kiri.
+/// Whether this engine has router ports of its own: Stowlark Dev starts its
+/// routers only then, leaving 80 and 443 to the installed Stowlark.
 pub fn own_ports() -> bool {
     env_port(Kind::Http.var()).is_some() || settings_path().is_some_and(|p| p.exists())
 }
@@ -252,7 +252,7 @@ pub fn report() -> serde_json::Value {
         v[kind.key()] = serde_json::json!({
             "port": r.as_ref().map_or(kind.port(), |r| r.port),
             "default": kind.default(),
-            // Off: no router (its port was taken at start, or Kiri Dev
+            // Off: no router (its port was taken at start, or Stowlark Dev
             // without ports of its own). Running but not serving: it
             // stepped aside for a container.
             "running": r.is_some(),
@@ -332,7 +332,7 @@ fn serve(mut client: TcpStream, engine: &Engine) -> io::Result<()> {
     to_guest.write_all(&head)?;
     let mut from_guest = std::fs::File::from(guest.fd.try_clone()?);
     let mut client_read = client.try_clone()?;
-    let up = std::thread::Builder::new().name("kiri-domain-up".into()).spawn(move || {
+    let up = std::thread::Builder::new().name("stowlark-domain-up".into()).spawn(move || {
         let _ = io::copy(&mut client_read, &mut to_guest);
         // SAFETY: half-closing a socket we own.
         unsafe { libc::shutdown(to_guest.as_raw_fd(), libc::SHUT_WR) };
@@ -372,7 +372,7 @@ fn route(client: &mut impl ReadWrite, engine: &Engine, scheme: &str) -> io::Resu
     let Some(target) = engine.route(&host) else {
         let list: String = engine.domains().iter().map(|d| { let d = escape(d); format!("<li><a href=\"{scheme}://{d}\">{d}</a></li>") }).collect();
         let body = format!(
-            "<!doctype html><meta charset=utf-8><title>Kiri</title><body style=\"font:15px -apple-system,sans-serif;margin:40px\">\
+            "<!doctype html><meta charset=utf-8><title>Stowlark</title><body style=\"font:15px -apple-system,sans-serif;margin:40px\">\
              <h1>No running container for {}</h1><p>Running containers:</p><ul>{}</ul>",
             escape(&host),
             if list.is_empty() { "<li>none</li>".to_owned() } else { list }
@@ -384,7 +384,7 @@ fn route(client: &mut impl ReadWrite, engine: &Engine, scheme: &str) -> io::Resu
     match engine.relay_to(target.ip, port) {
         Ok(g) => Ok(Some((head, g))),
         Err(e) => {
-            respond(client, 502, "Bad Gateway", &format!("Kiri could not reach the container: {}", escape(&e.to_string())))?;
+            respond(client, 502, "Bad Gateway", &format!("Stowlark could not reach the container: {}", escape(&e.to_string())))?;
             Ok(None)
         }
     }
@@ -395,7 +395,7 @@ fn route(client: &mut impl ReadWrite, engine: &Engine, scheme: &str) -> io::Resu
 pub struct Target {
     pub ip: [u8; 4],
     pub id: String,
-    /// `dev.kiri.http.port`: the owner said so.
+    /// `dev.stowlark.http.port`: the owner said so.
     pub label: Option<u16>,
     /// Container ports published with `-p` or `-P`.
     pub published: Vec<u16>,

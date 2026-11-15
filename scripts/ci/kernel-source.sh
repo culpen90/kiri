@@ -18,13 +18,13 @@ cd "$tmp/linux-$kver"
 for patch in "$root"/guest/kernel/patches/*.patch; do
   patch -p1 -s < "$patch"
 done
-mkdir kiri
-cp "$root/guest/kernel/build.sh" "$root/guest/kernel/kiri.config" "$root/guest/kernel/kiri-x86_64.config" kiri/
-cp -R "$root/guest/kernel/patches" kiri/
+mkdir stowlark
+cp "$root/guest/kernel/build.sh" "$root/guest/kernel/kiri.config" "$root/guest/kernel/kiri-x86_64.config" stowlark/
+cp -R "$root/guest/kernel/patches" stowlark/
 printf '%s\n' \
-  "Kiri guest kernel corresponding source" \
+  "Stowlark guest kernel corresponding source" \
   "Upstream: https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$kver.tar.xz" \
-  "All patches in kiri/patches have already been applied to this tree." \
-  "Build with kiri/build.sh as described in the Kiri repository." > kiri/SOURCE
+  "All patches in stowlark/patches have already been applied to this tree." \
+  "Build with stowlark/build.sh as described in the Stowlark repository." > stowlark/SOURCE
 mkdir -p "$(dirname "$out")"
 XZ_OPT=${XZ_OPT:--T0} tar -cJf "$out" -C "$tmp" "linux-$kver"

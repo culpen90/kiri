@@ -1,19 +1,19 @@
-//! `kiri diag`: Kiri's own log, read or followed, and the report to send us.
+//! `stowlark diag`: Stowlark's own log, read or followed, and the report to send us.
 //!
 //! The report is one text file: versions and the system, whether the
 //! engine runs, the last lines of every log, recent crash files and macOS's
-//! own crash reports for Kiri, all through [`Redactor::for_user`].
+//! own crash reports for Stowlark, all through [`Redactor::for_user`].
 //!
 //! # Kiri Cloud
 //!
-//! `kiri diag report --send` (and, only when the person turned crash
-//! reports on, each new crash file) goes to `POST /v1/reports` on the Kiri
+//! `stowlark diag report --send` (and, only when the person turned crash
+//! reports on, each new crash file) goes to `POST /v1/reports` on the Stowlark
 //! Share edge, as JSON of at most 1 MB:
 //!
 //! ```text
 //! {"kind":"crash"|"report","part":"ui"|"daemon"|"cli","app_version":"0.1.4",
-//!  "flavor":"kiri"|"kiri-dev","os":"macOS 26.1","arch":"aarch64",
-//!  "install_id":"<32 hex digits, kept in ~/.kiri/install_id>",
+//!  "flavor":"stowlark"|"stowlark-dev","os":"macOS 26.1","arch":"aarch64",
+//!  "install_id":"<32 hex digits, kept in ~/.stowlark/install_id>",
 //!  "created_at":"<RFC 3339>","text":"<the redacted report or crash>"}
 //! ```
 //!
@@ -37,10 +37,10 @@ use super::Part;
 use crate::daemon::time;
 
 const USAGE: &str = "\
-usage: kiri diag logs [-f] [--ui|--engine|--cli] [--errors] [--op ID] [-n N]
-       kiri diag report [--out PATH] [--send]
+usage: stowlark diag logs [-f] [--ui|--engine|--cli] [--errors] [--op ID] [-n N]
+       stowlark diag report [--out PATH] [--send]
 
-logs     Kiri's own log, oldest first: the window (--ui), the engine
+logs     Stowlark's own log, oldest first: the window (--ui), the engine
          (--engine) and the command line (--cli), all three by default.
          --errors keeps warnings and errors; --op ID one window action's
          lines (the id an error's Details show); -n N lines (default 50);
@@ -54,7 +54,7 @@ report   One file to send us: versions, whether the engine runs, recent
 pub const MAX_BODY: usize = 1 << 20;
 /// Lines of each log in a report.
 const REPORT_LINES: usize = 300;
-/// How much of one log a report or `kiri diag logs` reads, from the end.
+/// How much of one log a report or `stowlark diag logs` reads, from the end.
 const TAIL_BYTES: u64 = 512 << 10;
 /// How much of each log a report keeps.
 const LOG_BUDGET: usize = 120 << 10;
@@ -353,10 +353,10 @@ fn crash_name(name: &str) -> Option<(u64, Part)> {
 }
 
 /// The report's text, redacted. `home` holds `Library/Logs/DiagnosticReports`;
-/// `state` is `~/.kiri`.
+/// `state` is `~/.stowlark`.
 pub fn assemble(home: &Path, state: &Path, facts: &Facts, redactor: &Redactor) -> String {
     let mut s = String::new();
-    let _ = writeln!(s, "Kiri diagnostics report");
+    let _ = writeln!(s, "Stowlark diagnostics report");
     let _ = writeln!(s, "Created:  {}", time::rfc3339(facts.created));
     let _ = writeln!(s, "App:      {} {} ({}), made by the {}", crate::flavor::APP, env!("CARGO_PKG_VERSION"), crate::flavor::CONTEXT, super::part().name());
     let _ = writeln!(s, "System:   {}", super::system().line());
@@ -403,7 +403,7 @@ pub fn assemble(home: &Path, state: &Path, facts: &Facts, redactor: &Redactor) -
     // hang the system killed, an abort inside a framework).
     let reports = home.join("Library/Logs/DiagnosticReports");
     let month = SystemTime::now() - Duration::from_secs(30 * 86_400);
-    let ips: Vec<_> = newest(&reports, |n| n.to_ascii_lowercase().starts_with("kiri") && n.ends_with(".ips")).into_iter().filter(|(_, t)| *t >= month).collect();
+    let ips: Vec<_> = newest(&reports, |n| n.to_ascii_lowercase().starts_with("stowlark") && n.ends_with(".ips")).into_iter().filter(|(_, t)| *t >= month).collect();
     let _ = writeln!(s, "\n==== macOS crash reports ({}, last 30 days: {}) ====", reports.display(), ips.len());
     for (path, _) in ips.iter().take(MAC_REPORTS) {
         let text = String::from_utf8_lossy(&std::fs::read(path).unwrap_or_default()).into_owned();
@@ -414,7 +414,7 @@ pub fn assemble(home: &Path, state: &Path, facts: &Facts, redactor: &Redactor) -
     redactor.apply(&s)
 }
 
-/// This Mac's report, as `kiri diag report` and the window make it; the
+/// This Mac's report, as `stowlark diag report` and the window make it; the
 /// window may add the container list.
 pub fn report_text(containers: bool) -> io::Result<String> {
     let home = std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| io::Error::other("HOME is not set"))?;
@@ -423,13 +423,13 @@ pub fn report_text(containers: bool) -> io::Result<String> {
     Ok(assemble(&home, &state, &facts, &Redactor::for_user()))
 }
 
-/// `~/Desktop/kiri-report-20261028-104107.txt` (the home folder when there
+/// `~/Desktop/stowlark-report-20261028-104107.txt` (the home folder when there
 /// is no Desktop).
 fn default_out() -> io::Result<PathBuf> {
     let home = std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| io::Error::other("HOME is not set"))?;
     let desktop = home.join("Desktop");
     let stamp: String = local(&super::now()).chars().filter(|c| c.is_ascii_digit() || *c == ' ').take(15).collect::<String>().replace(' ', "-");
-    Ok(if desktop.is_dir() { desktop } else { home }.join(format!("kiri-report-{stamp}.txt")))
+    Ok(if desktop.is_dir() { desktop } else { home }.join(format!("stowlark-report-{stamp}.txt")))
 }
 
 /// Writes the report, readable only by this user. Returns where.
@@ -477,7 +477,7 @@ fn report_cli(args: &[String]) -> io::Result<()> {
 
 // ---------------------------------------------------------------- Kiri Cloud
 
-/// `~/.kiri/install_id`: 128 random bits in hex, made on first use, so
+/// `~/.stowlark/install_id`: 128 random bits in hex, made on first use, so
 /// reports from one Mac can be told apart without saying whose it is.
 pub fn install_id(state: &Path) -> String {
     let path = state.join("install_id");
@@ -676,7 +676,7 @@ fn without_names(text: &str, lines: &[Value]) -> String {
 }
 
 /// Every `name` in `s` that stands alone (not inside a longer word, so a
-/// container `web` leaves `webpki` be, but not `web.kiri.local`).
+/// container `web` leaves `webpki` be, but not `web.stowlark.local`).
 fn replace_whole(s: &str, name: &str, with: &str) -> String {
     let joins = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_' || c == '-');
     let (mut out, mut last, mut from) = (String::with_capacity(s.len()), 0, 0);
@@ -709,7 +709,7 @@ pub fn send_crash(name: &str) -> io::Result<String> {
         let text = std::fs::read_to_string(dir.join(name))?;
         return sent_id(&text).map(str::to_owned).ok_or_else(|| io::Error::other("it was sent, but its id isn't in the file"));
     }
-    let claimed = claim(&dir, name).ok_or_else(|| io::Error::other("Kiri is sending it already"))?;
+    let claimed = claim(&dir, name).ok_or_else(|| io::Error::other("Stowlark is sending it already"))?;
     send_claimed(&dir, name, &claimed, &Redactor::for_user())
 }
 
@@ -747,7 +747,7 @@ pub fn page_crashes(n: usize) -> Value {
 /// Sends waiting crash files in the background after `delay`, then every
 /// `every` if given (the engine runs for days).
 pub fn spawn_crash_sender(delay: Duration, every: Option<Duration>) {
-    let _ = std::thread::Builder::new().name("kiri-crash-send".into()).spawn(move || {
+    let _ = std::thread::Builder::new().name("stowlark-crash-send".into()).spawn(move || {
         std::thread::sleep(delay);
         loop {
             send_crashes();
@@ -803,7 +803,7 @@ mod tests {
     use super::*;
 
     fn temp_home(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("kiri-report-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-report-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -816,7 +816,7 @@ mod tests {
     #[test]
     fn reads_the_last_lines_of_several_logs_in_time_order() {
         let home = temp_home("read");
-        let state = home.join(".kiri");
+        let state = home.join(".stowlark");
         std::fs::create_dir_all(state.join("logs")).unwrap();
         let tagged = |t: &str, part: Part, msg: &str| super::super::json_line(t, Level::Info, part, msg, &[("op", "run-7c2e".into())]);
         let daemon = [tagged("2026-10-28T09:00:01.000Z", Part::Daemon, "a"), line("2026-10-28T09:00:03.000Z", Level::Error, Part::Daemon, "c")].join("\n");
@@ -839,10 +839,10 @@ mod tests {
             line("image pull failed", &[("image", "registry.acme.corp/secret-app:1.2".into()), ("error", "registry.acme.corp/secret-app:1.2: unauthorized".into())]),
             line("container exited", &[("name", "web".into()), ("image", "nginx".into())]),
         ];
-        let text = format!("panic at webpki: web.kiri.local is gone\n{}\n{}", render(&lines[0], true, false), render(&lines[1], true, false));
+        let text = format!("panic at webpki: web.stowlark.local is gone\n{}\n{}", render(&lines[0], true, false), render(&lines[1], true, false));
         let out = without_names(&text, &lines);
         assert!(!out.contains("secret-app") && !out.contains("acme") && !out.contains("nginx"), "{out}");
-        assert!(out.contains("webpki") && out.contains("[name].kiri.local") && out.contains("name=[name]"), "{out}");
+        assert!(out.contains("webpki") && out.contains("[name].stowlark.local") && out.contains("name=[name]"), "{out}");
     }
 
     #[test]
@@ -865,7 +865,7 @@ mod tests {
     #[test]
     fn assembles_a_redacted_report() {
         let home = temp_home("assemble");
-        let state = home.join(".kiri");
+        let state = home.join(".stowlark");
         let h = home.display().to_string();
         std::fs::create_dir_all(state.join("logs")).unwrap();
         std::fs::create_dir_all(state.join("crashes")).unwrap();
@@ -873,29 +873,29 @@ mod tests {
         std::fs::create_dir_all(&reports).unwrap();
         let mut log = String::new();
         for i in 0..400 {
-            log += &line(&format!("2026-10-28T09:{:02}:{:02}.000Z", i / 60, i % 60), Level::Info, Part::Daemon, &format!("event {i} in {h}/.kiri"));
+            log += &line(&format!("2026-10-28T09:{:02}:{:02}.000Z", i / 60, i % 60), Level::Info, Part::Daemon, &format!("event {i} in {h}/.stowlark"));
             log.push('\n');
         }
         std::fs::write(state.join("logs/daemon.log"), log).unwrap();
-        std::fs::write(state.join("daemon.log"), format!("2026-10-28T09:00:00.000Z kiri daemon: ready on unix://{h}/.kiri/run/docker.sock\n")).unwrap();
-        std::fs::write(state.join("crashes/1792800000-daemon.txt"), "Kiri crash report\nMessage:  boom with Bearer abcdefghijklmnop\n").unwrap();
-        std::fs::write(state.join("crashes/1792700000-ui.sent.txt"), "Kiri crash report\nMessage:  older\n").unwrap();
-        std::fs::write(reports.join("kiri-2026-10-28-094107.ips"), format!("{{\"app_name\":\"kiri\",\"crashReporterKey\":\"ABCD-1234\"}}\n{{\"procPath\":\"{h}/Applications/Kiri.app\"}}")).unwrap();
+        std::fs::write(state.join("daemon.log"), format!("2026-10-28T09:00:00.000Z stowlark daemon: ready on unix://{h}/.stowlark/run/docker.sock\n")).unwrap();
+        std::fs::write(state.join("crashes/1792800000-daemon.txt"), "Stowlark crash report\nMessage:  boom with Bearer abcdefghijklmnop\n").unwrap();
+        std::fs::write(state.join("crashes/1792700000-ui.sent.txt"), "Stowlark crash report\nMessage:  older\n").unwrap();
+        std::fs::write(reports.join("stowlark-2026-10-28-094107.ips"), format!("{{\"app_name\":\"stowlark\",\"crashReporterKey\":\"ABCD-1234\"}}\n{{\"procPath\":\"{h}/Applications/Stowlark.app\"}}")).unwrap();
         std::fs::write(reports.join("Safari-2026-10-28-094107.ips"), "not ours").unwrap();
         let facts = Facts { engine: "not running".into(), crash_reports: false, created: UNIX_EPOCH + Duration::from_secs(1_792_800_000), containers: Some("web  nginx:alpine  Up 2 hours\n".into()) };
         let text = assemble(&home, &state, &facts, &Redactor::new(Some(h.clone()), Vec::new()));
 
-        assert!(text.starts_with("Kiri diagnostics report\nCreated:  2026-10-24T00:00:00"), "{text}");
+        assert!(text.starts_with("Stowlark diagnostics report\nCreated:  2026-10-24T00:00:00"), "{text}");
         assert!(text.contains("Engine:   not running") && text.contains("Crash reports: not sent automatically"));
-        assert!(text.contains("==== Log: engine (~/.kiri/logs/daemon.log) ===="));
+        assert!(text.contains("==== Log: engine (~/.stowlark/logs/daemon.log) ===="));
         // The last 300 of 400 lines.
-        assert!(text.contains("event 399 in ~/.kiri") && text.contains("event 100 in") && !text.contains("event 99 in"));
+        assert!(text.contains("event 399 in ~/.stowlark") && text.contains("event 100 in") && !text.contains("event 99 in"));
         assert!(text.contains("==== Log: window") && text.contains("(empty)"));
-        assert!(text.contains("kiri daemon: ready on unix://~/.kiri/run/docker.sock"));
+        assert!(text.contains("stowlark daemon: ready on unix://~/.stowlark/run/docker.sock"));
         assert!(text.contains("==== Containers (names, images and status only) ====\nweb  nginx:alpine  Up 2 hours\n"));
         assert!(text.contains("2 in all") && text.contains("--- 1792800000-daemon.txt ---") && text.contains("boom with Bearer [redacted]"));
         assert!(text.find("1792800000-daemon").unwrap() < text.find("1792700000-ui").unwrap(), "newest crash first");
-        assert!(text.contains("--- kiri-2026-10-28-094107.ips ---") && text.contains("~/Applications/Kiri.app") && !text.contains("Safari"));
+        assert!(text.contains("--- stowlark-2026-10-28-094107.ips ---") && text.contains("~/Applications/Stowlark.app") && !text.contains("Safari"));
         assert!(!text.contains("ABCD-1234") && !text.contains(&h), "{text}");
         assert!(text.len() < MAX_BODY);
         let _ = std::fs::remove_dir_all(&home);
@@ -909,7 +909,7 @@ mod tests {
         for k in ["kind", "part", "app_version", "flavor", "os", "arch", "install_id", "created_at", "text"] {
             assert!(keys.contains(&k), "{k} missing");
         }
-        assert_eq!((v["kind"].as_str(), v["part"].as_str(), v["flavor"].as_str()), (Some("crash"), Some("daemon"), Some("kiri")));
+        assert_eq!((v["kind"].as_str(), v["part"].as_str(), v["flavor"].as_str()), (Some("crash"), Some("daemon"), Some("stowlark")));
         assert_eq!(v["created_at"].as_str().unwrap()[..19], *"2026-10-24T00:00:00");
         // Quotes and newlines double in JSON: still under 1 MB.
         let big = "\"\n".repeat(700_000);
@@ -930,8 +930,8 @@ mod tests {
     #[test]
     fn lists_crashes_with_their_ids() {
         let home = temp_home("list");
-        std::fs::write(home.join("1792800000-daemon.txt"), "Kiri crash report\nLocation: vm/balloon.rs:212:41\nMessage:  boom\n").unwrap();
-        std::fs::write(home.join("1792700000-ui.sent.txt"), "Kiri crash report\nMessage:  older\n\nSent to Kiri Cloud as rep_51c0e8d4\n").unwrap();
+        std::fs::write(home.join("1792800000-daemon.txt"), "Stowlark crash report\nLocation: vm/balloon.rs:212:41\nMessage:  boom\n").unwrap();
+        std::fs::write(home.join("1792700000-ui.sent.txt"), "Stowlark crash report\nMessage:  older\n\nSent to Kiri Cloud as rep_51c0e8d4\n").unwrap();
         std::fs::write(home.join(".window-opened"), "1").unwrap();
         let list = crash_list(&home, 10);
         assert_eq!(list.len(), 2);
@@ -941,12 +941,12 @@ mod tests {
         assert_eq!(crash_list(&home, 1).len(), 1);
         assert!(claim(&home, "notes.txt").is_none());
         // An upload carries its part's lines up to the crash, not after.
-        let state = home.join(".kiri");
+        let state = home.join(".stowlark");
         std::fs::create_dir_all(state.join("logs")).unwrap();
         let log: Vec<String> = (0..250).map(|i| line(&format!("2026-10-24T00:{:02}:{:02}.000Z", i / 60, i % 60), Level::Info, Part::Daemon, &format!("e{i}"))).collect();
         std::fs::write(state.join("logs/daemon.log"), log.join("\n") + "\n").unwrap();
-        let up = crash_upload(&state, 1_792_800_000 + 240, Part::Daemon, "Kiri crash report\n");
-        assert!(up.starts_with("Kiri crash report\n\n==== The last 200 log lines before it ====\n"), "{up}");
+        let up = crash_upload(&state, 1_792_800_000 + 240, Part::Daemon, "Stowlark crash report\n");
+        assert!(up.starts_with("Stowlark crash report\n\n==== The last 200 log lines before it ====\n"), "{up}");
         assert!(up.contains(" e240") && up.contains(" e41\n") && !up.contains(" e40\n") && !up.contains(" e241"), "{up}");
         assert!(claim(&home, "1792800000-daemon.txt").is_some_and(|p| p.ends_with("1792800000-daemon.txt.sending")));
         assert!(claim(&home, "1792800000-daemon.txt").is_none(), "claimed once");

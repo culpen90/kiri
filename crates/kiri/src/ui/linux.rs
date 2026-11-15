@@ -1,5 +1,5 @@
 //! What the Mac's `setup`, `update` and `import` do for the window, as Linux
-//! does it: the package manager installs and updates Kiri, the engine is a
+//! does it: the package manager installs and updates Stowlark, the engine is a
 //! system service, and there is no OrbStack to import from.
 
 /// Why the window can't reach the engine, and what to do about it.
@@ -7,10 +7,10 @@ pub fn engine_down() -> std::io::Error {
     let socket = std::path::Path::new(crate::client::SERVICE_SOCKET);
     std::io::Error::other(match std::os::unix::net::UnixStream::connect(socket) {
         Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
-            "This session can't reach Kiri yet: log out and back in once, so your account's new kiri group applies"
+            "This session can't reach Stowlark yet: log out and back in once, so your account's new stowlark group applies"
         }
-        _ if socket.exists() => "Kiri's engine isn't answering: sudo systemctl restart kiri",
-        _ => "Kiri's engine isn't running: sudo systemctl enable --now kiri",
+        _ if socket.exists() => "Stowlark's engine isn't answering: sudo systemctl restart stowlark",
+        _ => "Stowlark's engine isn't running: sudo systemctl enable --now stowlark",
     })
 }
 
@@ -22,19 +22,19 @@ pub mod setup {
         Ok(())
     }
 
-    /// `docker build` through Kiri's BuildKit builder, as on the Mac (needs
+    /// `docker build` through Stowlark's BuildKit builder, as on the Mac (needs
     /// the docker-buildx package, which the .deb pulls in).
     pub use crate::builds::ensure_builder;
 
     pub fn domains() -> io::Result<()> {
-        Err(io::Error::other("*.kiri.local isn't on Linux yet; containers answer at <name>.kiri.localhost"))
+        Err(io::Error::other("*.stowlark.local isn't on Linux yet; containers answer at <name>.stowlark.localhost"))
     }
 
     pub fn remove_domains() -> io::Result<()> {
         Ok(())
     }
 
-    /// The package's service provides /var/run/docker.sock (kiri.service).
+    /// The package's service provides /var/run/docker.sock (stowlark.service).
     pub fn docker_socket_note() -> Option<String> {
         None
     }
@@ -54,7 +54,7 @@ pub mod update {
     use std::path::PathBuf;
     use std::sync::atomic::AtomicBool;
 
-    const BY_APT: &str = "on Linux, Kiri updates with your other packages (apt or dnf)";
+    const BY_APT: &str = "on Linux, Stowlark updates with your other packages (apt or dnf)";
 
     #[derive(serde::Serialize)]
     pub struct Release {
@@ -87,9 +87,9 @@ pub mod update {
         std::env::current_exe()
     }
 
-    /// The engine is the `kiri` system service: restarting it is root's.
+    /// The engine is the `stowlark` system service: restarting it is root's.
     pub fn restart_engine() {
-        crate::diag::info!("the engine restarts with: sudo systemctl restart kiri");
+        crate::diag::info!("the engine restarts with: sudo systemctl restart stowlark");
     }
 }
 
@@ -136,15 +136,15 @@ pub mod onboarding {
 
     const SOCKET: &str = crate::client::SERVICE_SOCKET;
     /// The package's command; pkexec wants a full path.
-    const KIRI: &str = "/usr/bin/kiri";
+    const CLI: &str = "/usr/bin/stowlark";
 
     /// Each check's state for the page: "ok", "no" (fix it), "bad" (broken:
     /// fix it), "off" (can't tell until an earlier one passes) or "restart"
-    /// (fixed, applies after signing in again). `ready` when Kiri can run
+    /// (fixed, applies after signing in again). `ready` when Stowlark can run
     /// containers for this account; docker and builds are offered, not required
     /// (someone may keep docker on another engine on purpose).
     pub fn checks() -> serde_json::Value {
-        let installed = ["/lib/systemd/system/kiri.service", "/usr/lib/systemd/system/kiri.service", "/etc/systemd/system/kiri.service"]
+        let installed = ["/lib/systemd/system/stowlark.service", "/usr/lib/systemd/system/stowlark.service", "/etc/systemd/system/stowlark.service"]
             .iter()
             .any(|p| Path::new(p).exists());
         let (running, access) = match std::os::unix::net::UnixStream::connect(SOCKET) {
@@ -162,7 +162,7 @@ pub mod onboarding {
         let ready = installed && usable;
         // Setup is done when docker and builds pass too, or someone chose to
         // skip them (docker kept on another engine on purpose): until then
-        // the checklist stays and Open Kiri waits.
+        // the checklist stays and Open Stowlark waits.
         let skipped = skipped();
         let done = |k: &str, state: &str| state == "ok" || skipped.iter().any(|s| s == k);
         let complete = ready && done("docker", docker) && done("builds", builds);
@@ -182,7 +182,7 @@ pub mod onboarding {
     }
 
     /// The optional checks someone chose to skip ("docker", "builds"), kept
-    /// in the window's settings (~/.kiri/ui.json, `setupSkip`).
+    /// in the window's settings (~/.stowlark/ui.json, `setupSkip`).
     fn skipped() -> Vec<String> {
         crate::ui::prefs()["setupSkip"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_owned)).collect()
     }
@@ -198,7 +198,7 @@ pub mod onboarding {
     }
 
     /// Fixes one check, or "all" of them; Err says why it couldn't. Root's
-    /// part (the engine, access) is one `kiri host-access` through pkexec, so
+    /// part (the engine, access) is one `stowlark host-access` through pkexec, so
     /// the system asks for the password once.
     pub fn fix(what: &str) -> io::Result<()> {
         let c = checks();
@@ -217,23 +217,23 @@ pub mod onboarding {
 
     fn host_access() -> io::Result<()> {
         if which("pkexec").is_none() {
-            return Err(io::Error::other(format!("this system has no pkexec to ask for your password: in a terminal, run  sudo kiri host-access {}", user())));
+            return Err(io::Error::other(format!("this system has no pkexec to ask for your password: in a terminal, run  sudo stowlark host-access {}", user())));
         }
-        let out = Command::new("pkexec").args([KIRI, "host-access", &user()]).stdin(Stdio::null()).output()?;
+        let out = Command::new("pkexec").args([CLI, "host-access", &user()]).stdin(Stdio::null()).output()?;
         match out.status.code() {
             Some(0) | Some(10) => Ok(()),
             // pkexec: 126 the dialog was dismissed or the password refused, 127 not allowed.
             Some(126) | Some(127) => Err(io::Error::other("Not changed: the password prompt was cancelled")),
             _ => {
                 let why = String::from_utf8_lossy(&out.stderr);
-                let why = why.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("kiri host-access failed").trim_start_matches("kiri: ");
+                let why = why.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("stowlark host-access failed").trim_start_matches("stowlark: ");
                 Err(io::Error::other(why.to_owned()))
             }
         }
     }
 
-    /// `docker` reaches Kiri: its current endpoint is Kiri's socket, or the
-    /// standard socket that leads to it. Kiri's own `docker` (the package's
+    /// `docker` reaches Stowlark: its current endpoint is Stowlark's socket, or the
+    /// standard socket that leads to it. Stowlark's own `docker` (the package's
     /// wrapper) does unless someone chose another context.
     pub fn docker_uses_kiri() -> bool {
         let Some(docker) = crate::client::docker_cli() else { return false };
@@ -246,11 +246,11 @@ pub mod onboarding {
         }
     }
 
-    /// The `kiri` docker context, made if missing, as the current one.
+    /// The `stowlark` Docker context, made if missing, as the current one.
     fn use_kiri() -> io::Result<()> {
-        let docker = crate::client::docker_cli().ok_or_else(|| io::Error::other("no docker command here: install the kiri package (not kiri-lite) or docker's CLI"))?;
-        let _ = Command::new(&docker).args(["context", "create", "kiri", "--docker", &format!("host=unix://{SOCKET}")]).stdout(Stdio::null()).stderr(Stdio::null()).status();
-        super::setup::use_context("kiri")
+        let docker = crate::client::docker_cli().ok_or_else(|| io::Error::other("no docker command here: install the stowlark package (not stowlark-lite) or docker's CLI"))?;
+        let _ = Command::new(&docker).args(["context", "create", "stowlark", "--docker", &format!("host=unix://{SOCKET}")]).stdout(Stdio::null()).stderr(Stdio::null()).status();
+        super::setup::use_context("stowlark")
     }
 
     fn builder_made() -> bool {
@@ -261,11 +261,11 @@ pub mod onboarding {
         dir.is_some_and(|d| d.join("instances").join(crate::builds::BUILDER.get()).exists())
     }
 
-    /// In the kiri group by /etc/group, but this process (this session) isn't.
+    /// In the stowlark group by /etc/group, but this process (this session) isn't.
     fn in_group_not_session() -> bool {
         let me = user();
-        let listed = crate::daemon::access::members("kiri").is_ok_and(|m| m.contains(&me));
-        listed && !session_has_group("kiri")
+        let listed = crate::daemon::access::members("stowlark").is_ok_and(|m| m.contains(&me));
+        listed && !session_has_group("stowlark")
     }
 
     fn session_has_group(group: &str) -> bool {
@@ -300,7 +300,7 @@ pub mod onboarding {
         std::env::split_paths(&std::env::var_os("PATH")?).map(|d| d.join(cmd)).find(|p| p.is_file())
     }
 
-    /// Ends this session, so the next sign-in has the kiri group: the
+    /// Ends this session, so the next sign-in has the stowlark group: the
     /// desktop's own log-out (it asks to confirm), else logind.
     pub fn log_out() -> io::Result<()> {
         if which("gnome-session-quit").is_some() && Command::new("gnome-session-quit").arg("--logout").status()?.success() {

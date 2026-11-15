@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-labelledby="title">
+  <title id="title">Stowlark app icon</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22483F"/>
+      <stop offset="1" stop-color="#102D28"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="230" fill="url(#tile)"/>
+  <g transform="translate(69.208 109.462) scale(13.418)">
+    <path fill="#89F2C4" fill-rule="evenodd" d="M4 46l17-14L9 14l26 9 10-8a9 9 0 0 1 10 0l7 5-7 4a25 25 0 0 1-24 22H4ZM51.6 20.6a1.7 1.7 0 1 0-3.4 0 1.7 1.7 0 1 0 3.4 0Z"/>
+  <path fill="#EFF7F3" d="M9 14l26 9-6 12-8-3Z"/>
+  </g>
+</svg>

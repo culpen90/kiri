@@ -206,7 +206,8 @@ pub fn terminal(name: &str) -> io::Result<()> {
         return Err(io::Error::other("not a container name"));
     }
     let docker = client::docker_cli().ok_or_else(|| io::Error::other("no docker CLI found"))?;
-    let line = format!("'{}' --context kiri exec -it {name} sh -c 'exec $(command -v bash || command -v sh)'", docker.display());
+    let context = crate::flavor::CONTEXT.get();
+    let line = format!("'{}' --context {context} exec -it {name} sh -c 'exec $(command -v bash || command -v sh)'", docker.display());
     // A .command file Terminal opens, rather than scripting Terminal, which
     // would make macOS ask for permission to control it. It removes itself.
     let dir = super::state_dir().ok_or_else(|| io::Error::other("HOME is not set"))?.join("run");
@@ -239,15 +240,15 @@ fn linux_terminal(file: &std::path::Path) -> io::Result<()> {
 
 /// The container's root on the Mac (the Finder view), and `path` inside it.
 /// Only plain components are allowed, so nothing outside the container is read.
-/// `host_path`, once the engine's files are really at `~/Kiri`. On the Mac
+/// `host_path`, once the engine's files are really at `~/Stowlark`. On the Mac
 /// they are there only while the engine's Finder mount is: it is skipped
 /// when the folder already holds the person's own files, and those must
 /// never be listed as the container's.
 fn shown_path(name: &str, path: &str) -> io::Result<PathBuf> {
     #[cfg(target_os = "macos")]
     if !crate::daemon::nfs::is_mounted() {
-        let dir = crate::daemon::nfs::mount_point().map_or_else(|_| "~/Kiri".into(), |d| d.display().to_string());
-        return Err(io::Error::other(format!("Container files show through {dir}, and the engine has nothing mounted there now. If {dir} has your own files in it, Kiri leaves them alone: move them and restart the engine.")));
+        let dir = crate::daemon::nfs::mount_point().map_or_else(|_| "~/Stowlark".into(), |d| d.display().to_string());
+        return Err(io::Error::other(format!("Container files show through {dir}, and the engine has nothing mounted there now. If {dir} has your own files in it, Stowlark leaves them alone: move them and restart the engine.")));
     }
     host_path(name, path)
 }
@@ -338,10 +339,10 @@ pub fn reveal(name: &str, path: &str) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     /// Against a running daemon with a running `myapp` nginx container:
-    /// `KIRI_LIVE=1 cargo test -p kiri live_container_page -- --nocapture`.
+    /// `STOWLARK_LIVE=1 cargo test -p stowlark live_container_page -- --nocapture`.
     #[test]
     fn live_container_page() {
-        if std::env::var_os("KIRI_LIVE").is_none() {
+        if std::env::var_os("STOWLARK_LIVE").is_none() {
             return;
         }
         let mut s = crate::client::Stream::open("/containers/myapp/logs?follow=1&stdout=1&stderr=1").unwrap();
@@ -378,8 +379,8 @@ mod tests {
 
     #[test]
     fn keeps_paths_inside_the_container() {
-        assert!(super::host_path("web", "/etc/nginx/nginx.conf").unwrap().ends_with("Kiri/web/etc/nginx/nginx.conf"));
-        assert!(super::host_path("web", "").unwrap().ends_with("Kiri/web"));
+        assert!(super::host_path("web", "/etc/nginx/nginx.conf").unwrap().ends_with("Stowlark/web/etc/nginx/nginx.conf"));
+        assert!(super::host_path("web", "").unwrap().ends_with("Stowlark/web"));
         assert!(super::host_path("web", "/etc/../../other").is_err());
         assert!(super::host_path("../web", "/").is_err());
         assert!(super::host_path("", "/").is_err());

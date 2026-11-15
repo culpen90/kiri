@@ -1,9 +1,9 @@
-//! Kiri's images as a registry, for its BuildKit: `FROM myapp:dev` (an
+//! Stowlark's images as a registry, for its BuildKit: `FROM myapp:dev` (an
 //! image built or loaded here, never pushed) works as it does with Docker.
 //!
 //! A read-only registry API on 127.0.0.1, which containers reach at
 //! host.docker.internal. buildkitd.toml names it as a mirror of every
-//! registry Kiri has images from; a mirror that answers 404 is skipped, so
+//! registry Stowlark has images from; a mirror that answers 404 is skipped, so
 //! anything not here comes from the registry itself. Paths carry a secret
 //! (`/v2/<token>/<registry>/<repo>/…`), so other local users can't read
 //! images through it. Manifests are made from the store's records (layers,
@@ -72,18 +72,18 @@ pub fn start(engine: &Arc<Engine>) {
             match bind_freely(gateway, port) {
                 Ok(l) => {
                     let me = me.clone();
-                    let _ = std::thread::Builder::new().name("kiri-build-mirror".into()).spawn(move || serve(l, me));
+                    let _ = std::thread::Builder::new().name("stowlark-build-mirror".into()).spawn(move || serve(l, me));
                 }
                 Err(e) => crate::diag::warn!("image mirror not on the bridge; builds pull from registries", error = e),
             }
         }
-        std::thread::Builder::new().name("kiri-build-mirror".into()).spawn(move || serve(listener, me)).ok()?;
+        std::thread::Builder::new().name("stowlark-build-mirror".into()).spawn(move || serve(listener, me)).ok()?;
         crate::diag::info!("image mirror for builds", port = port);
         Some(port)
     });
 }
 
-/// buildkitd.toml lines: this mirror for every registry Kiri has images
+/// buildkitd.toml lines: this mirror for every registry Stowlark has images
 /// from (Docker Hub always), over plain HTTP.
 #[cfg(target_os = "linux")]
 fn mirror_host(networks: &super::network::Networks) -> String {
@@ -167,7 +167,7 @@ fn serve(listener: TcpListener, engine: Weak<Engine>) {
     for conn in listener.incoming() {
         let Ok(conn) = conn else { continue };
         let Some(engine) = engine.upgrade() else { return };
-        let _ = std::thread::Builder::new().name("kiri-build-mirror".into()).spawn(move || {
+        let _ = std::thread::Builder::new().name("stowlark-build-mirror".into()).spawn(move || {
             let _ = conn.set_read_timeout(Some(Duration::from_secs(30)));
             let _ = answer(conn, &engine);
         });
@@ -218,7 +218,7 @@ enum Found {
     Blob(std::path::PathBuf, String),
 }
 
-/// An image's manifest as Kiri serves it, and its digest.
+/// An image's manifest as Stowlark serves it, and its digest.
 fn manifest(store: &kiri_image::Store, i: &Image) -> Option<(Vec<u8>, String)> {
     let config_size = std::fs::metadata(store.blob_path(&i.config_digest).ok()?).ok()?.len();
     let m = json!({
@@ -279,7 +279,7 @@ mod tests {
 
     #[test]
     fn mirror_host_matches_the_host_network() {
-        let dir = std::env::temp_dir().join(format!("kiri-mirror-host-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-mirror-host-{}", std::process::id()));
         let networks = super::super::network::Networks::load(&dir).unwrap();
         #[cfg(target_os = "linux")]
         assert_eq!(mirror_host(&networks), super::super::network::ip_str(networks.find("bridge").unwrap().gateway));
@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn token_file_is_private_from_the_start() {
         use std::os::unix::fs::PermissionsExt;
-        let p = std::env::temp_dir().join(format!("kiri-mirror-token-{}", std::process::id()));
+        let p = std::env::temp_dir().join(format!("stowlark-mirror-token-{}", std::process::id()));
         // A leftover readable by everyone is replaced, not reused with its mode.
         std::fs::write(&p, "old").unwrap();
         std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o644)).unwrap();

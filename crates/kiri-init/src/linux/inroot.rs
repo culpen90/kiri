@@ -222,7 +222,7 @@ mod tests {
 
     /// A fake rootfs beside an "outside" directory standing in for /mnt/mac.
     fn setup(tag: &str) -> (Tmp, std::path::PathBuf, std::path::PathBuf) {
-        let base = std::env::temp_dir().join(format!("kiri-inroot-{tag}-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("stowlark-inroot-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&base);
         let (root, outside) = (base.join("root"), base.join("outside"));
         fs::create_dir_all(&root).unwrap();

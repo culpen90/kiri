@@ -12,8 +12,8 @@ use serde_json::{Value, json};
 use crate::vm;
 
 const USAGE: &str = "\
-Usage: kiri-android doctor | list | create NAME | delete NAME
-       kiri-android run [NAME] [--timeout SECONDS] < script.sh
+Usage: stowlark-android doctor | list | create NAME | delete NAME
+       stowlark-android run [NAME] [--timeout SECONDS] < script.sh
 
 Without NAME, run uses a temporary Linux workspace. A named workspace
 keeps /workspace between runs. Other VM state resets on each boot.
@@ -61,7 +61,7 @@ fn dispatch(args: Vec<String>) -> Result<(u8, Option<Value>)> {
             return Ok((0, None));
         }
         ["--version"] => {
-            println!("kiri-android {}", env!("CARGO_PKG_VERSION"));
+            println!("stowlark-android {}", env!("CARGO_PKG_VERSION"));
             return Ok((0, None));
         }
         ["doctor"] => {
@@ -101,7 +101,7 @@ fn dispatch(args: Vec<String>) -> Result<(u8, Option<Value>)> {
                 }
                 _ => {
                     return Err(
-                        "usage: kiri-android run [NAME] [--timeout SECONDS] < script.sh".into(),
+                        "usage: stowlark-android run [NAME] [--timeout SECONDS] < script.sh".into(),
                     );
                 }
             };
@@ -136,7 +136,7 @@ fn dispatch(args: Vec<String>) -> Result<(u8, Option<Value>)> {
             let (code, value) = result?;
             return Ok((code, Some(value)));
         }
-        _ => return Err("invalid arguments; see kiri-android --help".into()),
+        _ => return Err("invalid arguments; see stowlark-android --help".into()),
     };
     Ok((0, Some(result)))
 }
@@ -175,7 +175,7 @@ pub(super) struct Host {
 impl Host {
     fn locate_state() -> Result<Self> {
         #[cfg(not(target_os = "android"))]
-        if let Some(state) = env::var_os("KIRI_ANDROID_STATE_DIR") {
+        if let Some(state) = env::var_os("STOWLARK_ANDROID_STATE_DIR") {
             return Ok(Self {
                 qemu: PathBuf::new(),
                 assets: PathBuf::new(),
@@ -208,7 +208,7 @@ impl Host {
             qemu: PathBuf::new(),
             assets: PathBuf::new(),
             prefix,
-            state: home.join(".kiri-android"),
+            state: home.join(".stowlark-android"),
         })
     }
 
@@ -218,14 +218,14 @@ impl Host {
         let installed_assets = exe
             .parent()
             .and_then(Path::parent)
-            .ok_or("invalid Kiri bundle layout")?
-            .join("share/kiri-android");
+            .ok_or("invalid Stowlark bundle layout")?
+            .join("share/stowlark-android");
         #[cfg(target_os = "android")]
         {
             let home = host.state.parent().ok_or("invalid Termux home")?;
             if !exe.starts_with(home) {
                 return Err(
-                    "install the verified Kiri bundle inside the Termux home directory".into(),
+                    "install the verified Stowlark bundle inside the Termux home directory".into(),
                 );
             }
             host.qemu = host
@@ -242,7 +242,7 @@ impl Host {
                 .map(|dir| dir.join("qemu-system-aarch64"))
                 .find(|p| is_executable(p))
                 .ok_or("qemu-system-aarch64 is missing from PATH")?;
-            host.assets = env::var_os("KIRI_ANDROID_ASSETS")
+            host.assets = env::var_os("STOWLARK_ANDROID_ASSETS")
                 .map(PathBuf::from)
                 .unwrap_or(installed_assets);
         }
@@ -252,17 +252,17 @@ impl Host {
             );
         }
         let assets = fs::canonicalize(&host.assets)
-            .map_err(|e| format!("Kiri guest assets at {}: {e}", host.assets.display()))?;
+            .map_err(|e| format!("Stowlark guest assets at {}: {e}", host.assets.display()))?;
         #[cfg(target_os = "android")]
         if !assets.starts_with(host.state.parent().ok_or("invalid Termux home")?) {
-            return Err("Kiri guest assets must be inside the Termux home directory".into());
+            return Err("Stowlark guest assets must be inside the Termux home directory".into());
         }
         for name in ["Image", "initramfs.cpio.gz"] {
             let m = fs::symlink_metadata(assets.join(name))
-                .map_err(|e| format!("Kiri guest asset {name}: {e}"))?;
+                .map_err(|e| format!("Stowlark guest asset {name}: {e}"))?;
             if !m.is_file() || m.len() == 0 {
                 return Err(
-                    format!("Kiri guest asset {name} must be a nonempty regular file").into(),
+                    format!("Stowlark guest asset {name} must be a nonempty regular file").into(),
                 );
             }
         }
@@ -300,7 +300,7 @@ impl State {
         let m = fs::symlink_metadata(root)?;
         if !m.is_dir() || m.mode() & 0o077 != 0 || m.uid() != effective_uid() {
             return Err(
-                "Kiri state must be a private directory (mode 0700) owned by this user".into(),
+                "Stowlark state must be a private directory (mode 0700) owned by this user".into(),
             );
         }
         let root = root.canonicalize()?;
@@ -312,13 +312,13 @@ impl State {
             .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
             .open(root.join(".lock"))?;
         if !lock.metadata()?.is_file() {
-            return Err("Kiri state lock must be a regular file".into());
+            return Err("Stowlark state lock must be a regular file".into());
         }
         // SAFETY: lock is a valid owned fd kept open until State is dropped.
         if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
             let error = io::Error::last_os_error();
             if error.kind() == io::ErrorKind::WouldBlock {
-                return Err("Kiri is busy; wait for the active workspace command to finish".into());
+                return Err("Stowlark is busy; wait for the active workspace command to finish".into());
             }
             return Err(error.into());
         }

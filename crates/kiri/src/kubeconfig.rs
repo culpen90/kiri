@@ -1,14 +1,14 @@
-//! The cluster's entry in kubectl's own file, written by Kiri itself with
-//! no kubectl: `kiri k8s` on the Mac and Linux (crates/kiri/src/k8s.rs) and
+//! The cluster's entry in kubectl's own file, written by Stowlark itself with
+//! no kubectl: `stowlark k8s` on the Mac and Linux (crates/kiri/src/k8s.rs) and
 //! the window on Windows (crates/kiri-win/src/k8s.rs, which includes this
 //! file) use it.
 //!
 //! The file is the first of `$KUBECONFIG`, else `.kube/config` in the home
 //! folder (`%USERPROFILE%` on Windows), where kubectl looks. Only the
-//! cluster, user and context named after the engine (`kiri`, `kiri-dev`,
+//! cluster, user and context named after the engine (`stowlark`, `stowlark-dev`,
 //! …) are added, replaced or removed; every other line stays as it was, in
 //! its place, comments too. `current-context` changes only when asked
-//! (`kiri k8s start --use`), or a new file has ours. It is written to a
+//! (`stowlark k8s start --use`), or a new file has ours. It is written to a
 //! temporary file beside it and renamed over it, 0600.
 //!
 //! kubeconfigs are YAML as kubectl writes them, and as other tools (aws,
@@ -104,17 +104,17 @@ fn read(path: &Path) -> io::Result<Option<String>> {
 }
 
 /// The new text by a temporary file and a rename, 0600; the one before it
-/// kept as `config.bak.kiri`.
+/// kept as `config.bak.stowlark`.
 fn write(path: &Path, before: Option<&str>, text: &str) -> io::Result<()> {
     let dir = path.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
     std::fs::create_dir_all(dir)?;
     let file = path.file_name().and_then(|n| n.to_str()).unwrap_or("config");
     if let Some(before) = before {
-        let backup = dir.join(format!("{file}.bak.kiri"));
+        let backup = dir.join(format!("{file}.bak.stowlark"));
         std::fs::write(&backup, before)?;
         private(&backup)?;
     }
-    let tmp = dir.join(format!(".{file}.kiri-{}", std::process::id()));
+    let tmp = dir.join(format!(".{file}.stowlark-{}", std::process::id()));
     let done = std::fs::write(&tmp, text).and_then(|()| private(&tmp)).and_then(|()| std::fs::rename(&tmp, path));
     if done.is_err() {
         let _ = std::fs::remove_file(&tmp);
@@ -345,7 +345,7 @@ users:
     client-key-data: S0VZ
 ";
 
-    /// A file as kubectl and `aws eks update-kubeconfig` leave it, with another Kiri's context.
+    /// A file as kubectl and `aws eks update-kubeconfig` leave it, with another Stowlark's context.
     const MINE: &str = "apiVersion: v1
 clusters:
 - cluster:
@@ -355,16 +355,16 @@ clusters:
 - cluster:
     certificate-authority-data: REVW
     server: https://127.0.0.1:6444
-  name: kiri-dev
+  name: stowlark-dev
 contexts:
 - context:
     cluster: arn:aws:eks:eu-central-1:1:cluster/prod
     user: arn:aws:eks:eu-central-1:1:cluster/prod
   name: prod
 - context:
-    cluster: kiri-dev
-    user: kiri-dev
-  name: kiri-dev
+    cluster: stowlark-dev
+    user: stowlark-dev
+  name: stowlark-dev
 current-context: prod
 kind: Config
 preferences: {}
@@ -377,7 +377,7 @@ users:
       - --region
       - eu-central-1
       command: aws
-- name: kiri-dev
+- name: stowlark-dev
   user:
     client-certificate-data: REVWQ0VSVA==
 ";
@@ -391,78 +391,78 @@ users:
 
     #[test]
     fn k3s_names_become_the_engines() {
-        let ours = from_k3s(K3S, "kiri", 6445);
-        assert!(ours.contains("server: https://127.0.0.1:6445\n  name: kiri\n"));
-        assert!(ours.contains("    cluster: kiri\n    user: kiri\n  name: kiri\n"));
-        assert!(ours.contains("current-context: kiri\n") && ours.contains("- name: kiri\n"));
+        let ours = from_k3s(K3S, "stowlark", 6445);
+        assert!(ours.contains("server: https://127.0.0.1:6445\n  name: stowlark\n"));
+        assert!(ours.contains("    cluster: stowlark\n    user: stowlark\n  name: stowlark\n"));
+        assert!(ours.contains("current-context: stowlark\n") && ours.contains("- name: stowlark\n"));
         assert!(!ours.contains("default"));
     }
 
     #[test]
     fn merging_adds_ours_and_keeps_every_other_line_in_place() {
-        let ours = from_k3s(K3S, "kiri", 6445);
-        let merged = merge(MINE, &ours, "kiri", false).unwrap();
+        let ours = from_k3s(K3S, "stowlark", 6445);
+        let merged = merge(MINE, &ours, "stowlark", false).unwrap();
         for list in LISTS {
-            let want = if list == "contexts" { vec!["prod", "kiri-dev", "kiri"] } else { vec!["arn:aws:eks:eu-central-1:1:cluster/prod", "kiri-dev", "kiri"] };
+            let want = if list == "contexts" { vec!["prod", "stowlark-dev", "stowlark"] } else { vec!["arn:aws:eks:eu-central-1:1:cluster/prod", "stowlark-dev", "stowlark"] };
             assert_eq!(names(&merged, list), want, "{list}");
         }
         // Taking ours out again gives the file back exactly.
-        assert_eq!(remove(&merged, "kiri").unwrap(), MINE);
+        assert_eq!(remove(&merged, "stowlark").unwrap(), MINE);
         // The current context stays the user's.
         assert!(merged.contains("current-context: prod\n"));
-        assert!(merged.contains("    server: https://127.0.0.1:6445\n  name: kiri\ncontexts:\n"));
+        assert!(merged.contains("    server: https://127.0.0.1:6445\n  name: stowlark\ncontexts:\n"));
         // Nothing changes when merged again.
-        assert_eq!(merge(&merged, &ours, "kiri", false).unwrap(), merged);
+        assert_eq!(merge(&merged, &ours, "stowlark", false).unwrap(), merged);
         // --use makes it current.
-        assert!(merge(MINE, &ours, "kiri", true).unwrap().contains("current-context: kiri\n"));
+        assert!(merge(MINE, &ours, "stowlark", true).unwrap().contains("current-context: stowlark\n"));
     }
 
     #[test]
     fn a_new_port_replaces_the_old_entry() {
-        let merged = merge(MINE, &from_k3s(K3S, "kiri", 6444), "kiri", false).unwrap();
-        let moved = merge(&merged, &from_k3s(K3S, "kiri", 6445).replace("Q0E=", "TkVXQ0E="), "kiri", false).unwrap();
+        let merged = merge(MINE, &from_k3s(K3S, "stowlark", 6444), "stowlark", false).unwrap();
+        let moved = merge(&merged, &from_k3s(K3S, "stowlark", 6445).replace("Q0E=", "TkVXQ0E="), "stowlark", false).unwrap();
         assert!(moved.contains("https://127.0.0.1:6445") && moved.contains("TkVXQ0E="));
-        assert_eq!(moved.matches("name: kiri\n").count(), 3);
-        // kiri-dev's own port is untouched.
-        assert!(moved.contains("server: https://127.0.0.1:6444\n  name: kiri-dev"));
+        assert_eq!(moved.matches("name: stowlark\n").count(), 3);
+        // stowlark-dev's own port is untouched.
+        assert!(moved.contains("server: https://127.0.0.1:6444\n  name: stowlark-dev"));
         assert_eq!(names(&moved, "clusters").len(), 3);
     }
 
     #[test]
     fn indented_lists_and_crlf_are_kept() {
         let indented = "apiVersion: v1\r\nclusters:\r\n  - cluster:\r\n      server: https://x\r\n    name: \"x\"\r\ncontexts:\r\n  - name: x # theirs\r\n    context:\r\n      cluster: x\r\n      user: x\r\ncurrent-context: x\r\nkind: Config\r\nusers:\r\n  - name: x\r\n    user: {}\r\n";
-        let merged = merge(indented, &from_k3s(K3S, "kiri", 6445), "kiri", false).unwrap();
-        assert!(merged.contains("\r\n  - cluster:\r\n      certificate-authority-data: Q0E=\r\n      server: https://127.0.0.1:6445\r\n    name: kiri\r\n"));
+        let merged = merge(indented, &from_k3s(K3S, "stowlark", 6445), "stowlark", false).unwrap();
+        assert!(merged.contains("\r\n  - cluster:\r\n      certificate-authority-data: Q0E=\r\n      server: https://127.0.0.1:6445\r\n    name: stowlark\r\n"));
         assert!(!merged.replace("\r\n", "").contains('\n'));
-        assert_eq!(names(&merged, "contexts"), ["x", "kiri"]);
-        assert_eq!(remove(&merged, "kiri").unwrap(), indented);
+        assert_eq!(names(&merged, "contexts"), ["x", "stowlark"]);
+        assert_eq!(remove(&merged, "stowlark").unwrap(), indented);
     }
 
     #[test]
     fn missing_or_empty_lists_and_files() {
-        let ours = from_k3s(K3S, "kiri", 6445);
-        assert_eq!(merge("", &ours, "kiri", false).unwrap(), ours);
+        let ours = from_k3s(K3S, "stowlark", 6445);
+        assert_eq!(merge("", &ours, "stowlark", false).unwrap(), ours);
         let bare = "apiVersion: v1\nclusters: null\ncontexts: []\nkind: Config\n";
-        let merged = merge(bare, &ours, "kiri", false).unwrap();
-        assert_eq!(names(&merged, "clusters"), ["kiri"]);
-        assert_eq!(names(&merged, "contexts"), ["kiri"]);
-        assert_eq!(names(&merged, "users"), ["kiri"]);
+        let merged = merge(bare, &ours, "stowlark", false).unwrap();
+        assert_eq!(names(&merged, "clusters"), ["stowlark"]);
+        assert_eq!(names(&merged, "contexts"), ["stowlark"]);
+        assert_eq!(names(&merged, "users"), ["stowlark"]);
         // It had no current context, and still has none: a plain `kubectl` stays pointed at nothing.
         assert!(!merged.contains("current-context"));
-        assert!(merge(bare, &ours, "kiri", true).unwrap().ends_with("current-context: kiri\n"));
-        let removed = remove(&merge(bare, &ours, "kiri", true).unwrap(), "kiri").unwrap();
+        assert!(merge(bare, &ours, "stowlark", true).unwrap().ends_with("current-context: stowlark\n"));
+        let removed = remove(&merge(bare, &ours, "stowlark", true).unwrap(), "stowlark").unwrap();
         assert!(removed.contains("clusters: null\n") && removed.contains("users: null\n") && removed.contains("current-context: \"\"\n"));
-        assert!(merge("{\"apiVersion\": \"v1\"}", &ours, "kiri", false).is_err());
-        assert!(merge("clusters: [{name: a}]\n", &ours, "kiri", false).is_err());
+        assert!(merge("{\"apiVersion\": \"v1\"}", &ours, "stowlark", false).is_err());
+        assert!(merge("clusters: [{name: a}]\n", &ours, "stowlark", false).is_err());
     }
 
     #[test]
     fn removing_ours_leaves_others_and_clears_a_current_ours() {
-        let merged = merge(MINE, &from_k3s(K3S, "kiri-dev", 6446), "kiri-dev", true).unwrap();
-        let removed = remove(&merged, "kiri-dev").unwrap();
+        let merged = merge(MINE, &from_k3s(K3S, "stowlark-dev", 6446), "stowlark-dev", true).unwrap();
+        let removed = remove(&merged, "stowlark-dev").unwrap();
         assert_eq!(names(&removed, "contexts"), ["prod"]);
         assert!(removed.contains("current-context: \"\"\n"));
-        assert_eq!(remove(MINE, "kiri").unwrap(), MINE);
+        assert_eq!(remove(MINE, "stowlark").unwrap(), MINE);
     }
 
     #[test]
@@ -477,20 +477,20 @@ users:
 
     #[test]
     fn install_writes_atomically_and_privately() {
-        let dir = std::env::temp_dir().join(format!("kiri-kubeconfig-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-kubeconfig-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let path = dir.join(".kube").join("config");
-        let ours = from_k3s(K3S, "kiri", 6445);
-        assert!(install(&path, &ours, "kiri", false).unwrap());
-        assert!(!install(&path, &ours, "kiri", false).unwrap());
+        let ours = from_k3s(K3S, "stowlark", 6445);
+        assert!(install(&path, &ours, "stowlark", false).unwrap());
+        assert!(!install(&path, &ours, "stowlark", false).unwrap());
         std::fs::write(&path, MINE).unwrap();
-        assert!(install(&path, &ours, "kiri", false).unwrap());
-        assert_eq!(std::fs::read_to_string(dir.join(".kube").join("config.bak.kiri")).unwrap(), MINE);
+        assert!(install(&path, &ours, "stowlark", false).unwrap());
+        assert_eq!(std::fs::read_to_string(dir.join(".kube").join("config.bak.stowlark")).unwrap(), MINE);
         #[cfg(unix)]
         assert_eq!(std::os::unix::fs::PermissionsExt::mode(&std::fs::metadata(&path).unwrap().permissions()) & 0o777, 0o600);
-        assert!(uninstall(&path, "kiri").unwrap());
+        assert!(uninstall(&path, "stowlark").unwrap());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), MINE);
-        assert!(!uninstall(&path, "kiri").unwrap());
+        assert!(!uninstall(&path, "stowlark").unwrap());
         // No temporary files left beside it.
         assert_eq!(std::fs::read_dir(dir.join(".kube")).unwrap().count(), 2);
         let _ = std::fs::remove_dir_all(&dir);

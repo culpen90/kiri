@@ -1,24 +1,24 @@
 #!/bin/bash
-# Kiri on a Linux host: runs the Linux build (cargo xtask linux) as the host
-# engine inside a privileged container on the current Docker engine (Kiri
+# Stowlark on a Linux host: runs the Linux build (cargo xtask linux) as the host
+# engine inside a privileged container on the current Docker engine (Stowlark
 # works), then drives it with the docker CLI from inside. No VM is involved:
 # containers run on that Linux kernel directly.
 set -u
 D=${D:-docker}
 BIN=${BIN:-$(cd "$(dirname "$0")/.." && pwd)/target/linux/release}
 # The engine's container (and its volumes): another name runs a second copy beside this one.
-N=${N:-kiri-linux-host}
-[ -x "$BIN/kiri" ] || { echo "build first: cargo xtask linux"; exit 1; }
+N=${N:-stowlark-linux-host}
+[ -x "$BIN/stowlark" ] || { echo "build first: cargo xtask linux"; exit 1; }
 $D rm -f "$N" >/dev/null 2>&1
-$D run -d --name "$N" --privileged --tmpfs /run -v "$N":/var/lib/kiri -v "$N"-store:/root/.local/share/kiri \
-  -v "$BIN:/opt/kiri:ro" alpine sh -c 'apk add -q docker-cli curl python3 >/dev/null 2>&1; exec /opt/kiri/kiri daemon' >/dev/null
-up() { for _ in $(seq 60); do $D exec "$N" sh -c 'DOCKER_HOST=unix:///root/.kiri/run/docker.sock docker version' >/dev/null 2>&1 && break; sleep 1; done; }
+$D run -d --name "$N" --privileged --tmpfs /run -v "$N":/var/lib/stowlark -v "$N"-store:/root/.local/share/stowlark \
+  -v "$BIN:/opt/stowlark:ro" alpine sh -c 'apk add -q docker-cli curl python3 >/dev/null 2>&1; exec /opt/stowlark/stowlark daemon' >/dev/null
+up() { for _ in $(seq 60); do $D exec "$N" sh -c 'DOCKER_HOST=unix:///root/.stowlark/run/docker.sock docker version' >/dev/null 2>&1 && break; sleep 1; done; }
 up
 $D cp "$(dirname "$0")/testcontainers-api.py" "$N":/testcontainers-api.py >/dev/null
 PASS=0; FAIL=0
 t() {
   local name=$1 want=$2; shift 2
-  local got; got=$($D exec "$N" sh -c "export DOCKER_HOST=unix:///root/.kiri/run/docker.sock; $*" 2>&1 | tr -d '\r')
+  local got; got=$($D exec "$N" sh -c "export DOCKER_HOST=unix:///root/.stowlark/run/docker.sock; $*" 2>&1 | tr -d '\r')
   if [[ "$got" == *"$want"* ]]; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); printf '  FAIL %s\n    want: %s\n    got:  %s\n' "$name" "$want" "$(echo "$got" | head -3)"; fi
 }
 t server-os "linux" "docker version --format '{{.Server.Os}}'"
@@ -34,22 +34,22 @@ t exec-session-own "own" "docker exec web sh -c 's=\$(cut -d\" \" -f6 /proc/\$\$
 t cp "copied" "echo copied > /tmp/x && docker cp /tmp/x web:/tmp/x && docker exec web cat /tmp/x"
 # What Testcontainers needs (#222, #121); see tests/testcontainers-api.py.
 for c in version cmd keepalive follow follow-created timestamps; do
-  t "testcontainers-$c" "ok $c" "for i in \$(seq 60); do command -v python3 >/dev/null && break; sleep 1; done; python3 /testcontainers-api.py /root/.kiri/run/docker.sock $c"
+  t "testcontainers-$c" "ok $c" "for i in \$(seq 60); do command -v python3 >/dev/null && break; sleep 1; done; python3 /testcontainers-api.py /root/.stowlark/run/docker.sock $c"
 done
-t socket-mount-reaches-kiri "Kiri" "docker run --rm -v /root/.kiri/run/docker.sock:/var/run/docker.sock docker:cli docker version --format '{{.Server.Platform.Name}}'"
+t socket-mount-reaches-stowlark "Stowlark" "docker run --rm -v /root/.stowlark/run/docker.sock:/var/run/docker.sock docker:cli docker version --format '{{.Server.Platform.Name}}'"
 t stats "web" "docker stats --no-stream --format '{{.Name}}'"
 t network-dns "PONG" "docker network create lhn >/dev/null 2>&1; docker run -d --name db --network lhn redis:7-alpine >/dev/null; sleep 1; docker run --rm --network lhn redis:7-alpine redis-cli -h db ping"
 t bind-host-path "3." "docker run --rm -v /etc:/h:ro alpine cat /h/alpine-release"
 t volume "kept" "docker run --rm -v lhv:/d alpine sh -c 'echo kept > /d/f' && docker run --rm -v lhv:/d alpine cat /d/f"
 t memory-limit "67108864" "docker run --rm --memory 64m alpine cat /sys/fs/cgroup/memory.max"
 t seccomp "Seccomp:	2" "docker run --rm alpine grep Seccomp: /proc/self/status"
-t udp "10.9.8.7" "docker run -d --name dns -p 15354:53/udp alpine sh -c 'apk add -q dnsmasq >/dev/null 2>&1; dnsmasq -k --address=/kiri.test/10.9.8.7' >/dev/null; for i in \$(seq 40); do out=\$(nslookup -port=15354 kiri.test 127.0.0.1 2>/dev/null) && break; sleep 0.5; done; echo \"\$out\" | grep -o 10.9.8.7"
+t udp "10.9.8.7" "docker run -d --name dns -p 15354:53/udp alpine sh -c 'apk add -q dnsmasq >/dev/null 2>&1; dnsmasq -k --address=/stowlark.test/10.9.8.7' >/dev/null; for i in \$(seq 40); do out=\$(nslookup -port=15354 stowlark.test 127.0.0.1 2>/dev/null) && break; sleep 0.5; done; echo \"\$out\" | grep -o 10.9.8.7"
 t ipv6-network "true" "docker network create --ipv6 --subnet fd00:4c:1::/64 lh6 >/dev/null && docker network inspect lh6 -f '{{.EnableIPv6}}'"
 t ipv6-ping "1 packets received" "docker run -d --name v6a --network lh6 nginx:alpine >/dev/null; docker run --rm --network lh6 alpine ping -6 -c 1 -W 2 v6a"
 t ipv6-wget "Welcome to nginx" "docker run --rm --network lh6 alpine wget -qO- -T 5 'http://[fd00:4c:1::2]'"
-t ipv6-host-nat "masquerade" "apk add -q nftables >/dev/null 2>&1; nft list table ip6 kiri"
+t ipv6-host-nat "masquerade" "apk add -q nftables >/dev/null 2>&1; nft list table ip6 stowlark"
 t ipv6-port "Welcome to nginx" "docker run -d --name web6 -p 18082:80 nginx:alpine >/dev/null; for i in \$(seq 30); do curl -sg 'http://[::1]:18082' && break; sleep 0.3; done"
-t ipv6-cleanup "gone" "docker rm -f v6a web6 >/dev/null; docker network rm lh6 >/dev/null; for i in \$(seq 20); do nft list table ip6 kiri >/dev/null 2>&1 || { echo gone; break; }; sleep 0.1; done"
+t ipv6-cleanup "gone" "docker rm -f v6a web6 >/dev/null; docker network rm lh6 >/dev/null; for i in \$(seq 20); do nft list table ip6 stowlark >/dev/null 2>&1 || { echo gone; break; }; sleep 0.1; done"
 t ipv6-forwarding-restored "0" "cat /proc/sys/net/ipv6/conf/all/forwarding"
 # A build's --add-host host-gateway is the bridge gateway, as for docker run (not the Mac VM's 198.19.248.254).
 t build-host-gateway "GW-OK" "gw=\$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}'); mkdir -p /bhg && printf 'FROM alpine:3.21\\nRUN grep -w hgw /etc/hosts\\n' > /bhg/Dockerfile && DOCKER_BUILDKIT=0 docker build --no-cache --add-host hgw:host-gateway /bhg 2>&1 | grep -q \"\$gw\" && echo GW-OK"
@@ -61,11 +61,11 @@ t privileged-host-ptmx "character special file" "mkdir -p /hostdev && mount -t d
 t privileged-devices "DEVS-OK" "docker run --rm --privileged alpine sh -c 'test -c /dev/kmsg && test -c /dev/null && test -L /dev/ptmx && test -c /dev/pts/ptmx && echo DEVS-OK'"
 t privileged-tty "/dev/pts/0" "docker run --rm -t --privileged alpine tty"
 t cleanup "web" "docker rm -f web db dns"
-# Kiri's Stop is the engine's stop, not the user's, as stopping Docker's
+# Stowlark's Stop is the engine's stop, not the user's, as stopping Docker's
 # daemon is: Start, also after the engine restarted, brings back what
 # `always` and `unless-stopped` kept running, but not one the user stopped
-# (docker stop) while Kiri was stopped, which answers 204 (#181, #216).
-POST="curl -s -o /dev/null -w %{http_code} --unix-socket /root/.kiri/run/docker.sock -X POST"
+# (docker stop) while Stowlark was stopped, which answers 204 (#181, #216).
+POST="curl -s -o /dev/null -w %{http_code} --unix-socket /root/.stowlark/run/docker.sock -X POST"
 RUNNING="docker inspect -f '{{.Name}}={{.State.Running}}' ss-us ss-al ss-user ss-no | tr -d / | tr '\\n' ' '"
 BACK="for i in \$(seq 100); do [ \"\$(docker inspect -f '{{.State.Running}}' ss-us ss-al | tr '\\n' ' ')\" = 'true true ' ] && break; sleep 0.2; done; $RUNNING"
 ALL='ss-us ss-al ss-user ss-no ss-al1 ss-al2 ss-al3 ss-al4 ss-al5'
@@ -78,12 +78,12 @@ t ss-docker-stop-while-stopped "204" "$POST http://d/containers/ss-user/stop"
 t ss-start "204" "$POST http://d/kiri/wake"
 t ss-start-brings-back "ss-us=true ss-al=true ss-user=false ss-no=false" "$BACK"
 # Start, then Stop at once, after the engine restarted: the restarts under
-# way stop too, and nothing runs while Kiri is stopped (#181).
+# way stop too, and nothing runs while Stowlark is stopped (#181).
 t ss-stop-again "204" "$POST http://d/kiri/stop"
 $D restart -t 20 "$N" >/dev/null; up
 t ss-start-then-stop "204 204" "echo \$($POST http://d/kiri/wake) \$($POST http://d/kiri/stop)"
 t ss-start-then-stop-none-run "running: 0" "sleep 8; echo running: \$(docker ps -q | wc -l)"
-t ss-start-then-stop-refused "Kiri is stopped" "docker run --rm alpine true"
+t ss-start-then-stop-refused "Stowlark is stopped" "docker run --rm alpine true"
 t ss-restarted-start "204" "$POST http://d/kiri/wake"
 t ss-restarted-brings-back "ss-us=true ss-al=true ss-user=false ss-no=false" "$BACK"
 t ss-restarted-all-always "running: 7" "for i in \$(seq 100); do [ \$(docker ps -q | wc -l) -ge 7 ] && break; sleep 0.2; done; echo running: \$(docker ps -q | wc -l)"
@@ -104,7 +104,7 @@ t exec-no-shebang "exec /xs/nosb: exec format error 255" "$XS; docker run -d --n
 t init-no-shebang "hi 0" "$XS; o=\$(docker run --rm --init -v /xs:/xs alpine /xs/nosb 2>&1); echo \"\$o \$?\""
 t init-missing-interpreter "127" "$XS; docker run --rm --init -v /xs:/xs alpine /xs/badsb >/dev/null 2>&1; echo \$?"
 t exit-126-exec "126" "docker run -d --name x126 alpine sleep 60 >/dev/null; docker exec x126 /etc/passwd; echo \$?; docker rm -f x126 >/dev/null"
-# The engine stopped with containers running (systemctl stop kiri): a stop
+# The engine stopped with containers running (systemctl stop stowlark): a stop
 # that was asked for, "the VM stopped" at info, not an ERROR.
 t clean-stop-setup "ok" "docker run -d --name cs alpine sleep 1d >/dev/null && echo ok"
 $D restart -t 20 "$N" >/dev/null; up

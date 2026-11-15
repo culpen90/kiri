@@ -1,13 +1,13 @@
 //! Who may use the engine's socket on a Linux host, without signing in again.
 //!
-//! The socket is 0660 root:kiri, so members of the `kiri` group may use it, as
+//! The socket is 0660 root:stowlark, so members of the `stowlark` group may use it, as
 //! the docker group may use dockerd's. But a group someone was just added to
 //! only applies to sessions that start after: until they log out and back in,
 //! the window and every terminal they have open are refused. So each member
 //! also gets their own entry in the socket's access list (a POSIX ACL), which
 //! applies at once, to every session they have.
 //!
-//! The daemon writes the list when it makes the socket, and `kiri host-access`
+//! The daemon writes the list when it makes the socket, and `stowlark host-access`
 //! (run as root, from the window's onboarding through pkexec) writes it again
 //! after adding someone.
 //!
@@ -362,7 +362,7 @@ impl Gate {
     /// Checks everyone connected every few seconds, and writes the access
     /// list again whenever the group's members change.
     pub fn watch(self: Arc<Self>) -> io::Result<()> {
-        std::thread::Builder::new().name("kiri-access".into()).spawn(move || {
+        std::thread::Builder::new().name("stowlark-access".into()).spawn(move || {
             // Unknown at first: the first recheck writes the list once more,
             // so a change between startup's write and now isn't missed.
             let mut listed = None;
@@ -441,7 +441,7 @@ mod tests {
         let alice = c"alice";
         let mut names = [alice.as_ptr().cast_mut(), std::ptr::null_mut()];
         let group = libc::group {
-            gr_name: c"kiri".as_ptr().cast_mut(),
+            gr_name: c"stowlark".as_ptr().cast_mut(),
             gr_passwd: c"x".as_ptr().cast_mut(),
             gr_gid: 100,
             gr_mem: names.as_mut_ptr(),
@@ -475,7 +475,7 @@ mod tests {
         let name = unsafe { CStr::from_ptr(g.rec.gr_name) }.to_owned();
         assert!(member(uid, &name).unwrap());
         assert!(!member(u32::MAX - 7, &name).unwrap(), "no such account");
-        assert!(!member(uid, c"kiri-no-such-group-x").unwrap(), "a deleted group has nobody in it");
+        assert!(!member(uid, c"stowlark-no-such-group-x").unwrap(), "a deleted group has nobody in it");
     }
 
     #[test]
@@ -500,7 +500,7 @@ mod tests {
     }
 
     fn gate() -> Arc<Gate> {
-        let mut g = Gate::new(Path::new("/nonexistent"), OsStr::new("kiri")).unwrap();
+        let mut g = Gate::new(Path::new("/nonexistent"), OsStr::new("stowlark")).unwrap();
         Arc::get_mut(&mut g).unwrap().owner = u32::MAX;
         g
     }
@@ -509,7 +509,7 @@ mod tests {
     fn root_and_the_daemons_own_account_need_no_group() {
         let g = gate();
         assert!(g.allowed(0).unwrap());
-        let mut g2 = Gate::new(Path::new("/nonexistent"), OsStr::new("kiri-no-such-group-x")).unwrap();
+        let mut g2 = Gate::new(Path::new("/nonexistent"), OsStr::new("stowlark-no-such-group-x")).unwrap();
         Arc::get_mut(&mut g2).unwrap().owner = 4242;
         assert!(g2.allowed(4242).unwrap());
         assert!(!g2.allowed(4243).unwrap(), "anyone else is looked up");
@@ -560,7 +560,7 @@ mod tests {
     #[ignore]
     fn a_listed_user_gets_in_and_others_dont() {
         use std::os::unix::fs::PermissionsExt;
-        let dir = Path::new("/dev/shm").join(format!("kiri-acl-{}", std::process::id()));
+        let dir = Path::new("/dev/shm").join(format!("stowlark-acl-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
         let sock = dir.join("s.sock");
@@ -616,7 +616,7 @@ mod tests {
         let who = uid("kiritest").unwrap();
         assert!(members("kiritestg").unwrap().contains(&"kiritest".to_owned()));
 
-        let dir = Path::new("/dev/shm").join(format!("kiri-gate-{}", std::process::id()));
+        let dir = Path::new("/dev/shm").join(format!("stowlark-gate-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
         let sock = dir.join("s.sock");

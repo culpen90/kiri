@@ -1,6 +1,6 @@
 //! Proxies, for networks that need one. Settings → Network picks the mode
-//! (`~/.kiri/proxy.json`): the system's own settings (the default: macOS's;
-//! on Windows, Windows' as kiri-win sends them; on a Linux host, the proxy
+//! (`~/.stowlark/proxy.json`): the system's own settings (the default: macOS's;
+//! on Windows, Windows' as stowlark-win sends them; on a Linux host, the proxy
 //! variables), a custom proxy, or none. Image pulls, pushes, search and login go through it, and
 //! when "pass to containers" is on, new containers get `HTTP_PROXY`,
 //! `HTTPS_PROXY` and `NO_PROXY`, as Docker Desktop does. VPNs need nothing
@@ -19,7 +19,7 @@ pub struct Effective {
     pub http: Option<String>,
     pub https: Option<String>,
     pub no_proxy: Vec<String>,
-    /// macOS uses a PAC file, which Kiri does not run.
+    /// macOS uses a PAC file, which Stowlark does not run.
     pub pac: bool,
 }
 
@@ -70,7 +70,7 @@ pub fn effective() -> Effective {
     e
 }
 
-/// The host's own settings when the daemon runs in WSL2: kiri-win reads
+/// The host's own settings when the daemon runs in WSL2: stowlark-win reads
 /// Windows' and sends them (`PUT /kiri/proxy/system`).
 static HOST: Mutex<Option<Effective>> = Mutex::new(None);
 
@@ -79,7 +79,7 @@ pub fn set_host(e: Effective) {
     *CACHE.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
-/// Windows' settings if kiri-win sent them, else this machine's proxy
+/// Windows' settings if stowlark-win sent them, else this machine's proxy
 /// variables, as Linux programs take them.
 #[cfg(not(target_os = "macos"))]
 fn system() -> Effective {
@@ -130,7 +130,7 @@ fn parse_scutil(text: &str) -> Effective {
 }
 
 /// Windows loopback ports and the distro ports that lead to them, from
-/// kiri-win's relay (crates/kiri/src/hostrelay.rs): in WSL2, a proxy on
+/// stowlark-win's relay (crates/kiri/src/hostrelay.rs): in WSL2, a proxy on
 /// Windows' 127.0.0.1 is reached there.
 static RELAY: Mutex<Option<HashMap<u16, u16>>> = Mutex::new(None);
 
@@ -138,7 +138,7 @@ pub fn set_relay(map: HashMap<u16, u16>) {
     *RELAY.lock().unwrap_or_else(|e| e.into_inner()) = Some(map);
 }
 
-/// The address a proxy is dialled at: through kiri-win's relay when it is
+/// The address a proxy is dialled at: through stowlark-win's relay when it is
 /// on Windows' loopback, else as set.
 fn dialled(url: String) -> String {
     let relay = RELAY.lock().unwrap_or_else(|e| e.into_inner());
@@ -184,7 +184,7 @@ pub fn container_env() -> Vec<String> {
     }
     if !env.is_empty() {
         let mut skip = e.no_proxy.clone();
-        skip.extend(["localhost", "127.0.0.1", ".kiri.local", ".kiri.localhost", "host.docker.internal"].map(str::to_owned));
+        skip.extend(["localhost", "127.0.0.1", ".stowlark.local", ".stowlark.localhost", "host.docker.internal"].map(str::to_owned));
         let skip = skip.join(",");
         env.push(format!("NO_PROXY={skip}"));
         env.push(format!("no_proxy={skip}"));

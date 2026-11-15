@@ -1,6 +1,6 @@
 //! Windows' end of the proxy relay (crates/kiri/src/hostrelay.rs): a proxy
 //! on Windows' own 127.0.0.1, as most Windows proxy apps set, can't be
-//! reached from WSL, so `kiri hostrelay` in the distro listens for it and
+//! reached from WSL, so `stowlark hostrelay` in the distro listens for it and
 //! sends each connection here over wsl.exe's stdio, and this dials the proxy.
 
 use std::collections::{HashMap, HashSet};
@@ -45,7 +45,7 @@ fn start(distro: Option<String>) -> std::io::Result<Arc<Relay>> {
         cmd.args(["-d", d]);
     }
     let mut child = cmd
-        .args(["-u", "root", "--", "/usr/local/bin/kiri", "hostrelay"])
+        .args(["-u", "root", "--", "/usr/local/bin/stowlark", "hostrelay"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())

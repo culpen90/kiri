@@ -1,6 +1,6 @@
 //! Where a USB device shows up in Linux: its device nodes, read from sysfs.
 //!
-//! One file, shared: the guest agent (kiri-init) reads it for the devices
+//! One file, shared: the guest agent (stowlark-init) reads it for the devices
 //! passed through to the VM, and the engine on a Linux host or in WSL reads
 //! it for the machine's own devices. Only std, no unsafe.
 
@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     fn finds_each_kind_of_node_and_ignores_links_and_child_devices() {
-        let root = std::env::temp_dir().join(format!("kiri-usb-nodes-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("stowlark-usb-nodes-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let dev = root.join("1-2");
         let mk = |p: &str| std::fs::create_dir_all(dev.join(p)).unwrap();

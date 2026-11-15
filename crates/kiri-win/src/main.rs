@@ -1,11 +1,11 @@
-//! kiri-win: Kiri's Windows side. Serves the Docker API on a named pipe,
-//! `\\.\pipe\kiri`, and carries each connection into WSL2 over one
-//! long-lived `wsl.exe -u root -- kiri bridge`, multiplexed. TCP through
+//! stowlark-win: Stowlark's Windows side. Serves the Docker API on a named pipe,
+//! `\\.\pipe\stowlark`, and carries each connection into WSL2 over one
+//! long-lived `wsl.exe -u root -- stowlark bridge`, multiplexed. TCP through
 //! WSL's localhost relay loses half-closes, which `docker run` and
 //! `attach` depend on; the pipe and the bridge keep them. It is also
-//! Kiri's window and tray icon.
+//! Stowlark's window and tray icon.
 //!
-//!   kiri-win [--background] [--distro NAME] [--pipe \\.\pipe\kiri] [--socket PATH] [--kiri PATH]
+//!   stowlark-win [--background] [--distro NAME] [--pipe \\.\pipe\stowlark] [--socket PATH] [--stowlark PATH]
 //!
 //! `--background` (from the login shortcut) starts with the tray icon only.
 //! Starting it again while it runs shows the running one's window.
@@ -62,12 +62,12 @@ mod diag;
 #[path = "../../kiri/src/builds.rs"]
 #[allow(dead_code)]
 mod builds;
-// Which builder plain `docker build` uses, Docker's or Kiri's: the Mac's
+// Which builder plain `docker build` uses, Docker's or Stowlark's: the Mac's
 // and Linux's own crates/kiri/src/buildwith.rs.
 #[cfg(windows)]
 #[path = "../../kiri/src/buildwith.rs"]
 mod buildwith;
-// Kiri's program moved or deleted from where it started: the Mac's and
+// Stowlark's program moved or deleted from where it started: the Mac's and
 // Linux's own crates/kiri/src/appwatch.rs.
 #[cfg(windows)]
 #[path = "../../kiri/src/appwatch.rs"]
@@ -89,7 +89,7 @@ mod daemon {
 }
 #[cfg(windows)]
 mod wslconfig;
-// Kiri Dev's names (the window on Windows is always Kiri) and Share, the
+// Stowlark Dev's names (the window on Windows is always Stowlark) and Share, the
 // Mac's own files: crates/kiri/src/flavor.rs and share.rs.
 #[cfg(windows)]
 #[path = "../../kiri/src/flavor.rs"]
@@ -105,10 +105,10 @@ mod update;
 fn main() -> std::process::ExitCode {
     // There is no console to print a panic to.
     std::panic::set_hook(Box::new(|info| serve::log(&format!("panic: {info}"))));
-    // Load DLLs only from System32, not from the folder kiri-win runs from.
+    // Load DLLs only from System32, not from the folder stowlark-win runs from.
     win::harden_dll_search();
-    // Uninstalling (contrib/windows/kiri.ps1): docker build's own builder
-    // back as it was before Kiri changed it, and nothing else.
+    // Uninstalling (contrib/windows/stowlark.ps1): docker build's own builder
+    // back as it was before Stowlark changed it, and nothing else.
     if std::env::args().any(|a| a == "--uninstall-builds") {
         return match buildwith::places().and_then(|p| p.uninstall()) {
             Ok(()) => std::process::ExitCode::SUCCESS,
@@ -118,7 +118,7 @@ fn main() -> std::process::ExitCode {
             }
         };
     }
-    // Uninstalling, too: the cluster's `kiri` kubectl context out of
+    // Uninstalling, too: the cluster's `stowlark` kubectl context out of
     // %USERPROFILE%\.kube\config, the rest of the file as it was.
     if std::env::args().any(|a| a == "--uninstall-kubeconfig") {
         return match k8s::forget() {
@@ -130,9 +130,9 @@ fn main() -> std::process::ExitCode {
         };
     }
     // An update Later staged that the last quit didn't install: in now, and
-    // the helper opens the new Kiri once this process has gone.
+    // the helper opens the new Stowlark once this process has gone.
     // A staged update goes in before anything else, once: if the helper
-    // that was left to install it failed, Kiri starts as it is and the
+    // that was left to install it failed, Stowlark starts as it is and the
     // window offers the update again rather than quitting on every launch.
     if update::staged().is_some() && !update::attempted() {
         match update::install_staged() {
@@ -142,23 +142,23 @@ fn main() -> std::process::ExitCode {
     }
     let cfg = serve::Config::from_args();
     let background = std::env::args().any(|a| a == "--background");
-    // First run (or Kiri's Linux gone): the window opens on setup. Naming a
+    // First run (or Stowlark's Linux gone): the window opens on setup. Naming a
     // distro (--distro) is for development and skips it.
     let setup = !std::env::args().any(|a| a == "--distro") && setup::needed();
     serve::set_setup_pending(setup);
     if let Err(e) = serve::start(cfg.clone()) {
-        // Another kiri-win already serves the pipe: show its window instead.
+        // Another stowlark-win already serves the pipe: show its window instead.
         if app::running() {
             if !background {
                 app::show_running();
             }
             return std::process::ExitCode::SUCCESS;
         }
-        // No Kiri to show: whatever holds the name is not Kiri, and docker
+        // No Stowlark to show: whatever holds the name is not Stowlark, and docker
         // commands would talk to it as if it were. Say so and stop.
         let msg = format!("pipe: {e}; not starting");
         serve::log(&msg);
-        eprintln!("kiri-win: {msg}");
+        eprintln!("stowlark-win: {msg}");
         return std::process::ExitCode::FAILURE;
     }
     client::set_pipe(&cfg.pipe);
@@ -168,9 +168,9 @@ fn main() -> std::process::ExitCode {
     engine::start(engine::Env { distro: cfg.distro.clone(), pipe: cfg.pipe.clone() });
     // Its folder renamed, moved or deleted around it (Windows won't delete
     // a running program itself): docker build handed back as it was before
-    // Kiri took it, the choice kept for when Kiri runs again, and Kiri quits.
+    // Stowlark took it, the choice kept for when Stowlark runs again, and Stowlark quits.
     appwatch::watch(|exe| {
-        serve::log(&format!("{} is gone from where Kiri started; handing docker build back and quitting", exe.display()));
+        serve::log(&format!("{} is gone from where Stowlark started; handing docker build back and quitting", exe.display()));
         if let Err(e) = buildwith::places().and_then(|p| p.give_back()) {
             serve::log(&format!("docker build not handed back: {e}"));
         }
@@ -184,9 +184,9 @@ fn main() -> std::process::ExitCode {
     });
     // The engine starts when the page says `ready`, and with the window
     // hidden (--background, as from the login shortcut) no page loads: after
-    // kiri-win restarted, docker got no answer until Start was pressed.
-    // Start it now. ensure_daemon runs kiri-start only when the daemon does
-    // not answer, and kiri-start does nothing while one runs, so a daemon
+    // stowlark-win restarted, docker got no answer until Start was pressed.
+    // Start it now. ensure_daemon runs stowlark-start only when the daemon does
+    // not answer, and stowlark-start does nothing while one runs, so a daemon
     // already up is left alone and never doubled.
     if background && !setup {
         engine::send(engine::Cmd::Start);
@@ -214,6 +214,6 @@ fn main() -> std::process::ExitCode {
 
 #[cfg(not(windows))]
 fn main() -> std::process::ExitCode {
-    eprintln!("kiri-win runs on Windows only");
+    eprintln!("stowlark-win runs on Windows only");
     std::process::ExitCode::FAILURE
 }

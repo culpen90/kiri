@@ -1,9 +1,9 @@
-# kiri-win setup: page ⇄ host protocol
+# stowlark-win setup: page ⇄ host protocol
 
-The first-run setup page (`setup.html`, Windows only) talks to kiri-win the
+The first-run setup page (`setup.html`, Windows only) talks to stowlark-win the
 way the main page does: it sends JSON strings with
 `window.webkit.messageHandlers.kiri.postMessage(JSON.stringify({cmd, ...}))`
-(kiri-win's shim forwards that to WebView2) and receives state with
+(stowlark-win's shim forwards that to WebView2) and receives state with
 `window.kiri.on(event)`.
 
 ## Page → host
@@ -15,13 +15,13 @@ way the main page does: it sends JSON strings with
 | `setup-restart` | | Restart → "Restart now" |
 | `setup-later` | | Restart → "Restart later" (hides the window to the tray) |
 | `setup-choose` | `value`: `"kiri"` or `"ubuntu"` | Choose a Linux → the primary button |
-| `setup-switch` | `value`: `"kiri"` | while Ubuntu downloads → "Use Kiri Linux instead" |
+| `setup-switch` | `value`: `"kiri"` | while Ubuntu downloads → "Use Stowlark Linux instead" |
 | `setup-cancel` | | any progress screen → "Cancel" (back to the step's start) |
 | `setup-retry` | | error → "Try again" |
-| `setup-default` | `value`: bool | Docker tools → "Make Kiri the default for docker" checkbox |
-| `setup-build` | `value`: `"docker"` or `"kiri"` | Docker tools → Builds (shown only with another engine and Kiri not made docker's default): "Keep building with Docker" / "Build with Kiri" |
-| `setup-autostart` | `value`: bool | Ready → "Start Kiri when I sign in" |
-| `setup-open` | | Ready → "Open Kiri" (the main window replaces setup) |
+| `setup-default` | `value`: bool | Docker tools → "Make Stowlark the default for docker" checkbox |
+| `setup-build` | `value`: `"docker"` or `"kiri"` | Docker tools → Builds (shown only with another engine and Stowlark not made docker's default): "Keep building with Docker" / "Build with Stowlark" |
+| `setup-autostart` | `value`: bool | Ready → "Start Stowlark when I sign in" |
+| `setup-open` | | Ready → "Open Stowlark" (the main window replaces setup) |
 | `setup-quit` | | Welcome → "Quit" |
 | `copy` | `value`: text | Ready → "Copy" |
 | `open` | `name`: https URL | "What is WSL?" |
@@ -44,7 +44,7 @@ One event type, sent whenever anything changes (at most ~10 a second):
   "autostart": true,
   "progress": {"pct": 58, "done": 224395264, "total": 367575040, "rate": 19084083, "eta": 9, "label": "Downloading WSL 3.0.3 from Microsoft"} | null,
   "tasks": [{"label": "Download WSL", "state": "done" | "active" | "todo" | "error", "detail": "214 / 368 MB"}],
-  "log": ["kiri daemon: ready in 33 ms"],
+  "log": ["stowlark daemon: ready in 33 ms"],
   "error": null | "text"
 }
 ```

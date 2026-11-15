@@ -1,6 +1,6 @@
 //! The container page, as crates/kiri/src/ui/detail.rs is on the Mac:
 //! inspect, live logs and stats, a command line, a terminal and its files.
-//! The Mac reads files through its NFS mount at ~/Kiri; here they come
+//! The Mac reads files through its NFS mount at ~/Stowlark; here they come
 //! through the daemon: listings and previews by exec, saving by the archive
 //! API, so a container must be running to browse it.
 
@@ -31,7 +31,7 @@ fn spawn(name: &str, f: impl FnOnce() + Send + 'static) {
 }
 
 pub fn inspect(id: String) {
-    spawn("kiri-inspect", move || match client::get(&format!("/containers/{id}/json")) {
+    spawn("stowlark-inspect", move || match client::get(&format!("/containers/{id}/json")) {
         Ok(info) => emit(json!({"type": "inspect", "id": id, "info": info}).to_string()),
         Err(e) => emit(notice("error", &e.to_string())),
     });
@@ -41,7 +41,7 @@ pub fn inspect(id: String) {
 pub fn logs(id: String) {
     stop_logs();
     let generation = LOGS_GEN.load(Ordering::SeqCst);
-    spawn("kiri-logs", move || {
+    spawn("stowlark-logs", move || {
         let tty = client::get(&format!("/containers/{id}/json")).map(|i| i["Config"]["Tty"] == true).unwrap_or(false);
         let mut stream = match client::Stream::open(&format!("/containers/{id}/logs?follow=1&stdout=1&stderr=1&tail={}", lastlogs::LIVE_TAIL)) {
             Ok(s) => s,
@@ -53,7 +53,7 @@ pub fn logs(id: String) {
         *LOGS.lock().unwrap_or_else(PoisonError::into_inner) = Some(stream.closer());
         let (tx, rx) = std::sync::mpsc::channel::<(bool, Vec<u8>)>();
         let emit_id = id.clone();
-        spawn("kiri-logs-emit", move || {
+        spawn("stowlark-logs-emit", move || {
             let mut parts = Vec::new();
             let flush = |parts: &mut Vec<Value>| {
                 if !parts.is_empty() && LOGS_GEN.load(Ordering::SeqCst) == generation {
@@ -106,7 +106,7 @@ pub fn logs(id: String) {
 /// A stopped container's last lines, as on the Mac (the shared
 /// crates/kiri/src/ui/lastlogs.rs): `{type: "lastlogs", id, lines}`.
 pub fn last_logs(id: String) {
-    spawn("kiri-lastlogs", move || {
+    spawn("stowlark-lastlogs", move || {
         let tty = client::get(&format!("/containers/{id}/json")).is_ok_and(|v| v["Config"]["Tty"] == true);
         let lines = client::request("GET", &format!("/containers/{id}/logs?stdout=1&stderr=1&tail={}", lastlogs::KEEP), None)
             .map(|r| lastlogs::lines(&r.body, tty, lastlogs::KEEP))
@@ -126,7 +126,7 @@ pub fn stop_logs() {
 pub fn stats(id: String) {
     stop_stats();
     let generation = STATS_GEN.load(Ordering::SeqCst);
-    spawn("kiri-stats", move || {
+    spawn("stowlark-stats", move || {
         let Ok(mut stream) = client::Stream::open(&format!("/containers/{id}/stats?stream=1")) else { return };
         *STATS.lock().unwrap_or_else(PoisonError::into_inner) = Some(stream.closer());
         let mut pending = Vec::new();
@@ -176,7 +176,7 @@ fn sample(id: &str, s: &Value) -> Value {
 
 /// The page's command line: one command, its output and exit code.
 pub fn exec(id: String, line: String) {
-    spawn("kiri-exec", move || {
+    spawn("stowlark-exec", move || {
         let (code, output) = client::exec(&id, &["sh", "-c", &line]).unwrap_or_else(|e| (-1, e.to_string()));
         emit(json!({"type": "exec", "id": id, "cmd": line, "code": code, "output": output}).to_string());
     });
@@ -193,7 +193,7 @@ fn container_path(path: &str) -> Option<String> {
 
 /// Lists a directory: `stat` on each entry, in the container.
 pub fn files(name: String, path: String) {
-    spawn("kiri-files", move || {
+    spawn("stowlark-files", move || {
         let ev = |entries: Value, error: Option<String>| {
             let mut v = json!({"type": "files", "name": name, "path": path, "entries": entries});
             if let Some(e) = error {
@@ -231,7 +231,7 @@ done"#;
 
 /// A file's first 256 KiB as text, or that it is binary.
 pub fn preview(name: String, path: String) {
-    spawn("kiri-preview", move || {
+    spawn("stowlark-preview", move || {
         let base = json!({"type": "preview", "name": name, "path": path});
         let with = |k: &str, v: Value| {
             let mut e = base.clone();
@@ -278,7 +278,7 @@ pub(crate) fn safe_filename(leaf: &str) -> String {
 
 /// Copies a file to the Downloads folder, under a free name, and shows it.
 pub fn download(name: String, path: String) {
-    spawn("kiri-download", move || {
+    spawn("stowlark-download", move || {
         let result = (|| -> std::io::Result<String> {
             let file = container_path(&path).ok_or_else(|| std::io::Error::other("not a path in the container"))?;
             let bytes = read_file(&name, &file)?;
@@ -341,13 +341,13 @@ fn read_file(container: &str, file: &str) -> std::io::Result<Vec<u8>> {
     tar.get(512..512 + size).map(<[u8]>::to_vec).ok_or_else(|| std::io::Error::other("short archive"))
 }
 
-/// The docker CLI installed beside kiri-win (kiri.ps1 puts it in bin\),
+/// The docker CLI installed beside stowlark-win (stowlark.ps1 puts it in bin\),
 /// else whichever is on PATH.
 pub fn docker_cli() -> String {
-    // The installed copy first; then the one beside kiri-win.exe (the
+    // The installed copy first; then the one beside stowlark-win.exe (the
     // unzipped bundle), but only if it is the one this build shipped; else
     // whatever docker.exe is on PATH, found explicitly.
-    let installed = std::env::var_os("LOCALAPPDATA").map(|d| std::path::PathBuf::from(d).join("Kiri").join("bin").join("docker.exe"));
+    let installed = std::env::var_os("LOCALAPPDATA").map(|d| std::path::PathBuf::from(d).join("Stowlark").join("bin").join("docker.exe"));
     if let Some(p) = installed.filter(|p| p.is_file()) {
         return p.to_string_lossy().into_owned();
     }
@@ -366,7 +366,7 @@ pub fn terminal(name: &str, pipe: &str) {
     if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || "_.-".contains(c)) {
         return;
     }
-    // \\.\pipe\kiri is npipe:////./pipe/kiri to the docker CLI. Launch the
+    // \\.\pipe\stowlark is npipe:////./pipe/stowlark to the docker CLI. Launch the
     // docker CLI directly in its own console, not through `cmd /c start`,
     // which would re-parse `&` etc. in the path. The name is validated above.
     let host = format!("npipe://{}", pipe.replace('\\', "/"));

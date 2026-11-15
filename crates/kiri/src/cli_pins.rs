@@ -1,5 +1,5 @@
-//! The docker CLI, Compose and buildx versions Kiri ships (bundled in
-//! Kiri.app, downloaded by Kiri Lite), each with the SHA-256 it must match.
+//! The docker CLI, Compose and buildx versions Stowlark ships (bundled in
+//! Stowlark.app, downloaded by Stowlark Lite), each with the SHA-256 it must match.
 //! Shared with xtask, so both always agree.
 
 #![allow(dead_code)]
@@ -17,7 +17,7 @@ pub fn grype_url(v: &str) -> String {
 }
 
 /// The same Grype for Linux, x86-64 and arm64: the engine scans in WSL for
-/// Windows' window, where Kiri's store is.
+/// Windows' window, where Stowlark's store is.
 pub const LINUX_GRYPE: (&str, &str) = ("0.120.1", "0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d");
 pub const LINUX_ARM64_GRYPE: (&str, &str) = ("0.120.1", "29f47391dc283aa79fcc38e65224cd61f64dec0ecfd0db7074128ebf8ff23514");
 
@@ -42,7 +42,7 @@ pub fn buildx_url(v: &str) -> String {
     format!("https://github.com/docker/buildx/releases/download/{v}/{}", buildx_name(v))
 }
 
-/// The same versions for Intel Macs, bundled in the Intel Kiri.app
+/// The same versions for Intel Macs, bundled in the Intel Stowlark.app
 /// (`cargo xtask app --arch x86_64`). Compose and buildx are GitHub's asset
 /// digests; the docker tarball as download.docker.com served it.
 pub const X86_DOCKER_CLI: (&str, &str) = ("29.9.2", "089c3f618df88bdef4f1257d9d604499136a1ec5168b67d194c260acad2b522f");
@@ -115,8 +115,8 @@ impl MacArch {
     }
 }
 
-/// The same versions for Linux x86-64, bundled in the `kiri` .deb and .rpm
-/// (packaging/linux; `kiri-lite` ships the engine alone). The docker CLI is
+/// The same versions for Linux x86-64, bundled in the `stowlark` .deb and .rpm
+/// (packaging/linux; `stowlark-lite` ships the engine alone). The docker CLI is
 /// `docker/docker` inside download.docker.com's static tarball; Compose and
 /// buildx are GitHub's asset digests.
 pub const LINUX_DOCKER_CLI: (&str, &str) = ("29.9.2", "9ac225999fd5e863f7694c728ef23d480616b1e5639328fa309befd4243d69eb");
@@ -135,13 +135,13 @@ pub fn linux_buildx_url(v: &str) -> String {
     format!("https://github.com/docker/buildx/releases/download/{v}/buildx-{v}.linux-amd64")
 }
 
-/// The same versions for Linux arm64, in the arm64 `kiri` .deb and .rpm,
+/// The same versions for Linux arm64, in the arm64 `stowlark` .deb and .rpm,
 /// from the same places (packaging/linux/fetch-cli.sh).
 pub const LINUX_ARM64_DOCKER_CLI: (&str, &str) = ("29.9.2", "873b3e0207857c3b2f28392fb922f3ea6efe37620c16d4d4aaf2fef409c90b73");
 pub const LINUX_ARM64_COMPOSE: (&str, &str) = ("v5.6.1", "42cfa75f51ad0ccf290bad37899e0038a8c10a0069e85233ecc1d53e3ff1347d");
 pub const LINUX_ARM64_BUILDX: (&str, &str) = ("v0.38.1", "3b83b3731916ba433feccaaa689fe5bcdc81c641d92c8e6c2ea865dfa141c97a");
 
-/// The same versions for Windows x86-64, bundled with kiri-win
+/// The same versions for Windows x86-64, bundled with stowlark-win
 /// (`cargo xtask windows`). Compose and buildx are GitHub's asset digests;
 /// the docker CLI's zip as download.docker.com served it.
 pub const WIN_DOCKER_CLI: (&str, &str) = ("29.9.2", "b2be959bfed1281ddaf665c0972cba9a62ce30c542b6bcce82f055bf8886bc7d");

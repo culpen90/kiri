@@ -226,7 +226,7 @@ pub fn apply_sysctls(pid: libc::pid_t, sysctls: &[Sysctl]) -> io::Result<()> {
         let written = fs::write(format!("/proc/sys/{}", s.path), &s.value);
         // Coming back must work, or the agent itself is in the container.
         if let Err(e) = sys::setns(own.as_raw_fd(), kind) {
-            eprintln!("kiri-init: cannot leave a container's {name} namespace: {e}");
+            eprintln!("stowlark-init: cannot leave a container's {name} namespace: {e}");
             std::process::abort();
         }
         written.map_err(|e| io::Error::new(e.kind(), format!("write sysctl key {}: {}", s.path.replace('/', "."), errno_text(&e))))?;

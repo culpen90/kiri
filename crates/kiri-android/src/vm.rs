@@ -69,11 +69,11 @@ fn command(host: &Host, path: &Path, format: bool) -> Command {
         "-device",
         "virtio-blk-pci,drive=workspace",
         "-chardev",
-        "stdio,id=kiri,signal=off",
+        "stdio,id=stowlark,signal=off",
         "-device",
         "virtio-serial-pci",
         "-device",
-        "virtserialport,chardev=kiri,name=org.kiri.agent",
+        "virtserialport,chardev=stowlark,name=org.kiri.agent",
     ]);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())

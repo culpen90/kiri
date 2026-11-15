@@ -1,13 +1,13 @@
 //! Pull image's suggestions: Docker Hub's search and each image's tags,
 //! as crates/kiri/src/ui/hub.rs does for the Mac. Answers are kept in
-//! %LOCALAPPDATA%\Kiri\hub.json, so a search seen before shows at once,
+//! %LOCALAPPDATA%\Stowlark\hub.json, so a search seen before shows at once,
 //! offline too; one older than a day is shown and then fetched again, and
 //! the page swaps in the fresh answer.
 //!
 //! Search goes through the engine (`GET /images/search`, what
 //! `docker search` uses), which already reaches Docker Hub from WSL. Tags
 //! come from Hub's own API, which the engine does not serve, through
-//! curl.exe (part of Windows): kiri-win has no HTTPS client of its own.
+//! curl.exe (part of Windows): stowlark-win has no HTTPS client of its own.
 //! A name with a registry in front (ghcr.io/…, public.ecr.aws/…) is asked
 //! of that registry instead, as the Mac asks kiri-image's client.
 
@@ -49,7 +49,7 @@ impl Kind {
 
 fn path() -> Option<PathBuf> {
     let local = std::env::var_os("LOCALAPPDATA")?;
-    Some(PathBuf::from(local).join("Kiri").join("hub.json"))
+    Some(PathBuf::from(local).join("Stowlark").join("hub.json"))
 }
 
 fn now() -> u64 {
@@ -319,7 +319,7 @@ mod tests {
             assert!(tags.len() > 5, "{name}: {tags:?}");
             eprintln!("{name}: {:?}", &tags[..5]);
         }
-        assert!(registry_tags("public.ecr.aws/no-such-owner-kiri/none").is_err());
+        assert!(registry_tags("public.ecr.aws/no-such-owner-stowlark/none").is_err());
     }
 
     #[test]

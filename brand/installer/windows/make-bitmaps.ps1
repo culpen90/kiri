@@ -1,5 +1,5 @@
-# The WiX dialog bitmaps for installer/windows/kiri.wxs, to the design in the
-# Kiri Installer Windows canvas: the dialog bitmap is a 164 px night panel
+# The WiX dialog bitmaps for installer/windows/stowlark.wxs, to the design in the
+# Stowlark Installer Windows canvas: the dialog bitmap is a 164 px green panel
 # (the stacked lockup, the version under it) beside a white field the WixUI
 # text sits on; the banner is a chalk strip with the horizontal lockup at
 # its right (Windows Installer draws the banner text black, so it stays
@@ -63,7 +63,7 @@ $logo = (Resolve-Path (Join-Path $PSScriptRoot '..\..\logo')).Path
 $edge = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $edge) { throw "Microsoft Edge is needed to render the installer bitmaps" }
 New-Item -ItemType Directory -Force $Out | Out-Null
-$work = Join-Path $env:TEMP 'kiri-wix-bitmaps'
+$work = Join-Path $env:TEMP 'stowlark-wix-bitmaps'
 New-Item -ItemType Directory -Force $work | Out-Null
 
 function FileUrl([string]$p) { 'file:///' + ($p -replace '\\', '/') }
@@ -93,26 +93,23 @@ function Render([string]$Name, [int]$W, [int]$H, [string]$Html) {
     Write-Host "wrote $(Join-Path $Out "$Name.bmp") ($W x $H)"
 }
 
-$stacked = FileUrl (Join-Path $logo 'kiri-stacked-dark.svg')
-$horizontal = FileUrl (Join-Path $logo 'kiri-horizontal-light.svg')
+$stacked = FileUrl (Join-Path $logo 'stowlark-stacked-dark.svg')
+$horizontal = FileUrl (Join-Path $logo 'stowlark-horizontal-light.svg')
 
-# Dialog: the night panel is 164 px, under the 180 px where WixUI's text
-# starts. The lockup (96 x 131) and an empty 11 px version line, 18 px apart,
-# centred: the line lands at y = 225, where -Stamp writes.
+# Dialog: the dark panel ends before WixUI's text starts. The lockup leaves
+# room for the version at y = 225, where -Stamp writes.
 Render 'wix-dialog' 493 312 @"
 <!doctype html><meta charset="utf-8">
 <body style="margin:0;width:493px;height:312px;overflow:hidden;background:#FFFFFF">
-<div style="position:absolute;left:0;top:0;width:${PanelWidth}px;height:312px;box-sizing:border-box;padding:16px;
-            background:linear-gradient(180deg,#1B232C 0%,#0F1419 100%);
-            display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px">
-  <img src="$stacked" alt="" style="width:96px;display:block">
-  <div style="height:${VersionHeight}px"></div>
+<div style="position:absolute;left:0;top:0;width:${PanelWidth}px;height:312px;
+            background:linear-gradient(180deg,#22483F 0%,#102D28 100%)">
+  <img src="$stacked" alt="" style="position:absolute;left:23px;top:76px;width:118px;display:block">
 </div>
 "@
 
 # Banner: chalk, the horizontal lockup at the right; WixUI draws the title at the left.
 Render 'wix-banner' 493 58 @"
 <!doctype html><meta charset="utf-8">
-<body style="margin:0;width:493px;height:58px;overflow:hidden;background:#F6F2EA">
-<img src="$horizontal" alt="" style="position:absolute;right:14px;top:17px;height:24px;display:block">
+<body style="margin:0;width:493px;height:58px;overflow:hidden;background:#EFF7F3">
+<img src="$horizontal" alt="" style="position:absolute;right:14px;top:16px;height:26px;display:block">
 "@

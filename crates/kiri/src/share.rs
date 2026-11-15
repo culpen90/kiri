@@ -1,4 +1,4 @@
-//! `kiri share`: a public HTTPS URL for a local port or container, through
+//! `stowlark share`: a public HTTPS URL for a local port or container, through
 //! the Kiri Share edge (`edge.runkiri.com`, tunnels on `*.runkiri.cloud`).
 //!
 //! # API (used by the CLI below and by the daemon for the UI)
@@ -10,7 +10,7 @@
 //! - `on_event` gets every [`Event`]: `Connecting`, `Live { url, … }`,
 //!   `Request { method, path, status, ms, bytes_in, bytes_out, at }`,
 //!   `Notice`, `Reconnecting`, and finally `Ended { reason, error }`.
-//! - Account: [`load`] / [`save`] `~/.kiri/share.json` ([`Config`]),
+//! - Account: [`load`] / [`save`] `~/.stowlark/share.json` ([`Config`]),
 //!   [`login_dev`], [`login_start`] + [`login_poll`] (GitHub device flow),
 //!   [`logout`], [`whoami`].
 //!
@@ -54,7 +54,7 @@ include!(concat!(env!("OUT_DIR"), "/share_build_key.rs"));
 
 /// The build key official releases answer the edge's challenge with (see
 /// `kiri_share_proto::attest`), as its id and bytes. `None` in builds made
-/// without `KIRI_SHARE_BUILD_KEY`; their tunnels show as unverified.
+/// without `STOWLARK_SHARE_BUILD_KEY`; their tunnels show as unverified.
 fn build_key() -> Option<(&'static str, [u8; proto::attest::KEY_LEN])> {
     let (id, masked, pad) = std::hint::black_box(BUILD_KEY)?;
     let mut key = [0u8; proto::attest::KEY_LEN];
@@ -66,7 +66,7 @@ fn build_key() -> Option<(&'static str, [u8; proto::attest::KEY_LEN])> {
 
 // ---------------------------------------------------------------- config
 
-/// `~/.kiri/share.json`.
+/// `~/.stowlark/share.json`.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Config {
     /// Edge to use instead of edge.runkiri.com, as `host[:port]`.
@@ -82,17 +82,17 @@ pub struct Config {
 }
 
 fn config_path() -> io::Result<PathBuf> {
-    if let Some(p) = std::env::var_os("KIRI_SHARE_CONFIG") {
+    if let Some(p) = std::env::var_os("STOWLARK_SHARE_CONFIG") {
         return Ok(PathBuf::from(p));
     }
     let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(PathBuf::from).ok_or_else(|| io::Error::other("HOME is not set"))?;
-    Ok(home.join(".kiri/share.json"))
+    Ok(home.join(".stowlark/share.json"))
 }
 
 // ---------------------------------------------------------------- traffic file
 
-/// What a `kiri share` on this computer has served, for the window, which
-/// can't see another process's traffic: `~/.kiri/shares/<pid>.json` as
+/// What a `stowlark share` on this computer has served, for the window, which
+/// can't see another process's traffic: `~/.stowlark/shares/<pid>.json` as
 /// `{url, requests, in, out}`, beside the account file. Written every two
 /// seconds while it changes, and removed when the share ends; one left by a
 /// share that was killed matches no live link, and goes after a day.
@@ -167,7 +167,7 @@ fn traffic_dir() -> io::Result<PathBuf> {
     Ok(config_path()?.parent().map(|p| p.join("shares")).unwrap_or_else(|| PathBuf::from("shares")))
 }
 
-/// Every `kiri share` traffic file on this computer, by link: `url → [requests, in, out]`.
+/// Every `stowlark share` traffic file on this computer, by link: `url → [requests, in, out]`.
 pub fn traffic() -> HashMap<String, [u64; 3]> {
     traffic_dir().map(|d| traffic_in(&d)).unwrap_or_default()
 }
@@ -196,8 +196,8 @@ fn random_hex(bytes: usize) -> String {
 }
 
 /// The edge shows a computer's tunnels under this: the same for the app
-/// and `kiri share` on one computer, though their device ids can differ
-/// (Kiri Dev keeps its own config). A hash of the hardware id, never the id
+/// and `stowlark share` on one computer, though their device ids can differ
+/// (Stowlark Dev keeps its own config). A hash of the hardware id, never the id
 /// itself; the device id when there is none.
 pub fn machine_id(device: &str) -> String {
     static RAW: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
@@ -216,7 +216,7 @@ pub fn machine_id(device: &str) -> String {
 
 fn machine_hash(raw: &str) -> String {
     use sha2::{Digest, Sha256};
-    Sha256::digest(format!("kiri-share-machine:{raw}").as_bytes()).iter().take(12).map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(format!("stowlark-share-machine:{raw}").as_bytes()).iter().take(12).map(|b| format!("{b:02x}")).collect()
 }
 
 /// `IOPlatformUUID` from `ioreg -rd1 -c IOPlatformExpertDevice`.
@@ -261,7 +261,7 @@ pub fn load() -> io::Result<Config> {
         save(&cfg)?;
     }
     // For CI: a token from the dashboard, without signing in.
-    if let Ok(t) = std::env::var("KIRI_SHARE_TOKEN")
+    if let Ok(t) = std::env::var("STOWLARK_SHARE_TOKEN")
         && !t.is_empty()
     {
         cfg.token = Some(t);
@@ -270,12 +270,12 @@ pub fn load() -> io::Result<Config> {
 }
 
 /// The config as it is, without creating it (or a device id): for
-/// diagnostics, which must not leave state behind. `KIRI_SHARE_TOKEN` wins,
+/// diagnostics, which must not leave state behind. `STOWLARK_SHARE_TOKEN` wins,
 /// as in [`load`].
 #[cfg_attr(not(unix), allow(dead_code))]
 pub fn read_config() -> Config {
     let mut cfg: Config = config_path().ok().and_then(|p| std::fs::read(p).ok()).and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
-    if let Ok(t) = std::env::var("KIRI_SHARE_TOKEN")
+    if let Ok(t) = std::env::var("STOWLARK_SHARE_TOKEN")
         && !t.is_empty()
     {
         cfg.token = Some(t);
@@ -309,7 +309,7 @@ pub fn save(cfg: &Config) -> io::Result<()> {
 struct Server {
     host: String,
     port: u16,
-    /// Where to dial, when it isn't `host:port` (`KIRI_SHARE_CONNECT`, for tests).
+    /// Where to dial, when it isn't `host:port` (`STOWLARK_SHARE_CONNECT`, for tests).
     dial: String,
 }
 
@@ -322,19 +322,19 @@ fn parse_server(s: &str) -> (String, u16) {
 }
 
 fn server(cfg: &Config) -> Server {
-    let raw = std::env::var("KIRI_SHARE_SERVER").ok().or_else(|| cfg.server.clone()).unwrap_or_else(|| DEFAULT_SERVER.to_owned());
+    let raw = std::env::var("STOWLARK_SHARE_SERVER").ok().or_else(|| cfg.server.clone()).unwrap_or_else(|| DEFAULT_SERVER.to_owned());
     let (host, port) = parse_server(&raw);
-    let dial = std::env::var("KIRI_SHARE_CONNECT").unwrap_or_else(|_| format!("{host}:{port}"));
+    let dial = std::env::var("STOWLARK_SHARE_CONNECT").unwrap_or_else(|_| format!("{host}:{port}"));
     Server { host, port, dial }
 }
 
 fn tls_config(alpn: &[u8]) -> io::Result<Arc<rustls::ClientConfig>> {
     let mut roots = rustls::RootCertStore::empty();
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    if let Some(ca) = std::env::var_os("KIRI_SHARE_CA") {
-        let certs = rustls::pki_types::CertificateDer::pem_file_iter(&ca).map_err(|e| io::Error::other(format!("KIRI_SHARE_CA: {e}")))?;
+    if let Some(ca) = std::env::var_os("STOWLARK_SHARE_CA") {
+        let certs = rustls::pki_types::CertificateDer::pem_file_iter(&ca).map_err(|e| io::Error::other(format!("STOWLARK_SHARE_CA: {e}")))?;
         for c in certs {
-            roots.add(c.map_err(|e| io::Error::other(format!("KIRI_SHARE_CA: {e}")))?).map_err(|e| io::Error::other(format!("KIRI_SHARE_CA: {e}")))?;
+            roots.add(c.map_err(|e| io::Error::other(format!("STOWLARK_SHARE_CA: {e}")))?).map_err(|e| io::Error::other(format!("STOWLARK_SHARE_CA: {e}")))?;
         }
     }
     let provider = Arc::new(rustls::crypto::ring::default_provider());
@@ -381,7 +381,7 @@ fn api(srv: &Server, method: &str, path: &str, body: Option<&Value>, token: Opti
     let auth = token.map(|t| format!("Authorization: Bearer {t}\r\n")).unwrap_or_default();
     write!(
         s,
-        "{method} {path} HTTP/1.1\r\nHost: {}\r\nUser-Agent: kiri/{}\r\nAccept: application/json\r\n{auth}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+        "{method} {path} HTTP/1.1\r\nHost: {}\r\nUser-Agent: stowlark/{}\r\nAccept: application/json\r\n{auth}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
         srv.host,
         env!("CARGO_PKG_VERSION"),
         payload.len()
@@ -429,7 +429,7 @@ fn api_error(v: &Value, status: u16) -> io::Error {
 }
 
 /// Kiri Cloud's diagnostics intake, `POST /v1/reports` on the same edge
-/// (`KIRI_SHARE_SERVER` and the config's `server` move it, as for sharing).
+/// (`STOWLARK_SHARE_SERVER` and the config's `server` move it, as for sharing).
 /// `signed` sends the Kiri Cloud token when there is one, so a report the
 /// person sent can be answered; crashes always go without it, so they never
 /// name the person's GitHub account. See `crate::diag::report` (and
@@ -504,7 +504,7 @@ pub enum LoginPoll {
 /// GitHub device flow, step two. Call every `interval` until `Done`.
 pub fn login_poll(code: &DeviceCode) -> io::Result<LoginPoll> {
     if Instant::now() > code.expires {
-        return Err(io::Error::other("the sign-in code expired; run `kiri share login` again"));
+        return Err(io::Error::other("the sign-in code expired; run `stowlark share login` again"));
     }
     let mut cfg = load()?;
     let (status, v) = api(&server(&cfg), "POST", "/v1/login/poll", Some(&json!({ "device_code": code.device_code, "device": cfg.device })), None)?;
@@ -525,10 +525,10 @@ pub fn logout() -> io::Result<()> {
 /// The account and its limits, as the edge reports them.
 pub fn whoami() -> io::Result<Value> {
     let cfg = load()?;
-    let token = cfg.token.as_deref().ok_or_else(|| io::Error::other("not signed in; run `kiri share login`"))?;
+    let token = cfg.token.as_deref().ok_or_else(|| io::Error::other("not signed in; run `stowlark share login`"))?;
     let (status, v) = api(&server(&cfg), "GET", "/v1/whoami", None, Some(token))?;
     if status == 401 {
-        return Err(io::Error::other("your sign-in is no longer valid; run `kiri share login`"));
+        return Err(io::Error::other("your sign-in is no longer valid; run `stowlark share login`"));
     }
     if status != 200 {
         return Err(api_error(&v, status));
@@ -541,15 +541,15 @@ pub fn whoami() -> io::Result<Value> {
 /// A signed-in API call: the saved token, and a plain message when it has expired.
 fn signed_in(method: &str, path: &str, body: Option<&Value>) -> io::Result<(u16, Value)> {
     let cfg = load()?;
-    let token = cfg.token.as_deref().ok_or_else(|| io::Error::other("not signed in; run `kiri share login`"))?;
+    let token = cfg.token.as_deref().ok_or_else(|| io::Error::other("not signed in; run `stowlark share login`"))?;
     let (status, v) = api(&server(&cfg), method, path, body, Some(token))?;
     if status == 401 {
-        return Err(io::Error::other("your sign-in is no longer valid; run `kiri share login`"));
+        return Err(io::Error::other("your sign-in is no longer valid; run `stowlark share login`"));
     }
     Ok((status, v))
 }
 
-/// The account's reserved names, how many its plan allows, and names Kiri
+/// The account's reserved names, how many its plan allows, and names Stowlark
 /// Cloud recently didn't approve.
 #[derive(Debug, Clone, Default)]
 pub struct Names {
@@ -609,7 +609,7 @@ pub fn reserve(name: &str) -> io::Result<ReservedName> {
         200..=202 => Ok(reserved_name(&v)),
         403 if v["error"].as_str().is_some_and(|e| e.contains("isn't open")) => Err(api_error(&v, status)),
         403 => Err(io::Error::other(format!(
-            "{}. Release one with `kiri share release NAME`, or see your names with `kiri share names`.",
+            "{}. Release one with `stowlark share release NAME`, or see your names with `stowlark share names`.",
             v["error"].as_str().unwrap_or("your plan's reserved names are all in use").trim_end_matches('.')
         ))),
         _ => Err(api_error(&v, status)),
@@ -640,7 +640,7 @@ pub struct LiveTunnel {
     pub host: String,
     /// `app` or `cli`.
     pub kind: String,
-    /// What opened it, as it told the edge: `Kiri Dev 0.9.4`, `kiri 0.9.4`.
+    /// What opened it, as it told the edge: `Stowlark Dev 0.9.4`, `stowlark 0.9.4`.
     pub client: String,
     pub target: String,
     /// Unix seconds.
@@ -691,7 +691,7 @@ pub fn close_tunnel(name: &str) -> io::Result<()> {
     }
 }
 
-/// What `kiri PORT --name NAME` did about reserving NAME first.
+/// What `stowlark PORT --name NAME` did about reserving NAME first.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum AutoReserve {
     /// Already this account's.
@@ -746,8 +746,8 @@ pub struct Target {
     pub display: String,
 }
 
-/// Whether `kiri ARG` means "share this": a port number or `host:port`.
-/// No Kiri or docker command looks like either.
+/// Whether `stowlark ARG` means "share this": a port number or `host:port`.
+/// No Stowlark or docker command looks like either.
 pub fn is_shorthand(arg: &str) -> bool {
     port_or_addr(arg).is_some()
 }
@@ -791,7 +791,7 @@ fn published_port(inspect: &Value) -> Option<String> {
     found.into_iter().next().map(|(_, a)| a)
 }
 
-/// `3000`, `host:port`, or the name of a Kiri container with a published port.
+/// `3000`, `host:port`, or the name of a Stowlark container with a published port.
 pub fn resolve(arg: &str) -> io::Result<Target> {
     if let Some(t) = port_or_addr(arg) {
         return Ok(t);
@@ -817,7 +817,7 @@ pub fn resolve_via(arg: &str, inspect: impl FnOnce(&str) -> io::Result<Option<Va
 #[cfg(unix)]
 fn container_target(arg: &str) -> io::Result<Target> {
     if !client::alive() {
-        return Err(io::Error::other(format!("`{arg}` isn't a port, and Kiri isn't running to look up a container by that name")));
+        return Err(io::Error::other(format!("`{arg}` isn't a port, and Stowlark isn't running to look up a container by that name")));
     }
     let r = client::request("GET", &format!("/containers/{arg}/json"), None)?;
     if r.status == 404 {
@@ -834,19 +834,19 @@ fn container_target(arg: &str) -> io::Result<Target> {
 fn container_from(arg: &str, c: &Value) -> io::Result<Target> {
     let name = c["Name"].as_str().unwrap_or(arg).trim_start_matches('/').to_owned();
     if c["State"]["Running"].as_bool() != Some(true) {
-        return Err(io::Error::other(format!("container `{name}` isn't running; start it with `kiri start {name}`")));
+        return Err(io::Error::other(format!("container `{name}` isn't running; start it with `stowlark start {name}`")));
     }
     let addr = published_port(c).ok_or_else(|| {
-        io::Error::other(format!("container `{name}` publishes no ports; run it with -p (for example `kiri run -p 8080:80 …`) or share a port number"))
+        io::Error::other(format!("container `{name}` publishes no ports; run it with -p (for example `stowlark run -p 8080:80 …`) or share a port number"))
     })?;
     Ok(Target { display: format!("{name} ({addr})"), label: name, addr })
 }
 
-/// `kiri share` on Windows has no client of the engine; Kiri's window there
+/// `stowlark share` on Windows has no client of the engine; Stowlark's window there
 /// looks containers up through [`resolve_via`].
 #[cfg(windows)]
 fn container_target(arg: &str) -> io::Result<Target> {
-    Err(io::Error::other(format!("`{arg}` isn't a port; container names are not supported by `kiri share` on Windows yet")))
+    Err(io::Error::other(format!("`{arg}` isn't a port; container names are not supported by `stowlark share` on Windows yet")))
 }
 
 // ---------------------------------------------------------------- HTTP peeking
@@ -883,7 +883,7 @@ pub struct Options {
     pub target: Target,
     /// Preferred first label of the hostname; defaults to `target.label`.
     pub name: Option<String>,
-    /// Opened by the app, not `kiri share`: the edge lists it under the
+    /// Opened by the app, not `stowlark share`: the edge lists it under the
     /// app's name.
     pub app: bool,
 }
@@ -983,7 +983,7 @@ type OnEvent = Arc<dyn Fn(Event) + Send + Sync>;
 /// that, including the first connection, is reported through `on_event`.
 pub fn start(opts: Options, on_event: impl Fn(Event) + Send + Sync + 'static) -> io::Result<Handle> {
     let cfg = load()?;
-    let token = cfg.token.clone().ok_or_else(|| io::Error::other("not signed in; run `kiri share login`"))?;
+    let token = cfg.token.clone().ok_or_else(|| io::Error::other("not signed in; run `stowlark share login`"))?;
     let srv = server(&cfg);
     let stop = Arc::new(Stopper::default());
     let on_event: OnEvent = Arc::new(move |e: Event| {
@@ -992,13 +992,13 @@ pub fn start(opts: Options, on_event: impl Fn(Event) + Send + Sync + 'static) ->
     });
     let s = stop.clone();
     let version = env!("CARGO_PKG_VERSION");
-    let client = if opts.app { format!("{} {version}", crate::flavor::APP) } else { format!("kiri {version}") };
+    let client = if opts.app { format!("{} {version}", crate::flavor::APP) } else { format!("stowlark {version}") };
     let who = Who { machine: machine_id(&cfg.device), host: host_name(), device: cfg.device, client };
     let thread = std::thread::Builder::new().name("share".into()).spawn(move || run_tunnel(srv, token, who, opts, s, on_event))?;
     Ok(Handle { stop, thread: Some(thread) })
 }
 
-/// A tunnel's turns in Kiri's log: up, down, back, ended. Not its
+/// A tunnel's turns in Stowlark's log: up, down, back, ended. Not its
 /// requests, and never the token.
 fn log_event(e: &Event) {
     #[cfg(unix)]
@@ -1721,15 +1721,15 @@ fn read_loop(sess: &Arc<Session>, reader: &mut TcpStream, welcomed: &mut Option<
 // ---------------------------------------------------------------- the CLI
 
 const USAGE: &str = "\
-usage: kiri share PORT | HOST:PORT | CONTAINER [NAME | --name NAME] [--no-reserve] [--json]
-       kiri share reserve NAME     ask to keep NAME.runkiri.cloud for yourself
-       kiri share names            your reserved names, and requests waiting for review
-       kiri share release NAME     give a reserved name up, or withdraw a request
-       kiri share login [--dev LOGIN]
-       kiri share logout
-       kiri share status [--json]
+usage: stowlark share PORT | HOST:PORT | CONTAINER [NAME | --name NAME] [--no-reserve] [--json]
+       stowlark share reserve NAME     ask to keep NAME.runkiri.cloud for yourself
+       stowlark share names            your reserved names, and requests waiting for review
+       stowlark share release NAME     give a reserved name up, or withdraw a request
+       stowlark share login [--dev LOGIN]
+       stowlark share logout
+       stowlark share status [--json]
 
-`kiri 3000` shares port 3000 at a random address; `kiri 3000 myapp` (or
+`stowlark 3000` shares port 3000 at a random address; `stowlark 3000 myapp` (or
 --name myapp) at myapp.runkiri.cloud once it's reserved. Kiri Cloud checks each name before it's
 yours, usually within a day, and emails you; until then shares get a random address. If the name is free
 and your plan has a slot left, it's asked for first; --no-reserve uses it only as the start of a random
@@ -1751,7 +1751,7 @@ impl Paint {
         if self.on { format!("\x1b[{code}m{s}\x1b[0m") } else { s.to_owned() }
     }
 
-    /// Kiri's mustard, #E0B420.
+    /// Stowlark's mustard, #E0B420.
     fn accent(&self, s: &str) -> String {
         self.wrap("38;2;224;180;32", s)
     }
@@ -1818,7 +1818,7 @@ fn shorten(path: &str, max: usize) -> String {
     s
 }
 
-/// Prints events the way `kiri share` shows them.
+/// Prints events the way `stowlark share` shows them.
 fn printer(target: String) -> impl Fn(Event) + Send + Sync + 'static {
     let p = Paint::new();
     let shown_url = Mutex::new(None::<String>);
@@ -1888,20 +1888,20 @@ pub fn run(args: &[String]) -> io::Result<()> {
         Some("names") => names_cli(),
         Some("reserve") => {
             let p = Paint::new();
-            let name = args.get(1).ok_or_else(|| io::Error::other("usage: kiri share reserve NAME"))?;
+            let name = args.get(1).ok_or_else(|| io::Error::other("usage: stowlark share reserve NAME"))?;
             let r = reserve(name)?;
             if r.pending {
                 println!("  {}  Asked for {}", p.accent("◌"), p.bold(&r.url));
                 println!("     {}", p.dim("We check each name before it's yours, usually within a day, and email you when it's decided."));
-                println!("     {}", p.dim("Nobody else can ask for it meanwhile. See where it stands with `kiri share names`."));
+                println!("     {}", p.dim("Nobody else can ask for it meanwhile. See where it stands with `stowlark share names`."));
             } else {
                 println!("  {}  {} is yours: {}", p.accent("●"), p.bold(&r.name), p.accent(&p.bold(&r.url)));
-                println!("     {}", p.dim(&format!("Share on it with `kiri PORT --name {}`.", r.name)));
+                println!("     {}", p.dim(&format!("Share on it with `stowlark PORT --name {}`.", r.name)));
             }
             Ok(())
         }
         Some("release") => {
-            let name = args.get(1).ok_or_else(|| io::Error::other("usage: kiri share release NAME"))?;
+            let name = args.get(1).ok_or_else(|| io::Error::other("usage: stowlark share release NAME"))?;
             release(name)?;
             println!("Released `{name}`. Anyone can ask for it now.");
             Ok(())
@@ -1911,7 +1911,7 @@ pub fn run(args: &[String]) -> io::Result<()> {
                 Some(i) => Some(args.get(i + 1).ok_or_else(|| io::Error::other(USAGE))?.clone()),
                 None => None,
             };
-            // `kiri 3000 myapp` is `kiri 3000 --name myapp`.
+            // `stowlark 3000 myapp` is `stowlark 3000 --name myapp`.
             let mut rest = args[1..].iter().filter(|a| !a.starts_with("--") && Some(*a) != flag_name.as_ref());
             let name = match (flag_name.as_ref(), rest.next()) {
                 (None, Some(n)) => Some(n.clone()),
@@ -1954,7 +1954,7 @@ pub fn run(args: &[String]) -> io::Result<()> {
                         println!(
                             "  {}  {}",
                             p.dim("·"),
-                            p.dim(&format!("Your plan's {limit} reserved name{} in use, so this address gets a random ending. See `kiri share names`.", if limit == 1 { " is" } else { "s are" }))
+                            p.dim(&format!("Your plan's {limit} reserved name{} in use, so this address gets a random ending. See `stowlark share names`.", if limit == 1 { " is" } else { "s are" }))
                         );
                     }
                     Ok(AutoReserve::Mine | AutoReserve::Unavailable) | Err(_) => {}
@@ -2029,7 +2029,7 @@ fn names_cli() -> io::Result<()> {
     let limit = n.limit.map_or_else(|| "no limit".to_owned(), |l| format!("{} of {l} used", n.items.len()));
     println!("  {}  {}", p.accent(&p.bold("◆ Reserved names")), p.dim(&limit));
     if n.items.is_empty() {
-        println!("     {}", p.dim("None yet. Ask for one with `kiri share reserve NAME`."));
+        println!("     {}", p.dim("None yet. Ask for one with `stowlark share reserve NAME`."));
     }
     for r in &n.items {
         if r.pending {
@@ -2049,7 +2049,7 @@ fn names_cli() -> io::Result<()> {
     Ok(())
 }
 
-/// An event as `kiri share --json` prints it: `event` names it, the other fields are its own.
+/// An event as `stowlark share --json` prints it: `event` names it, the other fields are its own.
 fn event_json(e: &Event) -> serde_json::Value {
     use serde_json::json;
     match e {
@@ -2082,7 +2082,7 @@ fn status_cli(json: bool) -> io::Result<()> {
         return Ok(());
     }
     if cfg.token.is_none() {
-        println!("Not signed in to Kiri Share ({}). Run `kiri share login`.", srv.host);
+        println!("Not signed in to Kiri Share ({}). Run `stowlark share login`.", srv.host);
         return Ok(());
     }
     let v = whoami()?;
@@ -2124,7 +2124,7 @@ mod tests {
 
     #[test]
     fn a_kiri_share_writes_its_traffic_for_the_window() {
-        let dir = std::env::temp_dir().join(format!("kiri-traffic-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-traffic-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let f = TrafficFile { path: dir.join("1.json"), url: Mutex::new(String::new()), counts: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)], dirty: AtomicBool::new(false), done: AtomicBool::new(false) };
         f.on(&Event::Live { url: "https://dock-4k.runkiri.cloud".into(), rate: 0, remaining: 0, warning: false, domains: Vec::new() });
@@ -2259,7 +2259,7 @@ mod tests {
     fn live_tunnels_read_from_the_edge() {
         let t = live_tunnel(&json!({
             "name": "api-7fq2ab", "label": "api", "url": "https://api-7fq2ab.runkiri.cloud", "machine": "m1", "device": "d1", "host": "paul-desktop",
-            "kind": "app", "client": "Kiri Dev 0.9.4", "target": "api (localhost:3000)", "started": 1_800_000_000u64,
+            "kind": "app", "client": "Stowlark Dev 0.9.4", "target": "api (localhost:3000)", "started": 1_800_000_000u64,
         }));
         assert_eq!((t.name.as_str(), t.label.as_str(), t.host.as_str(), t.kind.as_str(), t.started), ("api-7fq2ab", "api", "paul-desktop", "app", 1_800_000_000));
         // An edge that leaves fields out: the name is the label.
@@ -2268,10 +2268,10 @@ mod tests {
 
     #[test]
     fn config_round_trip() {
-        let dir = std::env::temp_dir().join(format!("kiri-share-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-share-test-{}", std::process::id()));
         let path = dir.join("share.json");
-        // SAFETY: this is the only test that reads KIRI_SHARE_CONFIG.
-        unsafe { std::env::set_var("KIRI_SHARE_CONFIG", &path) };
+        // SAFETY: this is the only test that reads STOWLARK_SHARE_CONFIG.
+        unsafe { std::env::set_var("STOWLARK_SHARE_CONFIG", &path) };
         let cfg = load().unwrap();
         assert_eq!(cfg.device.len(), 32, "a device id is made on first load");
         let saved = Config { server: Some("edge.example:8443".into()), token: Some("ks_x".into()), login: Some("ada".into()), device: cfg.device.clone() };
@@ -2287,7 +2287,7 @@ mod tests {
 
     #[test]
     fn build_key_is_the_one_built_with() {
-        let built = option_env!("KIRI_SHARE_BUILD_KEY").filter(|v| !v.trim().is_empty());
+        let built = option_env!("STOWLARK_SHARE_BUILD_KEY").filter(|v| !v.trim().is_empty());
         match (built.and_then(proto::attest::parse_key), build_key()) {
             (None, None) => {}
             (Some(want), Some(got)) => {

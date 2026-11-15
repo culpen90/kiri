@@ -1,15 +1,15 @@
 //! Running Windows tools safely. `Command::new("reg")` (and friends) search
 //! the directory of the running exe before System32, so a `reg.exe`,
-//! `powershell.exe` or DLL planted next to kiri-win.exe — e.g. in the
+//! `powershell.exe` or DLL planted next to stowlark-win.exe — e.g. in the
 //! unzipped bundle in Downloads — would run in their place. Every system
 //! tool is resolved to its real System32 path, and the DLL search path is
 //! pinned to System32 for anything loaded at run time (WebView2's loader).
 //!
-//! PowerShell only ever runs script files installed beside kiri-win.exe
+//! PowerShell only ever runs script files installed beside stowlark-win.exe
 //! (contrib/windows), with `-File` and their parameters as arguments; never
 //! script text this binary carries, encoded or not. A hidden PowerShell fed
 //! an encoded script is what malware droppers do, and Defender's machine
-//! learning quarantined a kiri-win.exe that did it (Trojan:Win32/Bearfoos.A!ml).
+//! learning quarantined a stowlark-win.exe that did it (Trojan:Win32/Bearfoos.A!ml).
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -25,8 +25,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{SendMessageTimeoutW, HWND_BROA
 
 const LOAD_LIBRARY_SEARCH_SYSTEM32: u32 = 0x0000_0800;
 
-/// What every script kiri-win runs gets before `-File <script>`: no
-/// profile, no prompts, and no execution policy in the way of Kiri's own
+/// What every script stowlark-win runs gets before `-File <script>`: no
+/// profile, no prompts, and no execution policy in the way of Stowlark's own
 /// unsigned scripts.
 pub const PS_FILE: [&str; 5] = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"];
 
@@ -72,7 +72,7 @@ pub fn tool(name: &str) -> Command {
     Command::new(resolve(name))
 }
 
-/// Runs a script file (contrib/windows/kiri-admin.ps1) in an elevated
+/// Runs a script file (contrib/windows/stowlark-admin.ps1) in an elevated
 /// PowerShell and waits for it: ShellExecuteEx's "runas", so Windows asks
 /// for an administrator's approval first. Its exit code, or an error if it
 /// did not start: ERROR_CANCELLED (1223) when the approval was declined.
@@ -179,7 +179,7 @@ pub fn harden_dll_search() {
 pub const BUILD_ARCH: &str = if cfg!(target_arch = "aarch64") { "arm64" } else { "x64" };
 
 /// The PC's own processor, as Windows reports it even to a program running
-/// under emulation (an x64 Kiri on Windows on Arm): "arm64", "x64", or
+/// under emulation (an x64 Stowlark on Windows on Arm): "arm64", "x64", or
 /// None when Windows does not say.
 pub fn native_arch() -> Option<&'static str> {
     let (mut process, mut native) = (0u16, 0u16);
@@ -195,10 +195,10 @@ pub fn native_arch() -> Option<&'static str> {
     }
 }
 
-/// Why this Kiri cannot set up on this PC, if it cannot: its Linux half is
+/// Why this Stowlark cannot set up on this PC, if it cannot: its Linux half is
 /// built for one architecture, and WSL2 runs the PC's own (an arm64
 /// kernel on Windows on Arm, with no x86-64 emulation inside its distros),
-/// and WSL's installer is per architecture too. An x64 Kiri does start on
+/// and WSL's installer is per architecture too. An x64 Stowlark does start on
 /// an Arm PC, under Windows' emulation, so it says which to install.
 pub fn arch_mismatch() -> Option<String> {
     mismatch(BUILD_ARCH, native_arch()?)
@@ -207,7 +207,7 @@ pub fn arch_mismatch() -> Option<String> {
 fn mismatch(build: &str, native: &str) -> Option<String> {
     (build != native).then(|| {
         let v = env!("CARGO_PKG_VERSION");
-        format!("This is Kiri for {build} PCs, and this PC is {native}: its Linux cannot run Kiri's {build} engine. Install Kiri-{v}-{}.msi instead.", if native == "arm64" { "arm64" } else { "x86_64" })
+        format!("This is Stowlark for {build} PCs, and this PC is {native}: its Linux cannot run Stowlark's {build} engine. Install Stowlark-{v}-{}.msi instead.", if native == "arm64" { "arm64" } else { "x86_64" })
     })
 }
 
@@ -217,7 +217,7 @@ mod tests {
     fn quotes_arguments_as_windows_reads_them() {
         assert_eq!(super::quote("-Dns"), "-Dns");
         assert_eq!(super::quote(""), "\"\"");
-        assert_eq!(super::quote(r"C:\Users\A B\kiri-admin.ps1"), r#""C:\Users\A B\kiri-admin.ps1""#);
+        assert_eq!(super::quote(r"C:\Users\A B\stowlark-admin.ps1"), r#""C:\Users\A B\stowlark-admin.ps1""#);
         assert_eq!(super::quote(r"C:\A B\"), r#""C:\A B\\""#);
         assert_eq!(super::quote(r#"a "b""#), r#""a \"b\"""#);
         assert_eq!(super::quote(r#"a\"b"#), r#""a\\\"b""#);
@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(super::mismatch("x64", "x64"), None);
         assert_eq!(super::mismatch("arm64", "arm64"), None);
         let m = super::mismatch("x64", "arm64").unwrap();
-        assert!(m.contains(&format!("Kiri-{}-arm64.msi", env!("CARGO_PKG_VERSION"))), "{m}");
+        assert!(m.contains(&format!("Stowlark-{}-arm64.msi", env!("CARGO_PKG_VERSION"))), "{m}");
         assert!(super::mismatch("arm64", "x64").unwrap().ends_with("-x86_64.msi instead."));
     }
 }

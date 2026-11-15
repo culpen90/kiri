@@ -96,7 +96,7 @@ pub(crate) fn race<T: Send + 'static>(addrs: &[SocketAddr], delay: Duration, bud
             let addr = order[next];
             let limit = end.map_or(ATTEMPT_TIMEOUT, |e| (e - now).min(ATTEMPT_TIMEOUT));
             let (tx, attempt) = (tx.clone(), attempt.clone());
-            let spawned = thread::Builder::new().name("kiri-connect".into()).spawn(move || {
+            let spawned = thread::Builder::new().name("stowlark-connect".into()).spawn(move || {
                 // Nobody listens once another attempt has won; what this
                 // one opened is then dropped, and so closed.
                 let _ = tx.send(attempt(addr, limit));

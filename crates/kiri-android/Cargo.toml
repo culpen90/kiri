@@ -1,5 +1,5 @@
 [package]
-name = "kiri-android"
+name = "stowlark-android"
 description = "Run small offline Linux workspaces on Android"
 version.workspace = true
 edition.workspace = true

@@ -1,11 +1,11 @@
 #!/bin/bash
-# The docker CLI, Compose and buildx the full `kiri` package bundles, at the
+# The docker CLI, Compose and buildx the full `stowlark` package bundles, at the
 # versions and SHA-256s pinned in crates/kiri/src/cli_pins.rs (LINUX_* for
 # x86_64, LINUX_ARM64_* for aarch64):
 #   packaging/linux/fetch-cli.sh <cli-dir> [cache-dir] [x86_64|aarch64]
 # Leaves <cli-dir>/docker, docker-compose, docker-buildx, each verified.
 set -euo pipefail
-dir=$1 cache=${2:-${XDG_CACHE_HOME:-$HOME/.cache}/kiri-linux-cli} arch=${3:-x86_64}
+dir=$1 cache=${2:-${XDG_CACHE_HOME:-$HOME/.cache}/stowlark-linux-cli} arch=${3:-x86_64}
 # The pins' prefix, and each project's name for the architecture.
 case $arch in
   x86_64) p=LINUX_ compose_arch=x86_64 go_arch=amd64 ;;

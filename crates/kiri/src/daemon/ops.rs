@@ -380,7 +380,7 @@ fn container_prune(req: &Request, engine: &Engine) -> Result<Value, Error> {
 
 fn image_prune(req: &Request, engine: &Engine) -> Result<Value, Error> {
     let f = filters(req, &["dangling", "until", "label", "label!"])?;
-    // Without `-a` only untagged images go; Kiri keeps none of those around.
+    // Without `-a` only untagged images go; Stowlark keeps none of those around.
     let dangling_only = f.bool("dangling").unwrap_or(true);
     let used: Vec<String> = engine.each(|c| Some(c.spec.image_id.clone()));
     let mut deleted = Vec::new();

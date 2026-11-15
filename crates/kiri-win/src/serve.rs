@@ -45,7 +45,7 @@ pub struct Config {
     pub distro: Option<String>,
     pub pipe: String,
     pub socket: String,
-    pub kiri: String,
+    pub stowlark: String,
 }
 
 impl Config {
@@ -55,10 +55,10 @@ impl Config {
         Config {
             // The distro setup chose, unless one is named.
             distro: flag("--distro").or_else(crate::setup::distro),
-            pipe: flag("--pipe").unwrap_or_else(|| r"\\.\pipe\kiri".into()),
+            pipe: flag("--pipe").unwrap_or_else(|| r"\\.\pipe\stowlark".into()),
             // Where contrib/wsl/install.sh runs the daemon.
-            socket: flag("--socket").unwrap_or_else(|| "/var/lib/kiri-daemon/.kiri/run/docker.sock".into()),
-            kiri: flag("--kiri").unwrap_or_else(|| "/usr/local/bin/kiri".into()),
+            socket: flag("--socket").unwrap_or_else(|| "/var/lib/stowlark-daemon/.stowlark/run/docker.sock".into()),
+            stowlark: flag("--stowlark").or_else(|| flag("--kiri")).unwrap_or_else(|| "/usr/local/bin/stowlark".into()),
         }
     }
 }
@@ -73,7 +73,7 @@ pub fn set_setup_pending(pending: bool) {
     SETUP_PENDING.store(pending, Ordering::SeqCst);
 }
 
-const SETUP_UNFINISHED: &str = "Kiri's setup isn't finished: open Kiri to finish it";
+const SETUP_UNFINISHED: &str = "Stowlark's setup isn't finished: open Stowlark to finish it";
 
 /// Answers a client that got nothing from the engine while setup is
 /// unfinished: docker prints "Error response from daemon: <message>".
@@ -93,13 +93,13 @@ fn refuse_unfinished(pipe: &Pipe) -> bool {
 }
 
 /// Docker's own pipe. docker-py, the Go and Java SDKs, Testcontainers and
-/// IDE plugins open it without reading docker contexts, so Kiri serves it
+/// IDE plugins open it without reading docker contexts, so Stowlark serves it
 /// too while no other engine does.
 pub const DOCKER_ENGINE: &str = r"\\.\pipe\docker_engine";
 
 /// Processes that serve docker_engine themselves: while one runs, the pipe
-/// is theirs, and Kiri lets go of it (Docker Desktop cannot start its own
-/// while any instance of Kiri's is open).
+/// is theirs, and Stowlark lets go of it (Docker Desktop cannot start its own
+/// while any instance of Stowlark's is open).
 const OTHER_ENGINES: &[&str] = &["Docker Desktop.exe", "com.docker.backend.exe", "dockerd.exe", "Rancher Desktop.exe"];
 
 /// Carries connections to `distro` from now on (setup has just made it);
@@ -113,7 +113,7 @@ pub fn set_distro(distro: &str) {
     }
 }
 
-/// Serves the pipe on threads of its own. Fails if another kiri-win
+/// Serves the pipe on threads of its own. Fails if another stowlark-win
 /// already serves it.
 pub fn start(cfg: Config) -> io::Result<()> {
     let first = Pipe::create(&cfg.pipe, true)?;
@@ -122,7 +122,7 @@ pub fn start(cfg: Config) -> io::Result<()> {
     let hub = Arc::new(Hub { cfg: Mutex::new(cfg), current: Mutex::new(None), next_id: AtomicU32::new(1) });
     let _ = HUB.set(hub.clone());
     let h = hub.clone();
-    thread::Builder::new().name("kiri-docker-engine".into()).spawn(move || docker_engine(&h))?;
+    thread::Builder::new().name("stowlark-docker-engine".into()).spawn(move || docker_engine(&h))?;
     // Start WSL now, so the first docker command does not wait for it.
     let h = hub.clone();
     thread::spawn(move || {
@@ -132,7 +132,7 @@ pub fn start(cfg: Config) -> io::Result<()> {
             }
         }
     });
-    thread::Builder::new().name("kiri-pipe".into()).spawn(move || {
+    thread::Builder::new().name("stowlark-pipe".into()).spawn(move || {
         let mut pipe = first;
         loop {
             if let Err(e) = pipe.connect() {
@@ -226,7 +226,7 @@ fn serve_while_free(hub: &Arc<Hub>, first: Pipe) {
             }
             Err(e) => log(&format!("{DOCKER_ENGINE} connect: {e}")),
         }
-        // Every instance in use: wait for a client to go, as for Kiri's pipe.
+        // Every instance in use: wait for a client to go, as for Stowlark's pipe.
         pipe = loop {
             if stop.load(Ordering::SeqCst) {
                 break 'serve;
@@ -333,7 +333,7 @@ impl Window {
 
 #[derive(Debug)]
 struct Hub {
-    /// Setup may change the distro while kiri-win runs.
+    /// Setup may change the distro while stowlark-win runs.
     cfg: Mutex<Config>,
     /// The running bridge; a new one starts when it has died (WSL shut down).
     current: Mutex<Option<Arc<Bridge>>>,
@@ -347,9 +347,9 @@ impl Hub {
             return Ok(b.clone());
         }
         let cfg = self.cfg.lock().unwrap_or_else(PoisonError::into_inner).clone();
-        // Until setup has made Kiri's Linux there is nothing to bridge to.
+        // Until setup has made Stowlark's Linux there is nothing to bridge to.
         if cfg.distro.is_none() {
-            return Err(io::Error::new(io::ErrorKind::NotConnected, "Kiri is not set up yet"));
+            return Err(io::Error::new(io::ErrorKind::NotConnected, "Stowlark is not set up yet"));
         }
         let b = Bridge::start(&cfg)?;
         *current = Some(b.clone());
@@ -374,7 +374,7 @@ impl Bridge {
             cmd.args(["-d", d]);
         }
         let mut child = cmd
-            .args(["-u", "root", "--", &cfg.kiri, "bridge", "--socket", &cfg.socket])
+            .args(["-u", "root", "--", &cfg.stowlark, "bridge", "--socket", &cfg.socket])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -571,7 +571,7 @@ fn to_client(pipe: &Pipe, rx: &Receiver<Reply>, queued: &AtomicUsize, credit: Op
                 return pipe.write(&[]).is_ok();
             }
             // Closed before a word, with setup unfinished: no engine is
-            // listening in Kiri's Linux yet. Say why.
+            // listening in Stowlark's Linux yet. Say why.
             Reply::Close if !answered && refuse_unfinished(pipe) => return true,
             Reply::Close => break,
         }
@@ -633,12 +633,12 @@ fn read_frame(r: &mut impl Read) -> io::Result<Option<(u8, u32, Vec<u8>)>> {
     Ok(Some((h[0], id, data)))
 }
 
-/// Appends to %LOCALAPPDATA%\Kiri\kiri-win.log: there is no console.
+/// Appends to %LOCALAPPDATA%\Stowlark\stowlark-win.log: there is no console.
 pub fn log(msg: &str) {
-    let Some(dir) = std::env::var_os("LOCALAPPDATA").map(|d| std::path::PathBuf::from(d).join("Kiri")) else { return };
+    let Some(dir) = std::env::var_os("LOCALAPPDATA").map(|d| std::path::PathBuf::from(d).join("Stowlark")) else { return };
     let _ = std::fs::create_dir_all(&dir);
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("kiri-win.log")) {
-        // UTC to the millisecond, as the engine's /var/log/kiri.log writes
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("stowlark-win.log")) {
+        // UTC to the millisecond, as the engine's /var/log/stowlark.log writes
         // it, so a moment reads the same in both.
         let t = crate::daemon::time::rfc3339(std::time::SystemTime::now());
         let stamp = format!("{}Z", t.get(..23).unwrap_or(&t));

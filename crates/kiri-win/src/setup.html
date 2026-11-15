@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kiri Setup</title>
+<title>Stowlark Setup</title>
 <style>
 :root{
   --bg:#0F1419; --rail:#131920; --surface:#171E26; --sunk:#0B0F13; --line:#26303A; --line-2:#1B232C; --stroke:#3A4652;
@@ -263,17 +263,17 @@ main.choose .foot{position:sticky;bottom:-24px;margin-bottom:-24px;padding:14px 
 /* Values are set in the monospace face, and some are words ("optional",
    "included"): Arabic letters there come from the text face, since a
    monospace one stretches every letter to one width. Latin and digits keep it. */
-@font-face{font-family:"Kiri Arabic";src:local("Segoe UI"),local("GeezaPro");unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF}
-@font-face{font-family:"Kiri Arabic";font-weight:600 900;src:local("Segoe UI Semibold"),local("Segoe UI Bold"),local("GeezaPro-Bold");unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF}
-[lang|=ar]{--f-mono:"Kiri Arabic","Cascadia Mono",Consolas,monospace}
+@font-face{font-family:"Stowlark Arabic";src:local("Segoe UI"),local("GeezaPro");unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF}
+@font-face{font-family:"Stowlark Arabic";font-weight:600 900;src:local("Segoe UI Semibold"),local("Segoe UI Bold"),local("GeezaPro-Bold");unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF}
+[lang|=ar]{--f-mono:"Stowlark Arabic","Cascadia Mono",Consolas,monospace}
 </style>
 </head>
 <body>
 <div class="app">
   <aside class="rail" aria-label="Setup steps">
     <div class="brand">
-      <svg viewBox="0 0 64 64" width="36" height="36" aria-hidden="true" focusable="false"><defs><clipPath id="su-rail"><rect x="22" y="12" width="34" height="40" rx="10"/></clipPath></defs><g transform="translate(6 0) skewX(-10)"><rect x="22" y="12" width="34" height="40" rx="10" fill="#E0B420"/><rect x="10" y="0" width="60" height="21.5" fill="#F2CF5B" clip-path="url(#su-rail)"/><ellipse cx="41.5" cy="29" rx="3.1" ry="3.6" fill="#0F1419"/><ellipse cx="50.5" cy="29" rx="3.1" ry="3.6" fill="#0F1419"/></g><g fill="#F6F2EA"><rect x="5" y="21.5" width="13" height="5" rx="2.5"/><rect x="1" y="32" width="15" height="5" rx="2.5"/><rect x="7" y="42.5" width="7" height="5" rx="2.5"/></g></svg>
-      <span>Kiri</span>
+      <svg viewBox="0 0 64 64" width="36" height="36" aria-hidden="true" focusable="false"></svg>
+      <span>Stowlark</span>
     </div>
     <ol class="steps" id="steps"></ol>
     <p class="rail-foot" id="railFoot" hidden></p>
@@ -319,7 +319,7 @@ function rtlReady(s) {
 }
 function island(v) { return /^[\d.,\s]*$/.test(v) ? v : '\u2068' + v + '\u2069'; }
 addWords(/*STRINGS*/{});
-/* As the main window's langFor: the first of the system's languages Kiri has
+/* As the main window's langFor: the first of the system's languages Stowlark has
    (zh-TW, zh-HK, zh-MO and zh-Hant… read Traditional Chinese, any other Chinese
    Simplified, any Portuguese Brazilian, "in" Indonesian), else English. */
 var LANG_IDS = LANGS.map(function (l) { return l[0]; });
@@ -382,67 +382,62 @@ function trn(n, one, other, vars) { var s = isOne(n) ? one : other, v = { n: n }
   var mbN = function (b) { return Math.round(b / 1e6); };
   var mb = function (b) { return isNum(b) ? mbN(b) + ' MB' : '—'; };
   var setText = function (el, t) { t = t == null ? '' : String(t); if (el.textContent !== t) el.textContent = t; };
-  var linuxName = function (l, short) { return l === 'ubuntu' ? (short ? 'Ubuntu' : 'Ubuntu 26.04') : l === 'kiri' ? 'Kiri Linux' : 'Linux'; };
+  var linuxName = function (l, short) { return l === 'ubuntu' ? (short ? 'Ubuntu' : 'Ubuntu 26.04') : l === 'kiri' ? 'Stowlark Linux' : 'Linux'; };
   var STEPS = ['welcome', 'wsl', 'restart', 'choose', 'linux', 'engine', 'tools', 'ready'];
   var RAIL = { welcome: 0, wsl: 0, restart: 0, choose: 1, linux: 1, engine: 2, tools: 3, ready: 4 };
   var CHECK = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var CHECK_RAIL = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  document.title = tr("Kiri Setup");
+  document.title = tr("Stowlark Setup");
   document.querySelector('.rail').setAttribute('aria-label', tr("Setup steps"));
   var MONO = 'Cascadia Mono, Consolas, monospace';
   var DISP = 'Segoe UI Variable Display, Segoe UI, sans-serif';
 
   /* ---------- illustrations (decorative; copied from the design) ---------- */
-  var BODY = function (id, eyes) { return '<rect x="22" y="12" width="34" height="40" rx="10" fill="#E0B420"/><rect x="10" y="0" width="60" height="21.5" fill="#F2CF5B" clip-path="url(#' + id + ')"/>' + eyes; };
-  var CLIP = function (id) { return '<defs><clipPath id="' + id + '"><rect x="22" y="12" width="34" height="40" rx="10"/></clipPath></defs>'; };
-  var ARMS = '<g fill="#F6F2EA"><rect x="5" y="21.5" width="13" height="5" rx="2.5"/><rect x="1" y="32" width="15" height="5" rx="2.5"/><rect x="7" y="42.5" width="7" height="5" rx="2.5"/></g>';
-  var EYES = function (x1, x2, y, glint) {
-    return '<ellipse cx="' + x1 + '" cy="' + y + '" rx="3.1" ry="3.6" fill="#0F1419"/><ellipse cx="' + x2 + '" cy="' + y + '" rx="3.1" ry="3.6" fill="#0F1419"/>' +
-      (glint ? '<circle cx="' + (x1 + glint[0]) + '" cy="' + (y + glint[1]) + '" r="0.9" fill="#FFFFFF"/><circle cx="' + (x2 + glint[0]) + '" cy="' + (y + glint[1]) + '" r="0.9" fill="#FFFFFF"/>' : '');
-  };
+  var MARK = '<path fill="#89F2C4" fill-rule="evenodd" d="M4 46l17-14L9 14l26 9 10-8a9 9 0 0 1 10 0l7 5-7 4a25 25 0 0 1-24 22H4ZM51.6 20.6a1.7 1.7 0 1 0-3.4 0 1.7 1.7 0 1 0 3.4 0Z"/><path fill="#EFF7F3" d="M9 14l26 9-6 12-8-3Z"/>';
+  document.querySelector('.brand svg').innerHTML = MARK;
   var SVG = function (vb, w, h, inner) { return '<svg viewBox="' + vb + '" width="' + w + '" height="' + h + '" aria-hidden="true" focusable="false">' + inner + '</svg>'; };
 
   var ART = {
-    welcome: SVG('0 0 220 180', 220, 180, CLIP('su-a1') +
+    welcome: SVG('0 0 220 180', 220, 180,
       '<circle cx="110" cy="92" r="84" fill="#E0B420" opacity="0.08"/><rect x="128" y="44" width="62" height="104" rx="8" fill="#171E26" stroke="#3A4652" stroke-width="2"/><circle cx="178" cy="98" r="3.5" fill="#9AA3AE"/>' +
       '<text x="159" y="34" text-anchor="middle" font-family="' + MONO + '" font-size="12" fill="#9AA3AE">Linux</text><rect x="16" y="147" width="190" height="2" rx="1" fill="#26303A"/>' +
-      '<g transform="translate(18 62) scale(1.35)"><g transform="translate(6 0) skewX(-10)">' + BODY('su-a1', EYES(43, 52, 28, [1, -1.4])) + '</g>' + ARMS + '</g>'),
+      '<g transform="translate(18 62) scale(1.35)">\' + MARK + \'</g>'),
     download: SVG('0 0 64 64', 72, 72, '<circle cx="32" cy="32" r="30" fill="#131920" stroke="#26303A" stroke-width="2"/><path d="M32 16 v26 m-11 -11 l11 11 l11 -11 M20 48 h24" fill="none" stroke="#E0B420" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>'),
-    restart: SVG('0 0 240 190', 240, 190, CLIP('su-a3') +
+    restart: SVG('0 0 240 190', 240, 190,
       '<circle cx="120" cy="96" r="88" fill="#E0B420" opacity="0.08"/><path d="M188 96 a68 68 0 1 1 -20 -48" fill="none" stroke="#3A4652" stroke-width="8" stroke-linecap="round"/><path d="M172 26 l-2 26 l26 -4" fill="none" stroke="#3A4652" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>' +
-      '<g transform="translate(70 58) scale(1.3)"><g transform="translate(6 0) skewX(-10)">' + BODY('su-a3', '<path d="M38.5 29.5 q3 2.4 6 0 M47.5 29.5 q3 2.4 6 0" fill="none" stroke="#0F1419" stroke-width="2" stroke-linecap="round"/>') + '</g></g>' +
+      '<g transform="translate(70 58) scale(1.3)">\' + MARK + \'</g>' +
       '<text x="168" y="70" font-family="' + DISP + '" font-size="22" font-weight="700" fill="#E8C04A">z</text><text x="182" y="54" font-family="' + DISP + '" font-size="15" font-weight="700" fill="#E8C04A" opacity="0.7">z</text>'),
     chooseKiri: function (label) {
-      return SVG('0 0 440 168', '100%', 168, CLIP('su-ck') +
+      return SVG('0 0 440 168', '100%', 168,
         '<path d="M30 140 L110 72 L150 104 L196 58 L262 120 L300 92 L360 140 Z" fill="#1B232C"/><path d="M196 58 L184 69 L192 67 L198 72 L205 66 L210 70 Z" fill="#26303A"/><rect x="20" y="139" width="400" height="2" rx="1" fill="#26303A"/>' +
-        '<g transform="translate(138 52) scale(1.35)"><g transform="translate(6 0) skewX(-10)">' + BODY('su-ck', EYES(42.5, 51.5, 29, [1.1, -1.4])) + '</g>' + ARMS + '</g>' +
+        '<g transform="translate(138 52) scale(1.35)">\' + MARK + \'</g>' +
         '<g transform="translate(250 96)"><rect x="0" y="0" width="46" height="40" rx="7" fill="#1B232C" stroke="#E0B420" stroke-width="2"/><rect x="19" y="0" width="8" height="40" fill="#E0B420" opacity="0.55"/>' +
         '<text x="23" y="-10" text-anchor="middle" font-family="' + MONO + '" font-size="13" font-weight="600" fill="#E8C04A">' + esc(label) + '</text></g>' +
         '<circle cx="330" cy="46" r="3" fill="#E0B420" opacity="0.7"/><circle cx="352" cy="62" r="2" fill="#F2CF5B" opacity="0.6"/><circle cx="318" cy="72" r="1.6" fill="#F6F2EA" opacity="0.5"/>').replace('<svg ', '<svg preserveAspectRatio="xMidYMid meet" ');
     },
     chooseUbuntu: function (label) {
-      return SVG('0 0 440 168', '100%', 168, CLIP('su-cu') +
+      return SVG('0 0 440 168', '100%', 168,
         '<rect x="20" y="139" width="400" height="2" rx="1" fill="#26303A"/><path d="M262 46 a18 18 0 0 1 34 -8 a14 14 0 0 1 26 6 a12 12 0 0 1 -2 24 h-56 a11 11 0 0 1 -2 -22 z" fill="#1B232C" stroke="#3A4652" stroke-width="2"/>' +
         '<path d="M290 74 v20 m-8 -8 l8 8 l8 -8" fill="none" stroke="#9AA3AE" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
         '<g stroke="#3A4652" stroke-width="2" fill="#1B232C"><rect x="214" y="100" width="76" height="38" rx="6"/><rect x="292" y="100" width="76" height="38" rx="6"/></g>' +
         '<g stroke="#26303A" stroke-width="2"><path d="M214 113 h76 M214 125 h76 M292 113 h76 M292 125 h76"/></g>' +
         '<rect x="226" y="66" width="128" height="32" rx="6" fill="#1B232C" stroke="#3A4652" stroke-width="2"/>' +
         '<text x="290" y="88" text-anchor="middle" font-family="' + MONO + '" font-size="14" font-weight="600" fill="#C9CDD2">' + esc(label) + '</text>' +
-        '<g transform="translate(96 82) scale(0.86)"><g transform="translate(6 0) skewX(-10)">' + BODY('su-cu', EYES(43, 52, 26.5, [1, -1.7])) + '</g></g>' +
+        '<g transform="translate(96 82) scale(0.86)">\' + MARK + \'</g>' +
         '<text x="130" y="72" font-family="Segoe UI, sans-serif" font-size="18" font-weight="600" fill="#9AA3AE">?</text>');
     },
-    linuxKiri: SVG('0 0 120 100', 120, 100, CLIP('su-a5') +
-      '<circle cx="60" cy="52" r="46" fill="#E0B420" opacity="0.1"/><g transform="translate(30 20) scale(0.8)"><g transform="translate(6 0) skewX(-10)">' + BODY('su-a5', EYES(42.5, 51.5, 29)) + '</g></g>' +
+    linuxKiri: SVG('0 0 120 100', 120, 100,
+      '<circle cx="60" cy="52" r="46" fill="#E0B420" opacity="0.1"/><g transform="translate(30 20) scale(0.8)">\' + MARK + \'</g>' +
       '<path d="M22 62 h76 l-6 30 h-64 z" fill="#1B232C" stroke="#E0B420" stroke-width="2" stroke-linejoin="round"/><path d="M22 62 l-10 -12 M98 62 l10 -12" stroke="#E0B420" stroke-width="2" stroke-linecap="round"/>'),
     linuxUbuntu: SVG('0 0 120 100', 120, 100,
       '<circle cx="60" cy="52" r="46" fill="#9AA3AE" opacity="0.08"/><path d="M36 32 a14 14 0 0 1 27 -6 a11 11 0 0 1 20 5 a9 9 0 0 1 -1 18 h-45 a8.5 8.5 0 0 1 -1 -17 z" fill="#1B232C" stroke="#3A4652" stroke-width="2"/>' +
       '<path d="M60 52 v16 m-7 -7 l7 7 l7 -7" fill="none" stroke="#E0B420" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><g fill="#1B232C" stroke="#3A4652" stroke-width="1.5"><rect x="32" y="76" width="26" height="16" rx="3"/><rect x="62" y="76" width="26" height="16" rx="3"/></g>'),
-    engine: SVG('0 0 120 100', 120, 100, CLIP('su-a6') +
+    engine: SVG('0 0 120 100', 120, 100,
       '<circle cx="60" cy="52" r="46" fill="#E0B420" opacity="0.1"/><g transform="translate(78 30)" fill="none" stroke="#3A4652" stroke-width="6"><circle r="16"/><path d="M0 -26 v8 M0 18 v8 M-26 0 h8 M18 0 h8 M-18 -18 l6 6 M12 12 l6 6 M18 -18 l-6 6 M-12 12 l-6 6" stroke-linecap="round"/></g>' +
-      '<g transform="translate(14 30) scale(0.95)"><g transform="translate(6 0) skewX(-10)">' + BODY('su-a6', EYES(42.5, 51.5, 29)) + '</g>' + ARMS + '</g>'),
-    ready: SVG('0 0 280 200', 280, 200, CLIP('su-a8') +
+      '<g transform="translate(14 30) scale(0.95)">\' + MARK + \'</g>'),
+    ready: SVG('0 0 280 200', 280, 200,
       '<circle cx="140" cy="100" r="92" fill="#E0B420" opacity="0.1"/><ellipse cx="140" cy="182" rx="44" ry="6" fill="#0B0F13"/>' +
-      '<g transform="translate(84 18) scale(1.6)"><g transform="translate(6 0) skewX(-10)">' + BODY('su-a8', '<path d="M38.5 30 q3 -3 6 0 M47.5 30 q3 -3 6 0" fill="none" stroke="#0F1419" stroke-width="2.2" stroke-linecap="round"/>') + '</g>' + ARMS + '</g>' +
+      '<g transform="translate(84 18) scale(1.6)">\' + MARK + \'</g>' +
       '<g><rect x="40" y="40" width="10" height="5" rx="2.5" fill="#E0B420" transform="rotate(-30 45 42)"/><rect x="226" y="54" width="10" height="5" rx="2.5" fill="#5CC99A" transform="rotate(25 231 56)"/><rect x="60" y="120" width="8" height="4" rx="2" fill="#F6F2EA" transform="rotate(40 64 122)"/><rect x="214" y="130" width="9" height="4" rx="2" fill="#F2CF5B" transform="rotate(-20 218 132)"/><circle cx="236" cy="96" r="3.5" fill="#E0B420"/><circle cx="40" cy="86" r="3" fill="#5CC99A"/><circle cx="198" cy="28" r="2.5" fill="#F6F2EA"/></g>')
   };
   var TOOL_ICON = {
@@ -509,14 +504,14 @@ function trn(n, one, other, vars) { var s = isOne(n) ? one : other, v = { n: n }
       case 'wsl': return { cls: '', html:
         '<div class="head"><span class="eyebrow">' + tr("Step 1 of 5") + '</span><h1 tabindex="-1">' + tr("Installing Windows Subsystem for Linux") + '</h1></div>' +
         '<section class="card" aria-label="' + tr("Progress") + '">' + PROG + TASKS + '</section>' +
-        '<p class="note">' + tr("Windows will need one restart when this finishes. Kiri will ask before restarting, so you can save your work first.") + '</p>' +
+        '<p class="note">' + tr("Windows will need one restart when this finishes. Stowlark will ask before restarting, so you can save your work first.") + '</p>' +
         ERR + '<div class="foot">' + CANCEL + '</div>' };
 
       case 'restart': return { cls: 'center', html:
         ART.restart + '<h1 class="l" tabindex="-1">' + tr("One restart to finish WSL") + '</h1>' +
-        '<p class="lede lg">' + tr("Windows turns on Virtual Machine Platform while it starts up. Kiri opens again by itself afterwards and carries on from step 2. Save your work first.") + '</p>' +
+        '<p class="lede lg">' + tr("Windows turns on Virtual Machine Platform while it starts up. Stowlark opens again by itself afterwards and carries on from step 2. Save your work first.") + '</p>' +
         ERR + '<div style="display:flex;gap:12px;margin-top:8px"><button type="button" class="btn lg" data-cmd="setup-later">' + tr("Restart later") + '</button><button type="button" class="btn primary lg" style="padding:0 24px" data-cmd="setup-restart">' + tr("Restart now") + '</button></div>' +
-        '<p class="small">' + tr("Later: Kiri waits in the tray and picks up after your next restart.") + '</p>' };
+        '<p class="small">' + tr("Later: Stowlark waits in the tray and picks up after your next restart.") + '</p>' };
 
       case 'choose': {
         var ex = !!s.existingUbuntu;
@@ -524,28 +519,28 @@ function trn(n, one, other, vars) { var s = isOne(n) ? one : other, v = { n: n }
         var ubSize = isNum(sz.ubuntu) ? mb(sz.ubuntu) : '—';
         var ratio = isNum(sz.kiri) && isNum(sz.ubuntu) && sz.kiri > 0 ? Math.round(sz.ubuntu / sz.kiri) : null;
         return { cls: 'choose', html:
-          '<div class="head"><h1 tabindex="-1">' + tr("Where should your containers run?") + '</h1><p class="lede md">' + tr("Kiri runs Linux containers inside WSL, in a Linux of its own. Both choices run the same containers at the same speed; they differ in size and in what else you get.") + '</p></div>' +
-          '<div class="opts" role="radiogroup" aria-label="' + tr("Linux for Kiri") + '">' +
+          '<div class="head"><h1 tabindex="-1">' + tr("Where should your containers run?") + '</h1><p class="lede md">' + tr("Stowlark runs Linux containers inside WSL, in a Linux of its own. Both choices run the same containers at the same speed; they differ in size and in what else you get.") + '</p></div>' +
+          '<div class="opts" role="radiogroup" aria-label="' + tr("Linux for Stowlark") + '">' +
             '<label class="opt"><div class="opt-art">' + ART.chooseKiri(kiriSize) + '</div><div class="opt-b">' +
-              '<div class="opt-h"><input type="radio" name="linux" value="kiri"><span class="opt-n">Kiri Linux</span><span class="badge">' + tr("Recommended") + '</span></div>' +
-              '<p class="opt-p">' + tr("A tiny Linux made only for Kiri, built from Alpine. It stays out of sight and leaves with Kiri.") + '</p>' +
+              '<div class="opt-h"><input type="radio" name="linux" value="kiri"><span class="opt-n">Stowlark Linux</span><span class="badge">' + tr("Recommended") + '</span></div>' +
+              '<p class="opt-p">' + tr("A tiny Linux made only for Stowlark, built from Alpine. It stays out of sight and leaves with Stowlark.") + '</p>' +
               '<dl class="facts"><div><dt>' + tr("Download") + '</dt><dd>' + tr("Included") + '</dd></div><div><dt>' + tr("On disk") + '</dt><dd>≈ 15 MB</dd></div><div><dt>' + tr("Setup time") + '</dt><dd>≈ 30 s*</dd></div><div><dt>' + tr("Linux account") + '</dt><dd>' + tr("None") + '</dd></div></dl>' +
-              '<ul class="pros"><li>' + tr("+ No Microsoft Store, no username or password") + '</li><li>' + tr("+ Removed completely when you remove Kiri") + '</li><li class="con">' + tr("– Not a Linux to use yourself") + '</li></ul>' +
+              '<ul class="pros"><li>' + tr("+ No Microsoft Store, no username or password") + '</li><li>' + tr("+ Removed completely when you remove Stowlark") + '</li><li class="con">' + tr("– Not a Linux to use yourself") + '</li></ul>' +
             '</div></label>' +
             '<label class="opt"><div class="opt-art">' + ART.chooseUbuntu(ex ? tr("installed") : ubSize) + '</div><div class="opt-b">' +
               '<div class="opt-h"><input type="radio" name="linux" value="ubuntu"><span class="opt-n">Ubuntu 26.04</span></div>' +
               (ex
-                ? '<p class="opt-p">' + tr("Kiri will reuse the Ubuntu already installed on this PC. Kiri runs in it, and you keep opening it as your own Linux.") + '</p>' +
+                ? '<p class="opt-p">' + tr("Stowlark will reuse the Ubuntu already installed on this PC. Stowlark runs in it, and you keep opening it as your own Linux.") + '</p>' +
                   '<dl class="facts"><div><dt>' + tr("Download") + '</dt><dd>' + tr("Nothing to download") + '</dd></div><div><dt>' + tr("On disk") + '</dt><dd>' + tr("Already there") + '</dd></div><div><dt>' + tr("Setup time") + '</dt><dd>≈ 30 s*</dd></div><div><dt>' + tr("Linux account") + '</dt><dd>' + tr("Yours") + '</dd></div></dl>' +
-                  '<ul class="pros"><li>' + tr("+ Uses the Ubuntu you already have: nothing to download") + '</li><li>' + tr("+ A complete Linux you can open from Start") + '</li><li class="con">' + tr("– Kiri shares it with your own Linux work") + '</li></ul>'
-                : '<p class="opt-p">' + tr("The full Ubuntu from Microsoft's WSL list. Kiri runs in it, and you can open it as your own Linux too.") + '</p>' +
+                  '<ul class="pros"><li>' + tr("+ Uses the Ubuntu you already have: nothing to download") + '</li><li>' + tr("+ A complete Linux you can open from Start") + '</li><li class="con">' + tr("– Stowlark shares it with your own Linux work") + '</li></ul>'
+                : '<p class="opt-p">' + tr("The full Ubuntu from Microsoft's WSL list. Stowlark runs in it, and you can open it as your own Linux too.") + '</p>' +
                   '<dl class="facts"><div><dt>' + tr("Download") + '</dt><dd>' + ubSize + '</dd></div><div><dt>' + tr("On disk") + '</dt><dd>≈ 1.6 GB*</dd></div><div><dt>' + tr("Setup time") + '</dt><dd>≈ 2–4 min*</dd></div><div><dt>' + tr("Linux account") + '</dt><dd>' + tr("Optional") + '</dd></div></dl>' +
-                  '<ul class="pros"><li>' + tr("+ A complete Linux you can open from Start") + '</li><li>' + tr("+ Already have Ubuntu? Kiri uses it: nothing to download") + '</li>' +
-                  (ratio ? '<li class="con">' + tr("– About {ratio}× the download of Kiri Linux", { ratio: ratio }) + '</li>' : '') + '</ul>') +
+                  '<ul class="pros"><li>' + tr("+ A complete Linux you can open from Start") + '</li><li>' + tr("+ Already have Ubuntu? Stowlark uses it: nothing to download") + '</li>' +
+                  (ratio ? '<li class="con">' + tr("– About {ratio}× the download of Stowlark Linux", { ratio: ratio }) + '</li>' : '') + '</ul>') +
             '</div></label>' +
           '</div>' + ERR +
           '<div class="foot"><p class="small">' + (ex ? tr("Ubuntu is already on this PC, so choosing it downloads nothing.") : (isNum(sz.ubuntu) ? tr("{size} is Ubuntu's download today.", { size: ubSize }) : '')) + ' ' + tr("* Estimates until measured on a clean PC.") + '</p>' +
-          '<button type="button" class="btn primary" data-act="choose" id="chooseBtn">' + tr("Set up with Kiri Linux") + '</button></div>' };
+          '<button type="button" class="btn primary" data-act="choose" id="chooseBtn">' + tr("Set up with Stowlark Linux") + '</button></div>' };
       }
 
       case 'linux':
@@ -554,44 +549,44 @@ function trn(n, one, other, vars) { var s = isOne(n) ? one : other, v = { n: n }
           return { cls: '', html:
             hero(ART.linuxUbuntu, tr("Step 2 of 5"), exu ? tr("Setting up Ubuntu 26.04") : tr("Downloading Ubuntu 26.04"), exu ? tr("Using the Ubuntu already on this PC: nothing to download.") : tr("From ubuntu.com, through Microsoft's WSL list.")) +
             '<section class="card" aria-label="' + tr("Progress") + '">' + PROG + TASKS + '</section>' +
-            '<p class="note">' + tr("No Linux username is needed now: Kiri runs inside Ubuntu on its own. Ubuntu asks for one only the first time you open it yourself. * Estimate.") + '</p>' +
-            ERR + '<div class="foot">' + (exu ? '' : '<button type="button" class="btn" data-cmd="setup-switch" data-value="kiri">' + tr("Use Kiri Linux instead") + '</button>') + CANCEL + '</div>' };
+            '<p class="note">' + tr("No Linux username is needed now: Stowlark runs inside Ubuntu on its own. Ubuntu asks for one only the first time you open it yourself. * Estimate.") + '</p>' +
+            ERR + '<div class="foot">' + (exu ? '' : '<button type="button" class="btn" data-cmd="setup-switch" data-value="kiri">' + tr("Use Stowlark Linux instead") + '</button>') + CANCEL + '</div>' };
         }
         return { cls: '', html:
-          hero(ART.linuxKiri, tr("Step 2 of 5"), tr("Setting up Kiri Linux"), tr("Nothing to download: it came inside Kiri.")) +
+          hero(ART.linuxKiri, tr("Step 2 of 5"), tr("Setting up Stowlark Linux"), tr("Nothing to download: it came inside Stowlark.")) +
           '<section class="card" aria-label="' + tr("Progress") + '">' + PROG + TASKS + LOG(false) + '</section>' +
           ERR + '<div class="foot">' + CANCEL + '</div>' };
 
       case 'engine': return { cls: '', html:
-        hero(ART.engine, tr("Step 3 of 5"), tr("Starting Kiri’s engine"), tr("The part that runs your containers, inside {linux}.", { linux: esc(linuxName(s.linux, true)) })) +
+        hero(ART.engine, tr("Step 3 of 5"), tr("Starting Stowlark’s engine"), tr("The part that runs your containers, inside {linux}.", { linux: esc(linuxName(s.linux, true)) })) +
         '<section class="card tight" aria-label="' + tr("Progress") + '">' + PROG + TASKS + LOG(true) + '</section>' +
         ERR + '<div class="foot">' + CANCEL + '</div>' };
 
       case 'tools': return { cls: '', html:
-        '<div class="head"><span class="eyebrow">' + tr("Step 4 of 5") + '</span><h1 tabindex="-1">' + tr("Setting up the Docker tools") + '</h1><p class="lede">' + tr("The same docker commands you know, talking to Kiri. Each file is checked against its pinned SHA-256.") + '</p></div>' +
+        '<div class="head"><span class="eyebrow">' + tr("Step 4 of 5") + '</span><h1 tabindex="-1">' + tr("Setting up the Docker tools") + '</h1><p class="lede">' + tr("The same docker commands you know, talking to Stowlark. Each file is checked against its pinned SHA-256.") + '</p></div>' +
         PROG + '<ul class="tools" data-slot="tools" aria-label="' + tr("Docker tools") + '"></ul>' +
-        '<section class="box"><span class="box-t" id="mkT">' + tr("Make Kiri the default for docker") + '</span>' +
+        '<section class="box"><span class="box-t" id="mkT">' + tr("Make Stowlark the default for docker") + '</span>' +
         '<label class="check"><input type="checkbox" id="mk" aria-describedby="mkT">' +
         (s.otherDocker
-          ? tr("docker, docker compose and docker build use Kiri in every new terminal. Another Docker was found on this PC; leave this off to keep using it as the default.")
-          : tr("docker, docker compose and docker build use Kiri in every new terminal. No other Docker was found on this PC.")) +
+          ? tr("docker, docker compose and docker build use Stowlark in every new terminal. Another Docker was found on this PC; leave this off to keep using it as the default.")
+          : tr("docker, docker compose and docker build use Stowlark in every new terminal. No other Docker was found on this PC.")) +
         '</label></section>' +
         // Another engine, and docker stays on it: which builds docker build.
         (s.otherDocker
           ? '<section class="box" data-slot="bw"><span class="box-t" id="bwT">' + tr("Builds") + '</span>' +
             '<label class="check"><input type="radio" name="bw" value="docker" aria-describedby="bwT"><span>' + tr("<b>Keep building with Docker.</b> Nothing changes: docker build builds where it does now, and the images stay in {engine}.", { engine: esc(s.otherEngine || tr("your other Docker")) }) + '</span></label>' +
-            '<label class="check"><input type="radio" name="bw" value="kiri" aria-describedby="bwT"><span>' + tr("<b>Build with Kiri.</b> docker build and docker compose build run on Kiri, and the images are in Kiri. {engine} won’t see them. You can switch any time in Settings → Builds.", { engine: esc(s.otherEngine || tr("Your other Docker")) }) + '</span></label></section>'
+            '<label class="check"><input type="radio" name="bw" value="kiri" aria-describedby="bwT"><span>' + tr("<b>Build with Stowlark.</b> docker build and docker compose build run on Stowlark, and the images are in Stowlark. {engine} won’t see them. You can switch any time in Settings → Builds.", { engine: esc(s.otherEngine || tr("Your other Docker")) }) + '</span></label></section>'
           : '') + ERR + '<div class="foot">' + CANCEL + '</div>' };
 
       case 'ready': return { cls: 'center', html:
-        ART.ready + '<h1 class="xl" tabindex="-1">' + tr("Kiri is ready") + '</h1>' +
+        ART.ready + '<h1 class="xl" tabindex="-1">' + tr("Stowlark is ready") + '</h1>' +
         '<p class="lede lg" style="max-width:540px">' + tr("Your test container said hello. Open a new terminal and try it yourself:") + '</p>' +
         '<div class="cmd"><span class="p" aria-hidden="true">$</span><code>docker run --rm alpine echo hello</code><button type="button" class="btn sm" data-act="copy" aria-live="polite">' + tr("Copy") + '</button></div>' +
-        '<label class="check inline"><input type="checkbox" id="auto">' + tr("Start Kiri when I sign in (in the tray)") + '</label>' +
-        ERR + '<button type="button" class="btn primary xl" data-cmd="setup-open">' + tr("Open Kiri") + '</button>' };
+        '<label class="check inline"><input type="checkbox" id="auto">' + tr("Start Stowlark when I sign in (in the tray)") + '</label>' +
+        ERR + '<button type="button" class="btn primary xl" data-cmd="setup-open">' + tr("Open Stowlark") + '</button>' };
 
       default: return { cls: '', html: /* welcome */
-        '<div class="hero lgx">' + ART.welcome + '<div class="hero-t"><h1 class="xl" tabindex="-1">' + tr("Welcome to Kiri") + '</h1><p class="lede lg">' + tr("Kiri runs Linux containers on Windows without Docker Desktop. It needs Windows Subsystem for Linux (WSL), Microsoft's own way to run Linux, which this PC doesn't have yet.") + '</p></div></div>' +
+        '<div class="hero lgx">' + ART.welcome + '<div class="hero-t"><h1 class="xl" tabindex="-1">' + tr("Welcome to Stowlark") + '</h1><p class="lede lg">' + tr("Stowlark runs Linux containers on Windows without Docker Desktop. It needs Windows Subsystem for Linux (WSL), Microsoft's own way to run Linux, which this PC doesn't have yet.") + '</p></div></div>' +
         '<section class="size">' + ART.download + '<div class="size-t"><span class="size-n">' + (isNum(sz.wsl) ? mb(sz.wsl) : '—') + '</span><span class="size-s">' + tr("WSL, downloaded from Microsoft") + '</span></div></section>' +
         ERR + '<div class="foot"><a href="https://learn.microsoft.com/windows/wsl/about" data-open>' + tr("What is WSL?") + '</a><span class="grow"></span>' +
         '<button type="button" class="btn" data-cmd="setup-quit">' + tr("Quit") + '</button><button type="button" class="btn primary" data-cmd="setup-install-wsl">' + tr("Install WSL") + '</button></div>' };
@@ -610,7 +605,7 @@ function trn(n, one, other, vars) { var s = isOne(n) ? one : other, v = { n: n }
       { t: tr("Windows Subsystem for Linux"), f: '', c: step === 'wsl' ? tr("Installing") + (pct ? ' · ' + pct : '') : step === 'restart' ? tr("Needs a restart") : tr("Now"), d: tr("Installed") },
       { t: step === 'choose' ? tr("Choose a Linux") : 'Linux', f: step === 'restart' ? tr("After the restart") : tr("Choose and install"),
         c: step === 'choose' ? tr("Now") : s.linux === 'ubuntu' ? ('Ubuntu · ' + (s.existingUbuntu ? '' : tr("downloading") + ' ') + pct).trim() : ln + (pct ? ' · ' + pct : ''), d: s.linux ? ln : '' },
-      { t: tr("Kiri’s engine"), f: tr("Runs your containers"), c: tr("Starting"), d: tr("Running") },
+      { t: tr("Stowlark’s engine"), f: tr("Runs your containers"), c: tr("Starting"), d: tr("Running") },
       { t: tr("Docker tools"), f: 'docker, Compose, buildx', c: tasks.length ? tr("{done} of {total}", { done: nDone, total: tasks.length }) : tr("Now"), d: '' },
       { t: tr("Ready"), f: tr("docker run, from any terminal"), c: '', d: '' }
     ];
@@ -623,7 +618,7 @@ function trn(n, one, other, vars) { var s = isOne(n) ? one : other, v = { n: n }
     }).join('');
     var steps = document.getElementById('steps');
     if (steps.innerHTML !== html) steps.innerHTML = html;
-    var foot = { welcome: tr("Kiri sets itself up for your Windows account only."), wsl: tr("Keep using your PC meanwhile."), choose: tr("Step 2 of 5. Nothing else on this PC changes: Kiri sets itself up for your Windows account only.") }[step];
+    var foot = { welcome: tr("Stowlark sets itself up for your Windows account only."), wsl: tr("Keep using your PC meanwhile."), choose: tr("Step 2 of 5. Nothing else on this PC changes: Stowlark sets itself up for your Windows account only.") }[step];
     var rf = document.getElementById('railFoot');
     rf.hidden = !foot; setText(rf, foot || '');
   }
@@ -765,10 +760,10 @@ function trn(n, one, other, vars) { var s = isOne(n) ? one : other, v = { n: n }
     var r = main.querySelectorAll('input[name=linux]');
     for (var i = 0; i < r.length; i++) r[i].checked = r[i].value === choice;
     var cb = document.getElementById('chooseBtn');
-    if (cb) setText(cb, choice === 'ubuntu' ? tr("Set up with Ubuntu") : tr("Set up with Kiri Linux"));
+    if (cb) setText(cb, choice === 'ubuntu' ? tr("Set up with Ubuntu") : tr("Set up with Stowlark Linux"));
     var mk = document.getElementById('mk'); if (mk) mk.checked = effective(s, 'makeDefault');
     var au = document.getElementById('auto'); if (au) au.checked = effective(s, 'autostart');
-    // Kiri as docker's default builds on Kiri anyway: the question is only for docker staying elsewhere.
+    // Stowlark as docker's default builds on Stowlark anyway: the question is only for docker staying elsewhere.
     var bw = q('[data-slot=bw]'); if (bw) bw.hidden = effective(s, 'makeDefault');
     var bk = effective(s, 'buildKiri'), rb = main.querySelectorAll('input[name=bw]');
     for (var j = 0; j < rb.length; j++) rb[j].checked = (rb[j].value === 'kiri') === bk;
@@ -780,7 +775,7 @@ function trn(n, one, other, vars) { var s = isOne(n) ? one : other, v = { n: n }
   onRelang = function () { render(); };
 
   /* ---------- input ---------- */
-  /* As in the Kiri window: "Copied" in a bubble above the button, which stays as it is. */
+  /* As in the Stowlark window: "Copied" in a bubble above the button, which stays as it is. */
   var copyTimer = 0;
   function copiedTip(el) {
     document.querySelectorAll('.copied-tip').forEach(function (x) { x.remove(); });
@@ -855,15 +850,15 @@ function trn(n, one, other, vars) { var s = isOne(n) ? one : other, v = { n: n }
     restart: { step: 'restart' },
     choose: { step: 'choose' },
     'choose-existing': { step: 'choose', existingUbuntu: true },
-    linux: { step: 'linux', linux: 'kiri', progress: { pct: 66, done: null, total: null, rate: null, eta: null, label: 'Adding Kiri Linux to WSL' },
-      tasks: [T('Unpack Kiri Linux', 'done', '9 MB · done'), T('Add it to WSL', 'active', 'working'), T('Start it', 'todo', 'next')],
-      log: ['unpacked kiri-linux (Alpine 3.24.3 + Kiri 0.1.0) to %LOCALAPPDATA%\\Kiri\\wsl', 'wsl --import kiri %LOCALAPPDATA%\\Kiri\\wsl kiri-linux.tar --version 2'] },
+    linux: { step: 'linux', linux: 'kiri', progress: { pct: 66, done: null, total: null, rate: null, eta: null, label: 'Adding Stowlark Linux to WSL' },
+      tasks: [T('Unpack Stowlark Linux', 'done', '9 MB · done'), T('Add it to WSL', 'active', 'working'), T('Start it', 'todo', 'next')],
+      log: ['unpacked stowlark-linux (Alpine 3.24.3 + Stowlark 0.1.0) to %LOCALAPPDATA%\\Stowlark\\wsl', 'wsl --import stowlark %LOCALAPPDATA%\\Stowlark\\wsl stowlark-linux.tar --version 2'] },
     'linux-ubuntu': { step: 'linux', linux: 'ubuntu', progress: { pct: 37, done: 156000000, total: 418495746, rate: 21400000, eta: 13, label: 'Downloading' },
       tasks: [T('Download Ubuntu', 'active', '156 / 418 MB'), T('Unpack it into WSL', 'todo', '≈ 1.6 GB*'), T('Start Ubuntu', 'todo', 'next')] },
-    engine: { step: 'engine', linux: 'kiri', tasks: [T('Start the engine', 'done', 'ready in 33 ms'), T('Connect Windows to it', 'done', '\\\\.\\pipe\\kiri'), T('Run a test container', 'active', 'pulling alpine')],
-      log: ['kiri daemon: ready in 33 ms', '$ docker run --rm alpine echo hello', 'latest: Pulling from library/alpine'] },
-    tools: { step: 'tools', linux: 'kiri', tasks: [T('docker', 'done', '29.9.2 · checked'), T('Compose', 'done', 'v5.6.1 · checked'), T('buildx', 'done', 'v0.38.1 · checked'), T('docker build on Kiri', 'active', 'builder kiri-build')] },
-    'tools-other': { step: 'tools', linux: 'kiri', otherDocker: true, otherEngine: 'Docker Desktop', makeDefault: false, buildKiri: false, tasks: [T('docker', 'done', '29.9.2 · checked'), T('Compose', 'active', 'v5.6.1'), T('buildx', 'todo', 'v0.38.1'), T('docker build on Kiri', 'todo', 'builder kiri-build')] },
+    engine: { step: 'engine', linux: 'kiri', tasks: [T('Start the engine', 'done', 'ready in 33 ms'), T('Connect Windows to it', 'done', '\\\\.\\pipe\\stowlark'), T('Run a test container', 'active', 'pulling alpine')],
+      log: ['stowlark daemon: ready in 33 ms', '$ docker run --rm alpine echo hello', 'latest: Pulling from library/alpine'] },
+    tools: { step: 'tools', linux: 'kiri', tasks: [T('docker', 'done', '29.9.2 · checked'), T('Compose', 'done', 'v5.6.1 · checked'), T('buildx', 'done', 'v0.38.1 · checked'), T('docker build on Stowlark', 'active', 'builder stowlark-build')] },
+    'tools-other': { step: 'tools', linux: 'kiri', otherDocker: true, otherEngine: 'Docker Desktop', makeDefault: false, buildKiri: false, tasks: [T('docker', 'done', '29.9.2 · checked'), T('Compose', 'active', 'v5.6.1'), T('buildx', 'todo', 'v0.38.1'), T('docker build on Stowlark', 'todo', 'builder stowlark-build')] },
     ready: { step: 'ready', linux: 'kiri' },
     error: Object.assign({}, wsl, { progress: Object.assign({}, wsl.progress, { rate: 0, eta: null }), tasks: [wsl.tasks[0], T('Download WSL', 'error', 'stopped at 224 MB'), wsl.tasks[2], wsl.tasks[3]],
       error: 'The download from Microsoft stopped: this PC seems to be offline. Check the connection and try again.' })

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Stowlark
+GenericName=Containers
+Comment=Run and share containers
+Exec=/usr/lib/stowlark/stowlark-window ui
+Icon=/usr/share/icons/hicolor/scalable/apps/stowlark.svg
+Terminal=false
+Categories=Development;
+Keywords=docker;containers;kubernetes;
+StartupWMClass=dev.stowlark.Stowlark

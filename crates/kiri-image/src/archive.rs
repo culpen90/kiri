@@ -186,7 +186,7 @@ mod tests {
         // Tests run in parallel: each gets its own directory.
         static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let d = std::env::temp_dir().join(format!("kiri-archive-test-{}-{n}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("stowlark-archive-test-{}-{n}", std::process::id()));
         std::fs::create_dir_all(&d).unwrap();
         d
     }
@@ -249,7 +249,7 @@ mod tests {
             b.append_data(&mut h, name, data).unwrap();
         };
         let mut layer = tar::Builder::new(Vec::new());
-        add(&mut layer, "etc/hello.txt", b"hello kiri\n");
+        add(&mut layer, "etc/hello.txt", b"hello stowlark\n");
         let layer = layer.into_inner().unwrap();
         let config = json!({"architecture": "arm64", "os": "linux", "created": "2026-11-09T00:00:00Z",
             "config": {"Env": ["PATH=/usr/bin"], "Cmd": ["/bin/true"]},

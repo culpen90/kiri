@@ -1,14 +1,14 @@
-//! Diagnostics: Kiri's own log, crash reports and `kiri diag`.
+//! Diagnostics: Stowlark's own log, crash reports and `stowlark diag`.
 //!
 //! Each process, the window (`ui`), the engine (`daemon`) and the command
-//! line (`cli`), writes one JSON line per event to `~/.kiri/logs/<part>.log`:
+//! line (`cli`), writes one JSON line per event to `~/.stowlark/logs/<part>.log`:
 //!
 //! ```text
 //! {"time":"2026-10-28T09:41:07.123Z","level":"warn","part":"daemon","msg":"container exited","fields":{"id":"3f2a9c1e0b7d","exit_code":"137"}}
 //! ```
 //!
 //! `fields` is there only when there are some; their values are strings.
-//! A log over 5 MB moves to `.1` (and `.1` to `.2`). `KIRI_LOG=debug` (or
+//! A log over 5 MB moves to `.1` (and `.1` to `.2`). `STOWLARK_LOG=debug` (or
 //! `error`, `warn`, `info`, the default) sets how much is written.
 //!
 //! Only what helps explain a problem is logged: the VM, container and image
@@ -19,10 +19,10 @@
 //! The window and the engine also send their stderr through a pipe (see
 //! [`capture_stderr`]): each line gets a timestamp in the log, and a
 //! timestamped copy goes on to the original stderr (the engine's
-//! `~/.kiri/daemon.log`), with the log's own events beside them.
+//! `~/.stowlark/daemon.log`), with the log's own events beside them.
 //!
-//! A panic in any process leaves `~/.kiri/crashes/<unix time>-<part>.txt`.
-//! `kiri diag report` gathers logs and crashes, redacted, into one file
+//! A panic in any process leaves `~/.stowlark/crashes/<unix time>-<part>.txt`.
+//! `stowlark diag report` gathers logs and crashes, redacted, into one file
 //! (see [`report`]); crash files go to Kiri Cloud by themselves only when
 //! the person turned that on (`"crashReports": true` in `ui.json`).
 
@@ -111,7 +111,7 @@ pub fn part() -> Part {
 
 fn max_level() -> Level {
     static LEVEL: OnceLock<Level> = OnceLock::new();
-    *LEVEL.get_or_init(|| std::env::var("KIRI_LOG").ok().and_then(|v| Level::parse(&v)).unwrap_or(Level::Info))
+    *LEVEL.get_or_init(|| std::env::var("STOWLARK_LOG").ok().and_then(|v| Level::parse(&v)).unwrap_or(Level::Info))
 }
 
 pub fn enabled(level: Level) -> bool {
@@ -160,7 +160,7 @@ pub fn new_op(kind: &str) -> String {
     format!("{}-{n:04x}", if kind.is_empty() { "op" } else { &kind })
 }
 
-/// An op id as it may arrive from elsewhere (a header, `KIRI_OP`).
+/// An op id as it may arrive from elsewhere (a header, `STOWLARK_OP`).
 pub fn valid_op(op: &str) -> bool {
     !op.is_empty() && op.len() <= 40 && op.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
@@ -191,7 +191,7 @@ pub fn op_header() -> String {
     op().map(|o| format!("X-Kiri-Op: {o}\r\n")).unwrap_or_default()
 }
 
-/// `~/.kiri` (`~/.kiri-dev` for Kiri Dev).
+/// `~/.stowlark` (`~/.stowlark-dev` for Stowlark Dev).
 pub fn state_dir() -> Option<PathBuf> {
     std::env::var_os("HOME").map(|h| PathBuf::from(h).join(crate::flavor::STATE.get()))
 }
@@ -208,8 +208,8 @@ pub fn crashes_dir() -> Option<PathBuf> {
 /// the engine also log their stderr.
 pub fn init(part: Part) {
     let _ = PART.set(part);
-    // A command the window runs for an action (`kiri k8s start`) works for its op.
-    if let Ok(op) = std::env::var("KIRI_OP")
+    // A command the window runs for an action (`stowlark k8s start`) works for its op.
+    if let Ok(op) = std::env::var("STOWLARK_OP")
         && valid_op(&op)
     {
         std::mem::forget(enter_op(op));
@@ -290,7 +290,7 @@ fn append(part: Part, line: &str) -> io::Result<()> {
 
 /// Appends a line, first moving the file aside if the line would take it
 /// past `max`. One write per line, in append mode: lines from several
-/// processes (two `kiri` commands at once) don't interleave.
+/// processes (two `stowlark` commands at once) don't interleave.
 pub fn append_to(path: &Path, line: &str, max: u64) -> io::Result<()> {
     static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _held = LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -357,11 +357,11 @@ pub fn capture_stderr() {
     ECHO.store(orig, Ordering::Relaxed);
     // SAFETY: the pipe's read end, owned from here by the thread.
     let reader = unsafe { File::from_raw_fd(read) };
-    let spawned = std::thread::Builder::new().name("kiri-stderr".into()).spawn(move || {
+    let spawned = std::thread::Builder::new().name("stowlark-stderr".into()).spawn(move || {
         // This thread starts before the daemon blocks SIGINT and SIGTERM for
         // its signal thread. Left open here, systemd's SIGTERM lands on this
         // thread and its default action ends the process at once, without the
-        // daemon's shutdown: containers aren't stopped and kiri-init outlives
+        // daemon's shutdown: containers aren't stopped and stowlark-init outlives
         // the unit, so the next start fails (219/CGROUP).
         // SAFETY: plain signal-mask calls on a local set, for this thread only.
         unsafe {
@@ -464,10 +464,10 @@ pub fn system() -> System {
     System { os, build, arch: std::env::consts::ARCH, model }
 }
 
-/// `kiri` or `kiri-dev`, as an upload names the flavor (a feature app
+/// `stowlark` or `stowlark-dev`, as an upload names the flavor (a feature app
 /// counts as Dev); crash files say the exact one.
 pub fn flavor() -> &'static str {
-    if crate::flavor::dev() { "kiri-dev" } else { "kiri" }
+    if crate::flavor::dev() { "stowlark-dev" } else { "stowlark" }
 }
 
 /// Writes a crash file (and an error line) on every panic, then lets the
@@ -483,7 +483,7 @@ fn install_panic_hook() {
             .or_else(|| info.payload().downcast_ref::<String>().cloned())
             .unwrap_or_else(|| "(no message)".into());
         let at = info.location().map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column())).unwrap_or_default();
-        // A command whose output was closed under it (`kiri share | head`,
+        // A command whose output was closed under it (`stowlark share | head`,
         // a closed terminal, the reader gone): not a crash. End quietly, as
         // a command killed by SIGPIPE would, with no crash file.
         if part() == Part::Cli && closed_output(&message) {
@@ -514,7 +514,7 @@ pub fn crash_text(t: SystemTime, thread: &str, at: &str, message: &str, backtrac
     // The subcommand only: arguments can carry values (`-e KEY=VALUE`).
     let command = std::env::args().nth(1).filter(|a| a.len() <= 20 && a.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'));
     let text = format!(
-        "Kiri crash report\n\
+        "Stowlark crash report\n\
          Version:  {app} {version}\n\
          Flavor:   {flavor}\n\
          Part:     {part}\n\
@@ -523,7 +523,7 @@ pub fn crash_text(t: SystemTime, thread: &str, at: &str, message: &str, backtrac
          Location: {at}\n\
          Message:  {message}\n\
          System:   {system}\n\
-         Command:  kiri {command}\n\
+         Command:  stowlark {command}\n\
          \n\
          Backtrace:\n{backtrace}\n",
         app = crate::flavor::APP,
@@ -570,7 +570,7 @@ mod tests {
     }
 
     fn temp(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("kiri-diag-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("stowlark-diag-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -654,9 +654,9 @@ mod tests {
         let b = save_crash(&dir, t, Part::Daemon, "two").unwrap();
         assert_eq!(a.file_name().unwrap(), "1792800000-daemon.txt");
         assert_eq!(b.file_name().unwrap(), "1792800000-daemon-1.txt");
-        let text = crash_text(t, "kiri-api", "src/x.rs:1:2", "boom", "0: main");
-        assert!(text.contains("Message:  boom") && text.contains("Thread:   kiri-api") && text.contains("Backtrace:\n0: main"), "{text}");
-        assert!(text.contains(&format!("Version:  Kiri {}", env!("CARGO_PKG_VERSION"))));
+        let text = crash_text(t, "stowlark-api", "src/x.rs:1:2", "boom", "0: main");
+        assert!(text.contains("Message:  boom") && text.contains("Thread:   stowlark-api") && text.contains("Backtrace:\n0: main"), "{text}");
+        assert!(text.contains(&format!("Version:  Stowlark {}", env!("CARGO_PKG_VERSION"))));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

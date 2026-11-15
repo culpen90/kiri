@@ -1,5 +1,5 @@
-//! `kiri daemon`: owns the VM and serves the Docker Engine API on a Unix
-//! socket. The docker CLI (context `kiri`), the kiri CLI and the window are
+//! `stowlark daemon`: owns the VM and serves the Docker Engine API on a Unix
+//! socket. The docker CLI (context `stowlark`), the stowlark CLI and the window are
 //! all clients of it.
 
 #[cfg(target_os = "linux")]
@@ -41,17 +41,17 @@ use std::time::{Duration, Instant};
 
 use crate::diag;
 
-/// `~/.kiri` (`~/.kiri-dev` for Kiri Dev): the daemon's state (the CA key, proxy settings). Always under
-/// HOME: `KIRI_SOCKET` may point the socket anywhere, but it must not move
+/// `~/.stowlark` (`~/.stowlark-dev` for Stowlark Dev): the daemon's state (the CA key, proxy settings). Always under
+/// HOME: `STOWLARK_SOCKET` may point the socket anywhere, but it must not move
 /// private state into a directory another user can prepare.
 pub fn state_dir() -> io::Result<PathBuf> {
     let home = std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| io::Error::other("HOME is not set"))?;
     Ok(home.join(crate::flavor::STATE.get()))
 }
 
-/// `~/.kiri/run/docker.sock`, beside OrbStack's `~/.orbstack/run/docker.sock`.
+/// `~/.stowlark/run/docker.sock`, beside OrbStack's `~/.orbstack/run/docker.sock`.
 pub fn socket_path() -> io::Result<PathBuf> {
-    if let Some(s) = std::env::var_os("KIRI_SOCKET") {
+    if let Some(s) = std::env::var_os("STOWLARK_SOCKET") {
         return Ok(PathBuf::from(s));
     }
     let home = std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| io::Error::other("HOME is not set"))?;
@@ -108,9 +108,9 @@ pub fn run(_args: &[String]) -> io::Result<()> {
     let _ = std::fs::remove_file(&socket); // stale, from a daemon that died
     let listener = UnixListener::bind(&socket)?;
     std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600))?;
-    // On a Linux host the daemon runs as root; `KIRI_SOCKET_GROUP=kiri`
+    // On a Linux host the daemon runs as root; `STOWLARK_SOCKET_GROUP=stowlark`
     // lets that group's users in, as the docker group does for dockerd.
-    let access_group = std::env::var_os("KIRI_SOCKET_GROUP");
+    let access_group = std::env::var_os("STOWLARK_SOCKET_GROUP");
     if let Some(group) = &access_group {
         socket_group(&socket, group)?;
     }
@@ -136,7 +136,7 @@ pub fn run(_args: &[String]) -> io::Result<()> {
     diag::info!("engine ready", version = env!("CARGO_PKG_VERSION"), ms = t0.elapsed().as_millis(), socket = format!("unix://{}", socket.display()));
     // Crash files from earlier runs, if the person said they may go.
     diag::report::spawn_crash_sender(Duration::from_secs(30), Some(Duration::from_secs(6 * 3600)));
-    // Container files in Finder, at ~/Kiri. A Linux host has them on its
+    // Container files in Finder, at ~/Stowlark. A Linux host has them on its
     // own disk already.
     #[cfg(target_os = "macos")]
     finder(&engine);
@@ -145,16 +145,16 @@ pub fn run(_args: &[String]) -> io::Result<()> {
     builder::watch(engine.clone());
     // A Kubernetes node the engine restarted gets its kubectl context.
     crate::k8s::sync_at_start();
-    // Kiri Dev leaves *.kiri.local and ports 80 and 443 to the installed
-    // Kiri, unless given ports of its own (Settings → Domains, or
-    // KIRI_HTTP_PORT and KIRI_HTTPS_PORT).
+    // Stowlark Dev leaves *.stowlark.local and ports 80 and 443 to the installed
+    // Stowlark, unless given ports of its own (Settings → Domains, or
+    // STOWLARK_HTTP_PORT and STOWLARK_HTTPS_PORT).
     let routers = !crate::flavor::dev() || domains::own_ports();
     if crate::flavor::dev() {
         if !routers {
             diag::info!(format!("{}: container domains off (ports in Settings → Domains turn them on)", crate::flavor::APP));
         }
     } else if let Err(e) = dns::start() {
-        diag::warn!("*.kiri.local off", error = e);
+        diag::warn!("*.stowlark.local off", error = e);
     }
     if routers {
         match domains::start_tls(engine.clone()) {
@@ -164,7 +164,7 @@ pub fn run(_args: &[String]) -> io::Result<()> {
         match domains::start(engine.clone()) {
             Ok(port) => diag::info!(format!(
                 "container domains on http://<name>.{}{}",
-                if dns::installed() { "kiri.local" } else { "kiri.localhost" },
+                if dns::installed() { "stowlark.local" } else { "stowlark.localhost" },
                 if port == 80 { String::new() } else { format!(":{port}") }
             )),
             Err(e) => diag::warn!("container domains off", error = e),
@@ -175,7 +175,7 @@ pub fn run(_args: &[String]) -> io::Result<()> {
 
     let on_signal = engine.clone();
     let sock = socket.clone();
-    std::thread::Builder::new().name("kiri-signals".into()).spawn(move || {
+    std::thread::Builder::new().name("stowlark-signals".into()).spawn(move || {
         let mut sig = 0;
         // SAFETY: waits on the blocked set; writes the signal number to `sig`.
         unsafe { libc::sigwait(&set, &mut sig) };
@@ -194,7 +194,7 @@ pub fn run(_args: &[String]) -> io::Result<()> {
         let engine = engine.clone();
         #[cfg(target_os = "linux")]
         let gate = gate.clone();
-        let spawned = std::thread::Builder::new().name("kiri-api".into()).spawn(move || {
+        let spawned = std::thread::Builder::new().name("stowlark-api".into()).spawn(move || {
             // Checked here, not in the accept loop: a slow user lookup holds up
             // this connection only.
             #[cfg(target_os = "linux")]
@@ -234,12 +234,12 @@ fn watch_own_app(engine: std::sync::Arc<engine::Engine>, socket: std::path::Path
     });
 }
 
-/// Serves container files over NFS and mounts them at ~/Kiri.
-/// KIRI_NO_FINDER=1 skips the mount.
+/// Serves container files over NFS and mounts them at ~/Stowlark.
+/// STOWLARK_NO_FINDER=1 skips the mount.
 #[cfg(target_os = "macos")]
 fn finder(engine: &std::sync::Arc<engine::Engine>) {
     match nfs::start(engine.clone()) {
-        Ok(socket) if std::env::var_os("KIRI_NO_FINDER").is_none() => match nfs::mount(&socket) {
+        Ok(socket) if std::env::var_os("STOWLARK_NO_FINDER").is_none() => match nfs::mount(&socket) {
             Ok(dir) => diag::info!("container files in Finder", at = dir.display()),
             Err(e) => diag::warn!("Finder mount failed", error = e, nfs = socket.display()),
         },

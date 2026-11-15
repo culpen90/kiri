@@ -3,16 +3,16 @@
 //! and every attach after that just asks it.
 //!
 //! The helper is a root-owned copy of this binary in
-//! /Library/PrivilegedHelperTools, run by launchd as `kiri usb helper`. It
+//! /Library/PrivilegedHelperTools, run by launchd as `stowlark usb helper`. It
 //! listens on a socket in /var/run and takes requests only from the user
 //! who installed it. A request is a device's location plus a connection,
-//! passed as a file descriptor: the caller (`kiri usb attach`, the window)
+//! passed as a file descriptor: the caller (`stowlark usb attach`, the window)
 //! makes the connection to its own daemon, so the helper never opens a path
-//! a user named. For each device the helper starts `kiri usb serve`, which
+//! a user named. For each device the helper starts `stowlark usb serve`, which
 //! captures it and serves it over that connection until either side lets
 //! go, then gives it back to macOS.
 //!
-//! The helper is replaced when it differs from the Kiri asking (an update):
+//! The helper is replaced when it differs from the Stowlark asking (an update):
 //! that is one more prompt.
 
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -28,7 +28,7 @@ use std::time::Duration;
 use crate::flavor::Name;
 
 /// The LaunchDaemon's label, and the name of everything it installs.
-pub const LABEL: Name = Name("dev.kiri.usb", "dev.kiri.usb.dev");
+pub const LABEL: Name = Name("dev.stowlark.usb", "dev.stowlark.usb.dev");
 
 /// Devices one helper serves at once; vhci has 8 ports per speed.
 const MAX_SESSIONS: usize = 32;
@@ -43,7 +43,7 @@ fn socket() -> PathBuf {
     PathBuf::from(format!("/var/run/{LABEL}.sock"))
 }
 
-/// The Kiri build the installed helper was copied from, written beside it.
+/// The Stowlark build the installed helper was copied from, written beside it.
 fn source() -> PathBuf {
     PathBuf::from(format!("/Library/PrivilegedHelperTools/{LABEL}.source"))
 }
@@ -55,7 +55,7 @@ fn digest(path: &Path) -> io::Result<String> {
     Ok(Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect())
 }
 
-/// Whether the installed helper was copied from this Kiri. (Not compared
+/// Whether the installed helper was copied from this Stowlark. (Not compared
 /// byte for byte: the copy is signed again on its own, see `install`.)
 fn current() -> bool {
     if !binary().exists() || !plist().exists() {
@@ -93,10 +93,10 @@ fn install() -> io::Result<()> {
     let sum = digest(&me)?;
     let q = |p: &Path| sh_quote(&p.to_string_lossy());
     // The copy is root's: a helper that ran a binary in the user's app
-    // bundle would run whatever replaced it, as root. Kiri's own signature
+    // bundle would run whatever replaced it, as root. Stowlark's own signature
     // seals the app's Info.plist, which the copy is without, so macOS
     // wouldn't run it: it gets a signature of its own (ad hoc, no
-    // entitlements; it needs none). Then which Kiri it came from.
+    // entitlements; it needs none). Then which Stowlark it came from.
     let command = format!(
         "set -e; mkdir -p /Library/PrivilegedHelperTools; cp {me} {bin}.new; \
          /usr/bin/codesign --force --sign - --identifier {label} {bin}.new; \
@@ -109,12 +109,12 @@ fn install() -> io::Result<()> {
         tmp = q(&tmp),
         plist = q(&plist)
     );
-    let r = crate::setup::as_admin(&command, "Kiri wants to install its USB helper, so it can connect USB devices to its Linux VM. It asks once.");
+    let r = crate::setup::as_admin(&command, "Stowlark wants to install its USB helper, so it can connect USB devices to its Linux VM. It asks once.");
     let _ = std::fs::remove_file(&tmp);
     r
 }
 
-/// Removes the helper (`kiri usb helper remove`, and uninstalling Kiri).
+/// Removes the helper (`stowlark usb helper remove`, and uninstalling Stowlark).
 pub fn remove() -> io::Result<()> {
     if !plist().exists() && !binary().exists() {
         return Ok(());
@@ -128,13 +128,13 @@ pub fn remove() -> io::Result<()> {
         sh_quote(&source().to_string_lossy()),
         sh_quote(&socket().to_string_lossy())
     );
-    crate::setup::as_admin(&command, "Kiri wants to remove its USB helper.")?;
+    crate::setup::as_admin(&command, "Stowlark wants to remove its USB helper.")?;
     println!("removed the USB helper");
     Ok(())
 }
 
 /// A connection to the helper, installing or replacing it first if it
-/// isn't this Kiri.
+/// isn't this Stowlark.
 fn connect() -> io::Result<UnixStream> {
     if !current() {
         install()?;
@@ -160,10 +160,10 @@ pub fn attach(location: &str, name: &str, speed: u32, devid: u32) -> io::Result<
 
 /// The same, for the daemon attaching a device again when it comes back:
 /// never the administrator prompt, so only through a helper that is
-/// already this Kiri's.
+/// already this Stowlark's.
 pub fn reattach(location: &str, name: &str, speed: u32, devid: u32) -> io::Result<()> {
     if !current() {
-        return Err(io::Error::other("the USB helper is not this Kiri's (attach it once from the window to update it)"));
+        return Err(io::Error::other("the USB helper is not this Stowlark's (attach it once from the window to update it)"));
     }
     attach_through(UnixStream::connect(socket())?, location, name, speed, devid)
 }
@@ -185,7 +185,7 @@ fn attach_through(helper: UnixStream, location: &str, name: &str, speed: u32, de
 
 // --- The helper itself (root, under launchd) ----------------------------------------
 
-/// `kiri usb helper LABEL UID`: serves attach requests from UID until
+/// `stowlark usb helper LABEL UID`: serves attach requests from UID until
 /// launchd stops it.
 pub fn serve(label: &str, uid: &str) -> io::Result<()> {
     // SAFETY: getuid has no preconditions.
@@ -260,7 +260,7 @@ fn request(conn: &UnixStream, uid: libc::uid_t, exe: &Path, sessions: &Arc<Atomi
     Ok(())
 }
 
-/// `kiri usb serve LOCATION --fd 3 --status 4`, with the USB/IP
+/// `stowlark usb serve LOCATION --fd 3 --status 4`, with the USB/IP
 /// connection as fd 3 and the requester's connection as fd 4 for its "ok".
 fn spawn(exe: &Path, location: &str, conn: OwnedFd, status: UnixStream) -> io::Result<std::process::Child> {
     let (a, b) = (conn.as_raw_fd(), status.as_raw_fd());

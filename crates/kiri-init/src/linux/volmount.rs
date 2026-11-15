@@ -9,7 +9,7 @@ use std::fs;
 use std::io;
 
 /// Where volumes live; nothing outside it is ever mounted over.
-const ROOT: &str = "/var/lib/kiri/volumes/";
+const ROOT: &str = "/var/lib/stowlark/volumes/";
 
 fn invalid(what: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, what.to_owned())
@@ -105,6 +105,6 @@ mod tests {
     #[test]
     fn only_inside_the_volume_store() {
         assert!(ensure("/etc", "tmpfs", "tmpfs", "0", "").is_err());
-        assert!(ensure("/var/lib/kiri/volumes/../../etc/_data", "tmpfs", "tmpfs", "0", "").is_err());
+        assert!(ensure("/var/lib/stowlark/volumes/../../etc/_data", "tmpfs", "tmpfs", "0", "").is_err());
     }
 }

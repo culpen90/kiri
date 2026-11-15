@@ -1,7 +1,7 @@
-//! Boots Kiri's Linux guest with Apple's Virtualization.framework.
+//! Boots Stowlark's Linux guest with Apple's Virtualization.framework.
 //!
 //! Every Virtualization.framework object lives on one private serial dispatch
-//! queue and is only touched there; the rest of Kiri sees plain Rust types and
+//! queue and is only touched there; the rest of Stowlark sees plain Rust types and
 //! events. The guest dials the host over vsock when it is ready, so start-up
 //! needs no polling.
 
@@ -96,7 +96,7 @@ impl Vm {
     /// Builds, validates and starts the VM. Returns once Virtualization.framework
     /// reports the VM running; the guest connects later as an [`Event`].
     pub fn start(cfg: Config) -> io::Result<Vm> {
-        let queue = DispatchQueue::new("dev.kiri.vm", DispatchQueueAttr::SERIAL);
+        let queue = DispatchQueue::new("dev.stowlark.vm", DispatchQueueAttr::SERIAL);
         let (tx, events) = mpsc::channel();
         let (started_tx, started_rx) = mpsc::sync_channel::<Result<(), String>>(1);
 
@@ -547,7 +547,7 @@ struct ListenerIvars {
     events: Sender<Event>,
     /// The framework closes a connection's socket when the connection object
     /// is released, so the accepted connection is kept until the VM goes away.
-    /// There is only ever one: kiri-init dials once at boot.
+    /// There is only ever one: stowlark-init dials once at boot.
     connections: RefCell<Vec<Retained<VZVirtioSocketConnection>>>,
 }
 

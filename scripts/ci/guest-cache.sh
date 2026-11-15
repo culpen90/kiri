@@ -8,7 +8,7 @@
 #   scripts/ci/guest-cache.sh [arm64|x86_64]
 set -eu
 arch=${1:-arm64}
-cache="${KIRI_CI_CACHE:-$HOME/Library/Caches/kiri-ci}"
+cache="${STOWLARK_CI_CACHE:-$HOME/Library/Caches/stowlark-ci}"
 mkdir -p "$cache" guest/out
 
 case "$arch" in

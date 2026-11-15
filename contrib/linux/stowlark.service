@@ -1,0 +1,29 @@
+# Stowlark on a Linux host: containers on this machine's kernel, no VM.
+# Install: cargo xtask linux, copy target/linux/release/{stowlark,stowlark-init} to
+# /usr/local/bin, then:  cp stowlark.service /etc/systemd/system/ &&
+#   groupadd -f stowlark && systemctl enable --now stowlark
+# Users in the `stowlark` group:  docker context create stowlark --docker host=unix:///run/stowlark/docker.sock
+# Membership of the `stowlark` group is root-equivalent (a member can mount any
+# path into a container as root), exactly like the `docker` group.
+[Unit]
+Description=Stowlark container engine
+Documentation=https://github.com/culpen90/stowlark
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/stowlark daemon
+Environment=STOWLARK_SOCKET=/run/stowlark/docker.sock
+Environment=STOWLARK_SOCKET_GROUP=stowlark
+Environment=HOME=/var/lib/stowlark-daemon
+# The daemon creates the cgroups its containers run in.
+Delegate=yes
+KillMode=mixed
+Restart=on-failure
+RuntimeDirectory=stowlark
+# 0755: members of stowlark reach the socket (itself 0660 root:stowlark) through it.
+RuntimeDirectoryMode=0755
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

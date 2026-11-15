@@ -507,7 +507,7 @@ fn flags(s: &str) -> String {
     out
 }
 
-/// What starts a token that says what it is: Kiri share's, GitHub's,
+/// What starts a token that says what it is: Stowlark share's, GitHub's,
 /// GitLab's, Docker Hub's, an AWS access key id, Stripe's, Slack's,
 /// Anthropic's, OpenAI's, Google's, npm's and PyPI's.
 const TOKEN_PREFIXES: [&str; 26] = [
@@ -546,8 +546,8 @@ mod tests {
 
     #[test]
     fn home_becomes_tilde_but_not_a_longer_name() {
-        let out = r().apply("open /Users/ada/.kiri/logs and /Users/adam/x and /Users/ada");
-        assert_eq!(out, "open ~/.kiri/logs and /Users/adam/x and ~");
+        let out = r().apply("open /Users/ada/.stowlark/logs and /Users/adam/x and /Users/ada");
+        assert_eq!(out, "open ~/.stowlark/logs and /Users/adam/x and ~");
     }
 
     #[test]
@@ -584,7 +584,7 @@ mod tests {
         assert_eq!(patterns("https://x/?password=hunter2"), "https://x/?password=[redacted]");
         assert_eq!(patterns("-e DB_PASSWORD=hunter2 -e MODE=dev"), "-e DB_PASSWORD=[redacted] -e MODE=dev");
         assert_eq!(patterns("--password='two words' next"), "--password='[redacted]' next");
-        assert_eq!(patterns("KIRI_SHARE_TOKEN=\"abc def\""), "KIRI_SHARE_TOKEN=\"[redacted]\"");
+        assert_eq!(patterns("STOWLARK_SHARE_TOKEN=\"abc def\""), "STOWLARK_SHARE_TOKEN=\"[redacted]\"");
         assert_eq!(patterns("if token == other"), "if token == other");
         assert_eq!(patterns("a=b token="), "a=b token=");
     }

@@ -1,4 +1,4 @@
-//! The `kiri` command.
+//! The `stowlark` command.
 
 use std::process::ExitCode;
 
@@ -7,16 +7,16 @@ mod bench;
 #[cfg(target_os = "macos")]
 mod boot;
 // builds, cli_pins, scan and tools on Linux too: the daemon reads an
-// image's layers and scans it for kiri-win, whose window can't reach the
+// image's layers and scans it for stowlark-win, whose window can't reach the
 // store inside WSL (daemon/api.rs).
 #[cfg(unix)]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod builds;
-// The engine stops when its app is deleted under it (kiri-win includes it
+// The engine stops when its app is deleted under it (stowlark-win includes it
 // for Windows).
 #[cfg(unix)]
 mod appwatch;
-// Which builder plain `docker build` uses: Docker's or Kiri's.
+// Which builder plain `docker build` uses: Docker's or Stowlark's.
 #[cfg(unix)]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod buildwith;
@@ -24,7 +24,7 @@ mod buildwith;
 #[cfg(any(target_os = "linux", all(test, unix)))]
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 mod bridge;
-// Linux only (WSL's end of kiri-win's proxy relay); its tests run anywhere.
+// Linux only (WSL's end of stowlark-win's proxy relay); its tests run anywhere.
 #[cfg(unix)]
 mod hostrelay;
 #[cfg(unix)]
@@ -47,7 +47,7 @@ mod hostaccess;
 mod import;
 #[cfg(unix)]
 mod k8s;
-// kubectl's own file, which `kiri k8s` puts its context in.
+// kubectl's own file, which `stowlark k8s` puts its context in.
 #[cfg(unix)]
 mod kubeconfig;
 #[cfg(unix)]
@@ -76,35 +76,46 @@ mod tools;
 mod update;
 
 const USAGE: &str = "\
-usage: kiri COMMAND          docker's commands, on Kiri: kiri run, ps, exec,
+usage: stowlark COMMAND          docker's commands, on Stowlark: stowlark run, ps, exec,
                              logs, stop, rm, images, pull, build, compose…
-       kiri daemon
-       kiri bridge [--socket PATH]   (WSL2: the end of kiri-win.exe)
-       kiri ui [--start] [--view containers|images|volumes|networks]
-       kiri setup [--use] [--no-agent] | kiri setup --uninstall
-       kiri build-with [docker|kiri]   which builder docker build uses
-       kiri update [--check]
-       kiri diag logs [-f] [--ui|--engine|--cli] [--errors] [-n N]
-       kiri diag report [--out PATH] [--send]   (a file to send us, tokens taken out)
-       kiri PORT [NAME]           share a local port on the internet (same as kiri share PORT)
-       kiri share PORT|CONTAINER [--name N] | share login | logout | status
-       kiri k8s start [--use] | stop | status | delete | set [--lan on|off] [--tls-san NAME,…] [--port N]
-       kiri usb [list] | attach DEVICE | detach DEVICE   USB devices for containers, beta (Mac: pass through to the VM)
-       kiri machine create NAME [--distro D] | list | shell NAME | stop | delete NAME
-       kiri import [orbstack | desktop-linux] [--list]
-       kiri bench [--runs N] [--image IMAGE] [--network none|bridge]
-       kiri boot [--console] [--pings N]
-       kiri raw run [--rm] [-e KEY=VALUE]... IMAGE [COMMAND...]   (its own guest, no daemon)
-       kiri raw pull <image> | raw images | raw rmi <image>...";
+       stowlark daemon
+       stowlark bridge [--socket PATH]   (WSL2: the end of stowlark-win.exe)
+       stowlark ui [--start] [--view containers|images|volumes|networks]
+       stowlark setup [--use] [--no-agent] | stowlark setup --uninstall
+       stowlark build-with [docker|stowlark]   which builder docker build uses
+       stowlark update [--check]
+       stowlark diag logs [-f] [--ui|--engine|--cli] [--errors] [-n N]
+       stowlark diag report [--out PATH] [--send]   (a file to send us, tokens taken out)
+       stowlark PORT [NAME]           share a local port on the internet (same as stowlark share PORT)
+       stowlark share PORT|CONTAINER [--name N] | share login | logout | status
+       stowlark k8s start [--use] | stop | status | delete | set [--lan on|off] [--tls-san NAME,…] [--port N]
+       stowlark usb [list] | attach DEVICE | detach DEVICE   USB devices for containers, beta (Mac: pass through to the VM)
+       stowlark machine create NAME [--distro D] | list | shell NAME | stop | delete NAME
+       stowlark import [orbstack | desktop-linux] [--list]
+       stowlark bench [--runs N] [--image IMAGE] [--network none|bridge]
+       stowlark boot [--console] [--pings N]
+       stowlark raw run [--rm] [-e KEY=VALUE]... IMAGE [COMMAND...]   (its own guest, no daemon)
+       stowlark raw pull <image> | raw images | raw rmi <image>...";
 
 fn main() -> ExitCode {
-    flavor::init();
     let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.as_slice() {
+        [flag] if flag == "--help" || flag == "-h" => {
+            println!("{USAGE}");
+            return ExitCode::SUCCESS;
+        }
+        [flag] if flag == "--version" || flag == "-V" => {
+            println!("stowlark {}", env!("CARGO_PKG_VERSION"));
+            return ExitCode::SUCCESS;
+        }
+        _ => {}
+    }
+    flavor::init();
     // Which process this is, for its log and crash reports.
     #[cfg(unix)]
     diag::init(match args.first().map(String::as_str) {
         Some("daemon") => diag::Part::Daemon,
-        // Only a build with the window: elsewhere `kiri ui` is a plain
+        // Only a build with the window: elsewhere `stowlark ui` is a plain
         // command whose message must reach the terminal, not the log's pipe.
         #[cfg(any(target_os = "macos", all(target_os = "linux", feature = "window")))]
         Some("ui") => diag::Part::Ui,
@@ -144,7 +155,7 @@ fn main() -> ExitCode {
         Some("setup") => setup::run(&args[1..]),
         #[cfg(any(unix, windows))]
         Some("share") => share::run(&args[1..]),
-        // `kiri 3000`: share a port straight away.
+        // `stowlark 3000`: share a port straight away.
         #[cfg(any(unix, windows))]
         Some(a) if share::is_shorthand(a) => share::run(&args),
         #[cfg(unix)]
@@ -161,7 +172,7 @@ fn main() -> ExitCode {
         Some("update") => update::run(&args[1..]),
         #[cfg(unix)]
         Some("diag") => diag::run(&args[1..]),
-        // Opening Kiri.app: set up on first launch, then the window.
+        // Opening Stowlark.app: set up on first launch, then the window.
         #[cfg(target_os = "macos")]
         None if setup::launched_from_app() => setup::first_launch().and_then(|()| ui::run(true, None)),
         #[cfg(any(target_os = "macos", all(target_os = "linux", feature = "window")))]
@@ -177,7 +188,7 @@ fn main() -> ExitCode {
             engine_version_check();
             docker::run(&args)
         }
-        // Windows: the engine's commands, by the `kiri` in WSL.
+        // Windows: the engine's commands, by the `stowlark` in WSL.
         #[cfg(windows)]
         Some(c) if wsl::COMMANDS.contains(&c) => wsl::run(&args),
         _ => {
@@ -193,25 +204,25 @@ fn main() -> ExitCode {
             if !e.to_string().starts_with("usage:") {
                 diag::warn!("command failed", command = args.first().filter(|a| a.len() <= 20 && a.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')).map_or("", String::as_str), error = e);
             }
-            eprintln!("kiri: {e}");
+            eprintln!("stowlark: {e}");
             ExitCode::FAILURE
         }
     }
 }
 
-/// Where the `kiri` package puts the window: the same command built with
+/// Where the `stowlark` package puts the window: the same command built with
 /// GTK and WebKitGTK (packaging/linux/build.sh).
 #[cfg(all(target_os = "linux", not(feature = "window")))]
-const WINDOW: &str = "/usr/lib/kiri/kiri-window";
+const WINDOW: &str = "/usr/lib/stowlark/stowlark-window";
 
-/// `kiri ui` on Linux: runs the package's window, or says why there is none.
+/// `stowlark ui` on Linux: runs the package's window, or says why there is none.
 #[cfg(all(target_os = "linux", not(feature = "window")))]
 fn window(args: &[String]) -> std::io::Result<()> {
     use std::os::unix::process::CommandExt;
     if !std::path::Path::new(WINDOW).exists() {
         return Err(std::io::Error::other(
-            "this Kiri has no window. It comes with the kiri package for x86-64 (Debian, Ubuntu, Fedora); \
-             kiri-lite and the ARM packages are the engine and CLI only",
+            "this Stowlark has no window. It comes with the stowlark package for x86-64 (Debian, Ubuntu, Fedora); \
+             stowlark-lite and the ARM packages are the engine and CLI only",
         ));
     }
     // exec returns only when it failed.
@@ -222,8 +233,8 @@ fn window(args: &[String]) -> std::io::Result<()> {
 fn engine_version_check() {}
 
 /// Before a docker command: when the engine runs another version than this
-/// `kiri`, say so (on stderr, so output stays clean). Either an update whose
-/// engine restart was put off, or another `kiri` earlier on PATH.
+/// `stowlark`, say so (on stderr, so output stays clean). Either an update whose
+/// engine restart was put off, or another `stowlark` earlier on PATH.
 #[cfg(unix)]
 fn engine_version_check() {
     let me = env!("CARGO_PKG_VERSION");
@@ -232,7 +243,7 @@ fn engine_version_check() {
     }
     let Some(engine) = client::request("GET", "/version", None).ok().filter(|r| r.ok()).and_then(|r| client::kiri_version(&r.json()).map(str::to_owned)) else { return };
     if engine != me && engine != "0.0.0" {
-        let exe = std::env::current_exe().map(|p| p.display().to_string()).unwrap_or_else(|_| "kiri".into());
-        eprintln!("kiri: this kiri ({exe}) is {me}, but the engine runs {engine}. Restart the engine to use one version (Kiri → Restart engine), or remove the older kiri.");
+        let exe = std::env::current_exe().map(|p| p.display().to_string()).unwrap_or_else(|_| "stowlark".into());
+        eprintln!("stowlark: this stowlark ({exe}) is {me}, but the engine runs {engine}. Restart the engine to use one version (Stowlark → Restart engine), or remove the older stowlark.");
     }
 }

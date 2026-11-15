@@ -1,4 +1,4 @@
-// A Kiri Dev window with four containers, two of them shared: what the
+// A Stowlark Dev window with four containers, two of them shared: what the
 // tests start from. `sent` records what the page asks the app to do.
 document.body.classList.add("dev");ui.status={dev:true};
 kiri.on({type:"state",state:"running"});
@@ -22,7 +22,7 @@ window.webkit = { messageHandlers: { kiri: { postMessage: (m) => { const o = JSO
 // For the tests in other languages (zh.js, ar.js, langswitch.js): English left on screen.
 // Words that are fine in a Chinese window: products, systems, Kubernetes
 // kinds, units and the fixture's own names.
-const KEEP = new Set(("kiri dev share cloud docker hub desktop compose kubernetes kubectl macos windows linux wsl mac pc ubuntu " +
+const KEEP = new Set(("stowlark kiri dev share cloud docker hub desktop compose kubernetes kubectl macos windows linux wsl mac pc ubuntu " +
   "orbstack finder explorer pod pods service services deployment replicaset clusterip nodeport loadbalancer ingress configmap secret " +
   "canestack labs cpu cpus gpu ram id ids url dns tcp udp http https ip ipv6 ssh tls api cli json yaml sha k3s ok " +
   "web api postgres worker nginx alpine node python octo localhost runkiri default rancher latest").split(" "));

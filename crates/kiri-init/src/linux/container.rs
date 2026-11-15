@@ -175,9 +175,9 @@ fn child_report(fd: RawFd) -> Option<String> {
     start_failure(&String::from_utf8_lossy(&buf[..n as usize])).map(str::to_owned)
 }
 
-/// The reason in a child's "kiri: cannot start container: <reason>" line.
+/// The reason in a child's "stowlark: cannot start container: <reason>" line.
 fn start_failure(said: &str) -> Option<&str> {
-    said.lines().find_map(|l| l.strip_prefix("kiri: cannot start container: ")).map(str::trim).filter(|why| !why.is_empty())
+    said.lines().find_map(|l| l.strip_prefix("stowlark: cannot start container: ")).map(str::trim).filter(|why| !why.is_empty())
 }
 
 fn stdio(p: &Prepared) -> io::Result<(ParentStdio, ChildStdio)> {
@@ -256,7 +256,7 @@ pub fn spawn(spec: &RunSpec<'_>, paths: &Paths, net: NetCtx<'_>) -> io::Result<P
         || match super::devices::restrict(cgroup_fd.as_raw_fd(), &device_rules) {
             Ok(()) => true,
             Err(e) => {
-                eprintln!("kiri: device filter unavailable, dropping CAP_MKNOD: {e}");
+                eprintln!("stowlark: device filter unavailable, dropping CAP_MKNOD: {e}");
                 false
             }
         };
@@ -278,7 +278,7 @@ pub fn spawn(spec: &RunSpec<'_>, paths: &Paths, net: NetCtx<'_>) -> io::Result<P
     }
     prepared.host = HostApplied { rlimits: host.rlimits.clone(), groups: host.groups.clone(), nodes };
     // Small, short-lived files: kept in memory (/run is tmpfs), not on the data disk.
-    let etc_dir = PathBuf::from("/run/kiri").join(spec.id);
+    let etc_dir = PathBuf::from("/run/stowlark").join(spec.id);
     let embedded_dns = embedded_dns(spec, net.upstream_dns, net.dns.relay);
     let nameserver = embedded_dns.then(|| embedded_address(spec, net.dns.relay));
     prepared.etc_files = write_etc_files(spec, &etc_dir, net.upstream_dns, nameserver).map_err(cleanup)?;
@@ -566,7 +566,7 @@ fn remove_cgroup(dir: &std::path::Path) {
 fn undo_now(t: &Teardown, remove_files: bool) {
     let _ = sys::umount_lazy(&t.rootfs);
     if let Some(id) = t.base.file_name() {
-        let _ = fs::remove_dir_all(PathBuf::from("/run/kiri").join(id));
+        let _ = fs::remove_dir_all(PathBuf::from("/run/stowlark").join(id));
     }
     remove_cgroup(&t.cgroup);
     if remove_files {
@@ -577,7 +577,7 @@ fn undo_now(t: &Teardown, remove_files: bool) {
 /// Deletes a stopped container's directory (its writable layer).
 /// Deletes a named volume's data.
 /// Where volumes live: `<name>/_data` under it.
-pub const VOLUMES: &str = "/var/lib/kiri/volumes";
+pub const VOLUMES: &str = "/var/lib/stowlark/volumes";
 
 pub fn remove_volume(name: &str) {
     // Docker's rule for volume names: [a-zA-Z0-9][a-zA-Z0-9_.-]*
@@ -586,9 +586,9 @@ pub fn remove_volume(name: &str) {
     if valid {
         // An NFS export or a host folder mounted there is not the volume's
         // to delete: unmount it first, and keep everything if that fails.
-        let data = format!("/var/lib/kiri/volumes/{name}/_data");
+        let data = format!("/var/lib/stowlark/volumes/{name}/_data");
         if !super::volmount::release(&data) {
-            eprintln!("kiri-init: volume {name}: {data} is still mounted, not deleting it");
+            eprintln!("stowlark-init: volume {name}: {data} is still mounted, not deleting it");
             return;
         }
         let _ = fs::remove_dir_all(PathBuf::from(VOLUMES).join(name));
@@ -619,7 +619,7 @@ pub fn sweep(paths: &Paths, cgroup: &std::path::Path) {
         }
         kill_cgroup(&cg);
         let _ = sys::umount_lazy(&paths.containers.join(id).join("rootfs"));
-        let _ = fs::remove_dir_all(PathBuf::from("/run/kiri").join(id));
+        let _ = fs::remove_dir_all(PathBuf::from("/run/stowlark").join(id));
         remove_cgroup(&cg);
     }
     // Host-side veths are kv<9 characters of the id><4 hex digits>.
@@ -728,7 +728,7 @@ fn write_etc_files(spec: &RunSpec<'_>, base: &std::path::Path, upstream: &[[u8; 
     // `--network container:<id>` shares that container's files, as Docker does.
     if let Some(target) = net_opts::values(spec.net.opts, net_opts::NETNS).next() {
         valid_id(target)?;
-        let theirs = PathBuf::from("/run/kiri").join(target);
+        let theirs = PathBuf::from("/run/stowlark").join(target);
         let mut out = Vec::new();
         for name in ["hosts", "resolv.conf", "hostname"] {
             let src = theirs.join(name);
@@ -739,7 +739,7 @@ fn write_etc_files(spec: &RunSpec<'_>, base: &std::path::Path, upstream: &[[u8; 
     }
     let domain = net_opts::values(spec.net.opts, net_opts::DOMAINNAME).next().filter(|d| !d.is_empty());
     let mut hosts = String::from("127.0.0.1\tlocalhost\n::1\tlocalhost ip6-localhost ip6-loopback\n");
-    // On an IPv6-only network the IPv4 address is Kiri's own name for it.
+    // On an IPv6-only network the IPv4 address is Stowlark's own name for it.
     let v4 = spec.net.ip != [0; 4] && !net::Plug::from_opts(spec.net.opts).no_ipv4;
     if v4 {
         match domain {
@@ -1183,7 +1183,7 @@ fn finish_child(p: &Prepared, io: &ChildStdio, console: bool) -> ! {
                 // A session of its own, as runc gives every container and
                 // exec. Otherwise it stays in the agent's process group, which
                 // on a Linux host is the daemon's too: Apache's prefork stop
-                // (killpg(getpgrp(), SIGTERM)) then reached `kiri daemon`, and
+                // (killpg(getpgrp(), SIGTERM)) then reached `stowlark daemon`, and
                 // systemd took the whole engine down with it (#191).
                 libc::setsid();
                 let input = match stdin {
@@ -1602,7 +1602,7 @@ mod tests {
     fn copy_tree_through_a_proc_fd_keeps_the_directory_mode() {
         use std::os::fd::AsRawFd;
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        let base = std::env::temp_dir().join(format!("kiri-copy-tree-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("stowlark-copy-tree-{}", std::process::id()));
         let (img, vol) = (base.join("img"), base.join("vol"));
         let _ = std::fs::remove_dir_all(&base);
         std::fs::create_dir_all(img.join("sub")).unwrap();
@@ -1631,10 +1631,10 @@ mod tests {
     /// said, not the later step that noticed.
     #[test]
     fn a_start_failure_is_the_childs_own_reason() {
-        assert_eq!(super::start_failure("kiri: cannot start container: mount etc/hosts: mount /proc/self/fd/24: Not a directory (os error 20)\n"), Some("mount etc/hosts: mount /proc/self/fd/24: Not a directory (os error 20)"));
-        assert_eq!(super::start_failure("noise\nkiri: cannot start container: mount: boom\nmore"), Some("mount: boom"));
+        assert_eq!(super::start_failure("stowlark: cannot start container: mount etc/hosts: mount /proc/self/fd/24: Not a directory (os error 20)\n"), Some("mount etc/hosts: mount /proc/self/fd/24: Not a directory (os error 20)"));
+        assert_eq!(super::start_failure("noise\nstowlark: cannot start container: mount: boom\nmore"), Some("mount: boom"));
         assert_eq!(super::start_failure("hello from the program\n"), None);
-        assert_eq!(super::start_failure("kiri: cannot start container: \n"), None);
+        assert_eq!(super::start_failure("stowlark: cannot start container: \n"), None);
         assert_eq!(super::start_failure(""), None);
     }
 
@@ -1649,7 +1649,7 @@ mod tests {
 
     fn resolv(flags: u32, opts: &[&str], upstream: &[[u8; 4]]) -> String {
         let mut buf = Vec::new();
-        let net = Net { bridge: "kiri1", ip: [10, 5, 0, 2], prefix: 24, gateway: [10, 5, 0, 1], extra_hosts: &[], dns_names: &[], opts };
+        let net = Net { bridge: "stowlark1", ip: [10, 5, 0, 2], prefix: 24, gateway: [10, 5, 0, 1], extra_hosts: &[], dns_names: &[], opts };
         encode_run(&mut buf, "c1", &[], &["sh"], &[], "/", "", "c1", flags, net, &[], &Limits::default(), 0, &[] as &[&str]);
         let Ok(Msg::Run(spec)) = decode(&buf) else { panic!() };
         super::resolv_conf(&spec, upstream, (flags & run_flags::DNS_GATEWAY != 0).then_some(super::super::dns::EMBEDDED))
@@ -1668,7 +1668,7 @@ mod tests {
     #[test]
     fn a_resolver_at_one_of_the_hosts_own_addresses_goes_through_the_agent() {
         let mut buf = Vec::new();
-        let net = Net { bridge: "kiri0", ip: [172, 17, 0, 2], prefix: 16, gateway: [172, 17, 0, 1], extra_hosts: &[], dns_names: &[], opts: &[] };
+        let net = Net { bridge: "stowlark0", ip: [172, 17, 0, 2], prefix: 16, gateway: [172, 17, 0, 1], extra_hosts: &[], dns_names: &[], opts: &[] };
         encode_run(&mut buf, "c1", &[], &["sh"], &[], "/", "", "c1", 0, net, &[], &Limits::default(), 0, &[] as &[&str]);
         let Ok(Msg::Run(spec)) = decode(&buf) else { panic!() };
         // TEST-NET-3: no machine running the tests has it.
@@ -1680,7 +1680,7 @@ mod tests {
     fn in_the_vm_the_default_bridge_goes_through_the_agent() {
         let spec_with = |flags: u32, opts: &[&str], f: &dyn Fn(&kiri_proto::RunSpec<'_>)| {
             let mut buf = Vec::new();
-            let net = Net { bridge: "kiri0", ip: [172, 17, 0, 2], prefix: 16, gateway: [172, 17, 0, 1], extra_hosts: &[], dns_names: &[], opts };
+            let net = Net { bridge: "stowlark0", ip: [172, 17, 0, 2], prefix: 16, gateway: [172, 17, 0, 1], extra_hosts: &[], dns_names: &[], opts };
             encode_run(&mut buf, "c1", &[], &["sh"], &[], "/", "", "c1", flags, net, &[], &Limits::default(), 0, &[] as &[&str]);
             let Ok(Msg::Run(spec)) = decode(&buf) else { panic!() };
             f(&spec);

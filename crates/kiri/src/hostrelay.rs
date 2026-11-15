@@ -1,22 +1,22 @@
-//! `kiri hostrelay`: lets Kiri's engine in WSL2 reach a proxy on Windows' own
+//! `stowlark hostrelay`: lets Stowlark's engine in WSL2 reach a proxy on Windows' own
 //! loopback, `127.0.0.1:7892`, where most Windows proxy apps listen. In
 //! WSL's default NAT networking the distro's 127.0.0.1 is its own, and
 //! Windows' firewall keeps the WSL network away from Windows' ports, so a
 //! proxy the browser uses was refused to every image pull.
 //!
-//! The connections take the way kiri-win already talks to WSL: a wsl.exe
-//! process's stdin and stdout. kiri-win (crates/kiri-win/src/relay.rs)
+//! The connections take the way stowlark-win already talks to WSL: a wsl.exe
+//! process's stdin and stdout. stowlark-win (crates/kiri-win/src/relay.rs)
 //! starts this and asks it to LISTEN for each proxy port; it listens on the
 //! distro's 127.0.0.1 and sends each connection to it back as frames, and
-//! kiri-win dials the proxy on Windows. kiri-win dials only the ports it
+//! stowlark-win dials the proxy on Windows. stowlark-win dials only the ports it
 //! asked for, so nothing in WSL can reach any other Windows port this way.
 //! The engine pulls through `127.0.0.1:<the port here>` (daemon/proxy.rs).
 //!
 //! Both ends share this file. Frames are the bridge's (crates/kiri/src/bridge.rs):
 //! kind, connection id (u32 BE), length (u32 BE), then the data.
 
-// Each build uses one end: the WSL end in Linux's kiri, the Windows end in
-// kiri-win. The tests run both.
+// Each build uses one end: the WSL end in Linux's stowlark, the Windows end in
+// stowlark-win. The tests run both.
 #![allow(dead_code)]
 
 use std::collections::HashMap;
@@ -215,8 +215,8 @@ fn attach(conns: &Arc<Conns>, out: &Out, id: u32, rx: Receiver<Op>, stream: TcpS
     });
 }
 
-/// The WSL end (`kiri hostrelay`): listens as kiri-win asks and sends each
-/// connection over `out`, until kiri-win goes, and the listeners with it.
+/// The WSL end (`stowlark hostrelay`): listens as stowlark-win asks and sends each
+/// connection over `out`, until stowlark-win goes, and the listeners with it.
 pub fn listen_side(input: impl Read, out: &Out) -> io::Result<()> {
     let conns = Arc::new(Conns::default());
     let next = Arc::new(AtomicU32::new(1));
@@ -333,7 +333,7 @@ pub fn run() -> io::Result<()> {
     listen_side(io::stdin(), &out)
 }
 
-// Over unix socket pairs: these run with kiri's tests, not kiri-win's.
+// Over unix socket pairs: these run with stowlark's tests, not stowlark-win's.
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
@@ -430,7 +430,7 @@ mod tests {
     fn only_the_ports_asked_for_are_dialled() {
         let other = TcpListener::bind("127.0.0.1:0").unwrap();
         let target = other.local_addr().unwrap().port();
-        // kiri-win allows some other port; the WSL end listens for this one anyway.
+        // stowlark-win allows some other port; the WSL end listens for this one anyway.
         let (ports, out) = relay(1);
         let local = listen_for(&ports, &out, target);
         let mut c = TcpStream::connect(("127.0.0.1", local)).unwrap();

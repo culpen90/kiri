@@ -27,18 +27,18 @@ const MEMORY_FLOOR: u64 = 256 << 20;
 /// How much more the guest gets at once when it reports pressure.
 const MEMORY_GROW: u64 = 1 << 30;
 
-/// What a request that needs the VM gets while Kiri is stopped.
-pub const STOPPED: &str = "Kiri is stopped: press Start in the Kiri window to run containers again";
+/// What a request that needs the VM gets while Stowlark is stopped.
+pub const STOPPED: &str = "Stowlark is stopped: press Start in the Stowlark window to run containers again";
 
 /// The file that keeps "stopped" across engine restarts.
 fn stopped_marker() -> Option<std::path::PathBuf> {
     super::state_dir().ok().map(|d| d.join("stopped"))
 }
 
-/// The VM's memory ceiling: `KIRI_MEMORY_MIB`, else Settings → Resources,
+/// The VM's memory ceiling: `STOWLARK_MEMORY_MIB`, else Settings → Resources,
 /// else half the Mac's RAM up to 8 GiB.
 pub fn memory_ceiling() -> u64 {
-    if let Some(mib) = std::env::var("KIRI_MEMORY_MIB").ok().and_then(|v| v.parse::<u64>().ok()) {
+    if let Some(mib) = std::env::var("STOWLARK_MEMORY_MIB").ok().and_then(|v| v.parse::<u64>().ok()) {
         return mib << 20;
     }
     if let Some(mib) = resources()["memory_mib"].as_u64() {
@@ -47,10 +47,10 @@ pub fn memory_ceiling() -> u64 {
     (physical_memory() / 2).clamp(2 << 30, 8 << 30)
 }
 
-/// The VM's CPUs: `KIRI_CPUS`, else Settings → Resources, else 2.
+/// The VM's CPUs: `STOWLARK_CPUS`, else Settings → Resources, else 2.
 pub fn vm_cpus() -> usize {
     let max = max_cpus();
-    std::env::var("KIRI_CPUS").ok().and_then(|v| v.parse().ok()).or_else(|| resources()["cpus"].as_u64().map(|c| c as usize)).unwrap_or(2).clamp(1, max)
+    std::env::var("STOWLARK_CPUS").ok().and_then(|v| v.parse().ok()).or_else(|| resources()["cpus"].as_u64().map(|c| c as usize)).unwrap_or(2).clamp(1, max)
 }
 
 /// The Mac's CPUs, the most the VM can have.
@@ -81,7 +81,7 @@ fn physical_memory() -> u64 {
 }
 
 /// This process's resident memory, in bytes: on a Linux host the daemon runs
-/// beside its containers, so it counts in what Kiri holds.
+/// beside its containers, so it counts in what Stowlark holds.
 #[cfg(not(target_os = "macos"))]
 fn self_rss() -> u64 {
     let statm = std::fs::read_to_string("/proc/self/statm").unwrap_or_default();
@@ -409,7 +409,7 @@ pub struct ExecConfig {
     pub stdin: bool,
     /// `exec --privileged`, or any exec in a privileged container.
     pub privileged: bool,
-    /// Kiri's own (the Kubernetes service watcher): no events.
+    /// Stowlark's own (the Kubernetes service watcher): no events.
     pub internal: bool,
 }
 
@@ -516,7 +516,7 @@ pub struct Engine {
     saving: Mutex<()>,
     me: OnceLock<Weak<Engine>>,
     /// Containers that come back on Start: the ones whose restart policy
-    /// would have started them when the daemon came up, held because Kiri
+    /// would have started them when the daemon came up, held because Stowlark
     /// was stopped (Start starts them) or because the VM did not boot
     /// (`retry_held` tries it again), and the ones Stop (or the VM's sleep on
     /// request) stopped, which `always` and `unless-stopped` bring back.
@@ -559,7 +559,7 @@ pub struct Engine {
     k8s_fwd: Mutex<HashMap<u16, super::ports::Forwards>>,
 }
 
-/// k3s's pod and service ranges, which `kiri k8s` leaves at their defaults.
+/// k3s's pod and service ranges, which `stowlark k8s` leaves at their defaults.
 pub const K8S_RANGES: [([u8; 4], u8); 2] = [([10, 42, 0, 0], 16), ([10, 43, 0, 0], 16)];
 
 /// Whether an address is in the cluster's pod or service range.
@@ -727,7 +727,7 @@ impl Engine {
         self.last_activity.store(now_secs(), std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Powers the VM off after `KIRI_IDLE_SECS` (default 60; 0 = never)
+    /// Powers the VM off after `STOWLARK_IDLE_SECS` (default 60; 0 = never)
     /// with no running containers or execs and no API requests. A VM that
     /// boots in a tenth of a second can afford to sleep, and sleeping is the
     /// one thing that gives all its memory back to macOS: Apple's balloon
@@ -756,19 +756,19 @@ impl Engine {
         Ok((code, String::from_utf8_lossy(&out).into_owned()))
     }
 
-    /// `kiri k8s`: every LoadBalancer service gets its port on the Mac's
+    /// `stowlark k8s`: every LoadBalancer service gets its port on the Mac's
     /// localhost, as OrbStack and Docker Desktop do. k3s's service load
     /// balancer already serves the port on the node, so a forward to the
     /// node container is all it takes. Checked every few seconds while the
     /// cluster runs; forwards go when services or the cluster do.
     fn start_k8s_lb(self: &Arc<Self>) {
         let me = Arc::downgrade(self);
-        // `kiri k8s set --lan on` puts them on every interface; a change rebinds them.
+        // `stowlark k8s set --lan on` puts them on every interface; a change rebinds them.
         let mut bound_on = String::new();
-        let _ = std::thread::Builder::new().name("kiri-k8s-lb".into()).spawn(move || loop {
+        let _ = std::thread::Builder::new().name("stowlark-k8s-lb".into()).spawn(move || loop {
             std::thread::sleep(Duration::from_secs(3));
             let Some(engine) = me.upgrade() else { return };
-            let node = engine.lock().containers.values().find(|c| c.status == Status::Running && c.spec.labels.get("dev.kiri.k8s").is_some()).map(|c| (c.id.clone(), c.ip));
+            let node = engine.lock().containers.values().find(|c| c.status == Status::Running && c.spec.labels.get("dev.stowlark.k8s").is_some()).map(|c| (c.id.clone(), c.ip));
             let Some((id, Some(ip))) = node else {
                 engine.k8s_lb.lock().unwrap_or_else(|e| e.into_inner()).clear();
                 engine.k8s_fwd.lock().unwrap_or_else(|e| e.into_inner()).clear();
@@ -838,13 +838,13 @@ impl Engine {
         }
     }
 
-    /// Kiri's own: a port on the Mac's loopback that reaches `ip:port` in
+    /// Stowlark's own: a port on the Mac's loopback that reaches `ip:port` in
     /// the cluster (a service's ClusterIP or a pod), for sharing it.
     pub fn k8s_forward(&self, ip: [u8; 4], port: u16) -> Result<u16, Error> {
         if !in_k8s_ranges(ip) || port == 0 {
             return Err(Error::BadRequest("not an address in the Kubernetes cluster".into()));
         }
-        let node = self.lock().containers.values().find(|c| c.status == Status::Running && c.spec.labels.get("dev.kiri.k8s").is_some()).and_then(|c| c.ip);
+        let node = self.lock().containers.values().find(|c| c.status == Status::Running && c.spec.labels.get("dev.stowlark.k8s").is_some()).and_then(|c| c.ip);
         let Some(node) = node else { return Err(Error::Conflict("Kubernetes isn't running".into())) };
         self.route_k8s(node);
         let vm = self.vm()?;
@@ -862,13 +862,13 @@ impl Engine {
     }
 
     fn start_sleeper(self: &Arc<Self>) {
-        let idle: u64 = std::env::var("KIRI_IDLE_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(60);
+        let idle: u64 = std::env::var("STOWLARK_IDLE_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(60);
         if idle == 0 {
             return;
         }
-        let builder_idle: u64 = std::env::var("KIRI_BUILDER_IDLE_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(300);
+        let builder_idle: u64 = std::env::var("STOWLARK_BUILDER_IDLE_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(300);
         let me = Arc::downgrade(self);
-        let _ = std::thread::Builder::new().name("kiri-sleeper".into()).spawn(move || loop {
+        let _ = std::thread::Builder::new().name("stowlark-sleeper".into()).spawn(move || loop {
             std::thread::sleep(Duration::from_secs(5));
             let Some(engine) = me.upgrade() else { return };
             let quiet_for = now_secs().saturating_sub(engine.last_activity.load(std::sync::atomic::Ordering::Relaxed));
@@ -939,7 +939,7 @@ impl Engine {
         true
     }
 
-    /// The window's Stop: Kiri off until Start. Marked stopped first, so
+    /// The window's Stop: Stowlark off until Start. Marked stopped first, so
     /// nothing that comes in meanwhile boots it again; then every container
     /// stops and the VM powers off.
     pub fn stop_all(&self) -> Result<(), Error> {
@@ -947,7 +947,7 @@ impl Engine {
         if let Some(f) = stopped_marker() {
             let _ = std::fs::write(f, b"");
         }
-        crate::diag::info!("Kiri stopped: the VM stays off until Start");
+        crate::diag::info!("Stowlark stopped: the VM stays off until Start");
         self.sleep_now()
     }
 
@@ -955,12 +955,12 @@ impl Engine {
     /// for `/kiri/wake`).
     pub fn unstop(&self) {
         if self.stopped.swap(false, std::sync::atomic::Ordering::SeqCst) {
-            crate::diag::info!("Kiri started");
+            crate::diag::info!("Stowlark started");
         }
         if let Some(f) = stopped_marker() {
             let _ = std::fs::remove_file(f);
         }
-        // What the daemon would have restarted when it came up, had Kiri
+        // What the daemon would have restarted when it came up, had Stowlark
         // not been stopped then. Off this thread: the caller boots the VM.
         if let Some(me) = self.me.get().and_then(Weak::upgrade) {
             std::thread::spawn(move || me.start_held());
@@ -1004,7 +1004,7 @@ impl Engine {
     /// it. Tries again after 10 s, then twice as long each time, up to every
     /// 5 minutes: what launchd and systemd did by starting a daemon that
     /// exited, without the exits. Ends when the containers have started, when
-    /// Start took them, or when Kiri is stopped (then Start starts them).
+    /// Start took them, or when Stowlark is stopped (then Start starts them).
     fn retry_held(&self) {
         let Some(me) = self.me.get().and_then(Weak::upgrade) else { return };
         std::thread::spawn(move || {
@@ -1340,7 +1340,7 @@ impl Engine {
                 }
                 if let (Some(delay), Some(me)) = (restart_in, self.me.get().and_then(Weak::upgrade)) {
                     let id = id.to_owned();
-                    let _ = std::thread::Builder::new().name("kiri-restart".into()).spawn(move || {
+                    let _ = std::thread::Builder::new().name("stowlark-restart".into()).spawn(move || {
                         std::thread::sleep(delay);
                         // Only if nobody stopped or removed it in the meantime.
                         // start_inner checks again, under its lock, that the
@@ -1394,7 +1394,7 @@ impl Engine {
                 match vm_end(self.sleeping.load(std::sync::atomic::Ordering::SeqCst), SHUTTING_DOWN.load(std::sync::atomic::Ordering::SeqCst)) {
                     // sleep_if_idle says why it slept.
                     VmEnd::Slept => {}
-                    // The daemon's own shutdown (`systemctl stop kiri`, quitting Kiri): asked for.
+                    // The daemon's own shutdown (`systemctl stop stowlark`, quitting Stowlark): asked for.
                     VmEnd::ShutDown => {
                         self.save();
                         crate::diag::info!("the VM stopped");
@@ -1418,11 +1418,11 @@ impl Engine {
     /// balloon and nothing to give back: the reading is all, and it takes in
     /// this process too, which runs beside the containers there.
     fn start_balloon(self: &Arc<Self>) {
-        if std::env::var_os("KIRI_NO_BALLOON").is_some() {
+        if std::env::var_os("STOWLARK_NO_BALLOON").is_some() {
             return;
         }
         let me = Arc::downgrade(self);
-        let _ = std::thread::Builder::new().name("kiri-balloon".into()).spawn(move || {
+        let _ = std::thread::Builder::new().name("stowlark-balloon".into()).spawn(move || {
             loop {
                 std::thread::sleep(Duration::from_secs(1));
                 let Some(engine) = me.upgrade() else { return };
@@ -1475,7 +1475,7 @@ impl Engine {
     }
 
     /// (ceiling, current target) in bytes. On a Linux host there is no VM
-    /// of Kiri's to bound: both are the machine's memory (in WSL, the memory
+    /// of Stowlark's to bound: both are the machine's memory (in WSL, the memory
     /// .wslconfig gives it), so the window shows use against what is there.
     pub fn memory(&self) -> (u64, u64) {
         if cfg!(target_os = "macos") {
@@ -1486,7 +1486,7 @@ impl Engine {
         }
     }
 
-    /// What Kiri's Linux holds now, in bytes; 0 while asleep.
+    /// What Stowlark's Linux holds now, in bytes; 0 while asleep.
     pub fn memory_used(&self) -> u64 {
         self.memory_used.load(std::sync::atomic::Ordering::Relaxed)
     }
@@ -1512,7 +1512,7 @@ impl Engine {
     /// the agent only steps its clock when it is off.
     fn start_clock(self: &Arc<Self>) {
         let me = Arc::downgrade(self);
-        let _ = std::thread::Builder::new().name("kiri-clock".into()).spawn(move || {
+        let _ = std::thread::Builder::new().name("stowlark-clock".into()).spawn(move || {
             let (mut wall, mut mono) = (SystemTime::now(), std::time::Instant::now());
             let mut sent = std::time::Instant::now();
             loop {
@@ -1536,7 +1536,7 @@ impl Engine {
     /// Reads the VM's CPU time every two seconds, for `cpu_percent`.
     fn start_cpu_meter(self: &Arc<Self>) {
         let me = Arc::downgrade(self);
-        let _ = std::thread::Builder::new().name("kiri-cpu".into()).spawn(move || {
+        let _ = std::thread::Builder::new().name("stowlark-cpu".into()).spawn(move || {
             let mut last: Option<(u64, std::time::Instant)> = None;
             loop {
                 std::thread::sleep(Duration::from_secs(2));
@@ -1843,7 +1843,7 @@ impl Engine {
         flags |= spec.security_flags();
         // Every container can reach the Mac, as with Docker Desktop and OrbStack.
         let mut hosts = vec![
-            format!("{}\thost.docker.internal host.kiri.internal", super::ports::HOST_ADDR),
+            format!("{}\thost.docker.internal host.stowlark.internal", super::ports::HOST_ADDR),
             format!("{}\tgateway.docker.internal", super::ports::HOST_ADDR),
         ];
         hosts.extend(spec.extra_hosts.iter().cloned());
@@ -2189,20 +2189,20 @@ impl Engine {
         self.lock_networks().allocate6(&n.name, super::network::parse_ip6(want), &avoid).map_err(Error::Conflict)
     }
 
-    /// Where `<host>` (a `*.kiri.localhost` name) should go: the container
+    /// Where `<host>` (a `*.stowlark.localhost` name) should go: the container
     /// and the ports that could be its web port (domains.rs picks one).
     /// Names are the container name, or `<service>.<project>` for Compose
     /// services.
     pub fn route(&self, host: &str) -> Option<super::domains::Target> {
         let host = host.split(':').next()?.to_ascii_lowercase();
-        let name = host.strip_suffix(".kiri.localhost").or_else(|| host.strip_suffix(".kiri.local"))?.to_owned();
+        let name = host.strip_suffix(".stowlark.localhost").or_else(|| host.strip_suffix(".stowlark.local"))?.to_owned();
         let st = self.lock();
         let c = st.containers.values().find(|c| {
             c.status == Status::Running && {
                 let label = |k: &str| c.spec.labels.get(k).and_then(|v| v.as_str()).unwrap_or("");
                 let service = format!("{}.{}", label("com.docker.compose.service"), label("com.docker.compose.project"));
-                // `dev.kiri.domain=api.myapp` (comma-separated for several) picks the names.
-                let chosen = label(DOMAIN_LABEL).split(',').map(|d| own_name(d.trim())).any(|d| !d.is_empty() && d.eq_ignore_ascii_case(&name));
+                // `dev.stowlark.domain=api.myapp` (comma-separated for several) picks the names.
+                let chosen = domain_label(&c.spec.labels).unwrap_or("").split(',').map(|d| own_name(d.trim())).any(|d| !d.is_empty() && d.eq_ignore_ascii_case(&name));
                 chosen || c.name.eq_ignore_ascii_case(&name) || service.eq_ignore_ascii_case(&name) || (name.len() >= 12 && c.id.starts_with(&name))
             }
         })?;
@@ -2210,7 +2210,7 @@ impl Engine {
         Some(super::domains::Target {
             ip,
             id: c.id.clone(),
-            label: c.spec.labels.get("dev.kiri.http.port").and_then(|v| v.as_str()).and_then(|p| p.parse().ok()),
+            label: c.spec.labels["dev.stowlark.http.port"].as_str().or_else(|| c.spec.labels["dev.kiri.http.port"].as_str()).and_then(|p| p.parse().ok()),
             published: c.spec.ports.iter().filter(|b| b.proto != "udp").map(|b| b.container_port).collect(),
             exposed: c.spec.exposed.clone(),
         })
@@ -2259,9 +2259,9 @@ impl Engine {
 
     /// Running containers' domains, for the router's "not found" page.
     pub fn domains(&self) -> Vec<String> {
-        let suffix = if super::dns::installed() { "kiri.local" } else { "kiri.localhost" };
+        let suffix = if super::dns::installed() { "stowlark.local" } else { "stowlark.localhost" };
         let mut v = self.each(|c| {
-            let chosen = c.spec.labels.get(DOMAIN_LABEL).and_then(|v| v.as_str()).map(|d| own_name(d.split(',').next().unwrap_or("").trim()).to_owned());
+            let chosen = domain_label(&c.spec.labels).map(|d| own_name(d.split(',').next().unwrap_or("").trim()).to_owned());
             (c.status == Status::Running).then(|| format!("{}.{suffix}", chosen.filter(|d| !d.is_empty()).unwrap_or_else(|| c.name.clone())))
         });
         v.sort();
@@ -2517,7 +2517,7 @@ impl Engine {
             let mut st = self.lock();
             let c = st.containers.get_mut(&id).expect("resolved");
             if c.spec.network_mode == net.name {
-                return Err(Error::BadRequest(format!("Kiri cannot disconnect a container from its first network ({})", net.name)));
+                return Err(Error::BadRequest(format!("Stowlark cannot disconnect a container from its first network ({})", net.name)));
             }
             let Some(pos) = c.spec.extra_networks.iter().position(|x| x.name == net.name) else {
                 return Err(Error::NotFound(format!("container {} is not connected to network {}", &id[..12], net.name)));
@@ -2615,7 +2615,7 @@ impl Engine {
         Ok(self.vm()?.top(&id)?)
     }
 
-    /// Kiri's own: the TCP ports a running container listens on, split into
+    /// Stowlark's own: the TCP ports a running container listens on, split into
     /// those a published port would reach and those it would not.
     pub fn listening(&self, key: &str) -> Result<(Vec<u16>, Vec<u16>), Error> {
         let id = self.resolve(key)?;
@@ -2633,7 +2633,7 @@ impl Engine {
     }
 
     /// `docker rename`.
-    /// Kiri's own: new published ports for a container. A running one keeps
+    /// Stowlark's own: new published ports for a container. A running one keeps
     /// running: its ports are relays on the Mac, so only they are replaced.
     /// If the new ones cannot be bound, the old ones are put back.
     pub fn set_ports(&self, key: &str, ports: Vec<super::ports::Binding>) -> Result<(), Error> {
@@ -2678,7 +2678,7 @@ impl Engine {
         Ok(())
     }
 
-    /// Kiri's own: a container's environment. Takes effect at its next start;
+    /// Stowlark's own: a container's environment. Takes effect at its next start;
     /// says whether it is running now, so the caller can restart it.
     pub fn set_env(&self, key: &str, env: Vec<String>) -> Result<bool, Error> {
         let id = self.resolve(key)?;
@@ -3052,7 +3052,7 @@ impl Engine {
         self.lock().execs.values().filter(|e| e.container_id == container_id && e.running).count()
     }
 
-    /// Drops a finished exec's record: Kiri's own, which nobody inspects.
+    /// Drops a finished exec's record: Stowlark's own, which nobody inspects.
     pub fn forget_exec(&self, exec_id: &str) {
         self.lock().execs.remove(exec_id);
     }
@@ -3124,7 +3124,7 @@ impl Engine {
     }
 }
 
-/// A Docker event in Kiri's log: containers and images coming and going,
+/// A Docker event in Stowlark's log: containers and images coming and going,
 /// with name, image and exit code; never labels (they can hold anything).
 /// A BuildKit container's exec is a build session (`docker build`).
 /// The `key=value` network settings the guest takes with `Run`.
@@ -3274,16 +3274,20 @@ pub fn random_hex(bytes: usize) -> String {
 }
 
 /// The label a container chooses its local names with.
-pub const DOMAIN_LABEL: &str = "dev.kiri.domain";
+pub const DOMAIN_LABEL: &str = "dev.stowlark.domain";
 
-/// `api.myapp`, from any of `api.myapp`, `api.myapp.kiri.local` or
-/// `api.myapp.kiri.localhost`.
+fn domain_label(labels: &serde_json::Value) -> Option<&str> {
+    labels[DOMAIN_LABEL].as_str().or_else(|| labels["dev.kiri.domain"].as_str())
+}
+
+/// Pull the name out of a label that includes a local domain suffix.
 fn own_name(d: &str) -> &str {
-    d.strip_suffix(".kiri.localhost").or_else(|| d.strip_suffix(".kiri.local")).unwrap_or(d)
+    [".stowlark.localhost", ".stowlark.local", ".kiri.localhost", ".kiri.local"]
+        .iter().find_map(|suffix| d.strip_suffix(suffix)).unwrap_or(d)
 }
 
 /// Docker's container-name rule: non-empty, `[a-zA-Z0-9_.-]` only. A name
-/// is a DNS label on user networks and part of `<name>.kiri.localhost`, so
+/// is a DNS label on user networks and part of `<name>.stowlark.localhost`, so
 /// it must not carry spaces, slashes or control characters.
 fn valid_container_name(n: &str) -> bool {
     !n.is_empty() && n.bytes().all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
@@ -3400,7 +3404,7 @@ fn error_text(e: &Error) -> String {
 const SHUTDOWN_WAIT_CAP: Duration = Duration::from_secs(120);
 
 /// Who stops every container: the daemon shutting down (each wait capped,
-/// no events), or Kiri's Stop (`docker stop`'s waits and events).
+/// no events), or Stowlark's Stop (`docker stop`'s waits and events).
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Stopping {
     Shutdown,
@@ -3414,7 +3418,7 @@ impl Engine {
         stop_wait(self.with(key, |c| c.spec.stop_timeout).ok().flatten().unwrap_or(DEFAULT_STOP_TIMEOUT))
     }
 
-    /// Daemon shutdown and Kiri's Stop: every running container gets its
+    /// Daemon shutdown and Stowlark's Stop: every running container gets its
     /// stop signal and its own stop timeout, as `docker stop` would, then
     /// SIGKILL, all at once. Returns the ones still running after SIGKILL.
     fn stop_together(&self, vm: &VmLink, ids: &[String], how: Stopping) -> Vec<String> {
@@ -3436,7 +3440,7 @@ impl Engine {
             pending.push((id.clone(), t0 + wait, None));
         }
         // A SIGKILLed container's exit is quick; don't hang on one that
-        // isn't. Kiri's Stop waits as long as `docker stop` does.
+        // isn't. Stowlark's Stop waits as long as `docker stop` does.
         let grace = if engine { Duration::from_secs(10) } else { Duration::from_secs(2) };
         let mut exited = Vec::new();
         let mut st = self.lock();
@@ -3516,7 +3520,7 @@ impl Engine {
             run.epoch
         };
         let id = id.to_owned();
-        let spawned = std::thread::Builder::new().name("kiri-health".into()).spawn(move || me.monitor(&id, epoch));
+        let spawned = std::thread::Builder::new().name("stowlark-health".into()).spawn(move || me.monitor(&id, epoch));
         if let Err(e) = spawned {
             crate::diag::error!("healthcheck not started", error = e);
         }
@@ -3677,7 +3681,7 @@ mod vm_end_tests {
     use super::{VmEnd, vm_end};
 
     /// A stop that was asked for (the daemon's shutdown, `systemctl stop
-    /// kiri`) is no error; only a VM that ended on its own is.
+    /// stowlark`) is no error; only a VM that ended on its own is.
     #[test]
     fn only_an_unrequested_vm_end_is_an_error() {
         assert_eq!(vm_end(false, true), VmEnd::ShutDown);

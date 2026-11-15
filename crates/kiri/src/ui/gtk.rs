@@ -27,14 +27,14 @@ thread_local! {
 /// Before the page's own scripts: which system this is.
 const SHIM: &str = r#"window.KIRI_OS = "linux";"#;
 
-const ICON_PNG: &[u8] = include_bytes!("../../../../brand/icon/png/kiri-app-icon-512.png");
+const ICON_PNG: &[u8] = include_bytes!("../../../../brand/icon/png/stowlark-app-icon-512.png");
 
 /// `autostart` starts the engine as soon as the page has loaded; `view` picks
 /// the sidebar section to open on.
 pub fn run(autostart: bool, view: Option<String>) -> io::Result<()> {
     // The desktop file's name, before GTK starts: on Wayland it's the window's
-    // app id, which is how the dock finds Kiri's launcher and icon.
-    glib::set_prgname(Some("kiri"));
+    // app id, which is how the dock finds Stowlark's launcher and icon.
+    glib::set_prgname(Some("dev.stowlark.Stowlark"));
     gtk::init().map_err(|e| io::Error::other(format!("no display to open the window on ({e})")))?;
     let (tx, rx) = mpsc::channel();
     let engine_tx = tx.clone();
