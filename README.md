@@ -92,6 +92,22 @@ kiri import                         # bring images, volumes and containers over 
 Docker's commands also work as `kiri` commands (`kiri run`, `kiri ps`,
 `kiri compose up`, and so on), and always target Kiri.
 
+## Linux workspaces on Android
+
+`kiri-android` runs a small ARM64 Linux VM from Termux on Android without
+root. It gives scripts and on-device agents a shell, Python, and optional
+persistent workspace files. Each run returns JSON with stdout, stderr and the
+exit status, and starts with networking and host file sharing disabled.
+
+```sh
+kiri-android create project
+printf 'python3 -c "print(6 * 7)"\n' | kiri-android run project
+kiri-android delete project
+```
+
+See [Android setup and agent integration](docs/android.md) for installation,
+limits, and what the QEMU software emulator can safely be used for.
+
 ## Numbers
 
 `alpine` running `true` and removed, median of 30 runs, same `docker` CLI for all three:

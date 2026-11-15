@@ -1,0 +1,49 @@
+name: Android Linux workspaces
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/android-vm.yml'
+      - '.cargo/**'
+      - 'Cargo.*'
+      - 'crates/kiri-android/**'
+      - 'crates/kiri-init/**'
+      - 'guest/android/**'
+      - 'scripts/build-android.sh'
+      - 'tests/android-vm.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-vm-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  arm64-vm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install build and test tools
+        run: |
+          rustup target add aarch64-linux-android aarch64-unknown-linux-musl
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qemu-system-arm
+          sdkmanager --install 'ndk;28.2.13676358'
+      - name: Build the ARM64 Android bundle
+        env:
+          NDK_VERSION: 28.2.13676358
+        run: |
+          ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" scripts/build-android.sh
+          cd target/android-dist
+          sha256sum -c kiri-android-aarch64.tar.gz.sha256
+          tar -xzf kiri-android-aarch64.tar.gz
+      - name: Exercise the packaged Linux guest under QEMU
+        run: |
+          cargo build --locked -p kiri-android
+          KIRI_ANDROID_ASSETS="$PWD/target/android-dist/kiri-android/share/kiri-android" \
+            python3 tests/android-vm.py "$PWD/target/debug/kiri-android"

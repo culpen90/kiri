@@ -5,6 +5,15 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
+default-run = "kiri-init"
+
+[features]
+android-guest = []
+
+[[bin]]
+name = "kiri-android-init"
+path = "src/bin/kiri-android-init.rs"
+required-features = ["android-guest"]
 
 [dependencies]
 kiri-proto = { path = "../kiri-proto" }

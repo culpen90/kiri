@@ -25,6 +25,10 @@ app, which would carry both builds of the docker tools. On Intel there is
 no Rosetta for Linux: amd64 images run natively, and images with no amd64
 build are refused.
 
+The Android distribution builds separately from the desktop engine. See
+[Android setup](android.md#build-from-source) for the ARM64 Termux bundle and
+real QEMU smoke test.
+
 On Windows, `cargo xtask windows-dev` builds the Linux engine, Kiri Linux and
 Docker tools into `target/kiri-windows-x86_64` with a debug `kiri-win.exe`.
 `cargo run -p kiri-win` uses that bundle automatically. Use `cargo xtask
@@ -95,9 +99,11 @@ kiri UI ────┘
 | `crates/kiri` | the `kiri` binary: daemon, Docker API, CLI, UI, bench |
 | `crates/kiri-vmm` | Virtualization.framework VM |
 | `crates/kiri-init` | guest PID 1, agent and container runtime |
+| `crates/kiri-android` | local Termux launcher and JSON CLI for offline ARM64 Linux VMs |
 | `crates/kiri-proto` | host ↔ guest wire protocol (no_std, no allocation per message) |
 | `crates/kiri-image` | image references, registry client, blob store, archives |
 | `guest/kernel` | kernel config and patches |
+| `guest/android` | pinned Alpine inputs and the Android initramfs builder |
 | `tests/e2e.sh` | ~350 checks through the real `docker` CLI, plus a leak soak (`K8S=1` adds Kubernetes) |
 | `tests/linux-host.sh` | the Linux host build, driven in a privileged container |
 | `tests/finder-mount.sh` | the Mac's Finder mount at `~/Kiri`: covers only an empty folder or its own old mount, never your files or another mount |
