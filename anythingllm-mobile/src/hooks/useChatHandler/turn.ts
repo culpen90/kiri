@@ -156,6 +156,7 @@ export default class AssistantTurn {
                     skillName: request.skillName,
                     description: request.description ?? null,
                     payload: request.payload ?? {},
+                    allowAlwaysApprove: request.allowAlwaysApprove,
                     timeoutMs: request.timeoutMs,
                     approved: null,
                 });

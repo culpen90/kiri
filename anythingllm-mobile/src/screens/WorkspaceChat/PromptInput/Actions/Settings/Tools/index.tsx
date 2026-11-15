@@ -32,23 +32,28 @@ export default function ToolsActionSheet() {
     const { llmPreferences } = useLLMPreference();
     const [page, setPage] = useState<ToolsPage>('menu');
     const [toolSettings, setToolSettings] = useState<Record<string, boolean>>({});
+    const savingToolSetting = useRef(false);
 
     const isToolAvailable = (tool: ToolManagerTool) => toolSupportsProvider(tool, llmPreferences?.provider);
     const isToolOn = (tool: ToolManagerTool) => !!toolSettings[tool.id] && isToolAvailable(tool);
 
     const handleToggle = async (tool: ToolManagerTool) => {
-        if (!isToolAvailable(tool)) return;
-        const turningOn = !toolSettings[tool.id];
-        if (turningOn && tool.requestPermission && !(await tool.requestPermission())) {
-            if (tool.permissionDeniedMessage) showToast(tool.permissionDeniedMessage);
-            return;
+        if (!isToolAvailable(tool) || savingToolSetting.current) return;
+        savingToolSetting.current = true;
+        try {
+            const turningOn = !toolSettings[tool.id];
+            if (turningOn && tool.requestPermission && !(await tool.requestPermission())) {
+                if (tool.permissionDeniedMessage) showToast(tool.permissionDeniedMessage);
+                return;
+            }
+            const newToolSettings = { ...toolSettings, [tool.id]: turningOn };
+            await uiStore.setToStorage('tools', newToolSettings);
+            setToolSettings(newToolSettings);
+            if (turningOn) Telemetry.logEvent(Telemetry.CUSTOM_EVENTS.ACTIONS.TOOL_ENABLED, { tool: tool.id, provider: llmPreferences?.provider ?? 'unknown' });
+            ToolsManager.resetTools();
+        } finally {
+            savingToolSetting.current = false;
         }
-        const newToolSettings = { ...toolSettings, [tool.id]: turningOn };
-        setToolSettings(newToolSettings);
-        await uiStore.setToStorage('tools', newToolSettings);
-        if (turningOn) Telemetry.logEvent(Telemetry.CUSTOM_EVENTS.ACTIONS.TOOL_ENABLED, { tool: tool.id, provider: llmPreferences?.provider ?? 'unknown' });
-        ToolsManager.resetTools();
-        await loadTools();
     };
 
     const loadTools = async () => {

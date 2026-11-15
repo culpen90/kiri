@@ -44,6 +44,7 @@ export const TOOL_APPROVAL_MESSAGES = {
 
 type PendingApproval = {
     skillName: string;
+    allowAlwaysApprove: boolean;
     settle: (result: ToolApprovalResult) => void;
 }
 
@@ -71,6 +72,7 @@ class ToolApprovalManager {
      * @param signal - session abort signal; aborting settles the request as denied
      * @param timeoutMs - defaults to TOOL_APPROVAL_TIMEOUT_MS
      * @param autoApprove - resolve approved right away without asking (unattended scheduled jobs - see `ToolExecutionContext.autoApproveTools`)
+     * @param allowAlwaysApprove - allow saved approvals and show the option on the card
      */
     async request({
         skillName,
@@ -80,6 +82,7 @@ class ToolApprovalManager {
         signal = null,
         timeoutMs = TOOL_APPROVAL_TIMEOUT_MS,
         autoApprove = false,
+        allowAlwaysApprove = true,
     }: {
         skillName: string;
         description?: string | null;
@@ -88,6 +91,7 @@ class ToolApprovalManager {
         signal?: AbortSignal | null;
         timeoutMs?: number;
         autoApprove?: boolean;
+        allowAlwaysApprove?: boolean;
     }): Promise<ToolApprovalResult> {
         const requestId = generateUUID();
         if (signal?.aborted) return { approved: false, message: TOOL_APPROVAL_MESSAGES.aborted };
@@ -96,7 +100,7 @@ class ToolApprovalManager {
             streamEmitter('report_status', i18n.t('tools.approval.auto_approved_status', { tool: skillName }));
             return { approved: true, message: TOOL_APPROVAL_MESSAGES.autoApproved };
         }
-        if (await isAutoApproved(skillName).catch(() => false)) {
+        if (allowAlwaysApprove && await isAutoApproved(skillName).catch(() => false)) {
             this.log(`Auto-approving ${skillName} (user chose to always approve)`);
             streamEmitter('report_status', i18n.t('tools.approval.auto_approved_status', { tool: skillName }));
             return { approved: true, message: TOOL_APPROVAL_MESSAGES.alwaysApproved };
@@ -120,10 +124,10 @@ class ToolApprovalManager {
                 settle({ approved: false, message: TOOL_APPROVAL_MESSAGES.aborted });
             }
 
-            this.pending.set(requestId, { skillName, settle });
+            this.pending.set(requestId, { skillName, allowAlwaysApprove, settle });
             signal?.addEventListener('abort', onAbort, { once: true });
 
-            const request: IToolApprovalRequest = { requestId, skillName, description, payload, timeoutMs };
+            const request: IToolApprovalRequest = { requestId, skillName, description, payload, timeoutMs, allowAlwaysApprove };
             streamEmitter('request_tool_approval', request);
 
             timeoutId = setTimeout(() => {
@@ -141,7 +145,7 @@ class ToolApprovalManager {
     respond(requestId: string, approved: boolean, { always = false }: { always?: boolean } = {}): boolean {
         const pending = this.pending.get(requestId);
         if (!pending) return false;
-        if (approved && always) {
+        if (approved && always && pending.allowAlwaysApprove) {
             addAutoApproval(pending.skillName).catch((error) => this.log(`Could not save auto-approval for ${pending.skillName}`, error));
         }
         pending.settle({ approved, message: approved ? TOOL_APPROVAL_MESSAGES.approved : TOOL_APPROVAL_MESSAGES.rejected });

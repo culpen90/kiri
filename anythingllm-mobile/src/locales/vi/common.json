@@ -662,6 +662,15 @@
       "status_expired": "Thời gian nhắc nhở đã hết, nhưng vẫn chưa được phê duyệt",
       "status_set": "Đặt lời nhắc {{label}}"
     },
+    "stowlark": {
+      "name": null,
+      "description": null,
+      "approval_description": null,
+      "status_running": null,
+      "setup_title": null,
+      "setup_message": null,
+      "open_app_settings": null
+    },
     "draft_email": {
       "name": "Soạn thảo email",
       "description": "Sử dụng trợ lý để soạn thảo email cho bạn.",

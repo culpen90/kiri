@@ -718,6 +718,15 @@
       "status_expired": "Tempo de lembrete expirou antes da aprovação",
       "status_set": "Definir lembrete {{label}}"
     },
+    "stowlark": {
+      "name": null,
+      "description": null,
+      "approval_description": null,
+      "status_running": null,
+      "setup_title": null,
+      "setup_message": null,
+      "open_app_settings": null
+    },
     "draft_email": {
       "name": "Redigir E-mail",
       "description": "Use o assistente para redigir um e-mail para você.",

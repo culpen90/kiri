@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { Animated, Pressable, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Pressable, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { CaretDown, Check, ShieldCheck } from "phosphor-react-native";
 import { type DynamicChatMessage } from "@/screens/WorkspaceChat/ChatHistory";
 import { type IToolApprovalActivity } from "@/database/models/WorkspaceChat";
@@ -53,7 +53,9 @@ const COLORS = {
 
 function ToolApprovalCard({ node }: { node: IToolApprovalActivity }) {
     const { t } = useTranslation();
-    const [isExpanded, setIsExpanded] = useState(false);
+    const allowAlwaysApprove = node.allowAlwaysApprove !== false;
+    const script = node.skillName === 'run_linux_script' && typeof node.payload?.script === 'string' ? node.payload.script : undefined;
+    const [isExpanded, setIsExpanded] = useState(script !== undefined);
     const [alwaysApprove, setAlwaysApprove] = useState(false);
     // Guard against a double tap landing before the settled snapshot arrives.
     const [responded, setResponded] = useState(false);
@@ -63,7 +65,7 @@ function ToolApprovalCard({ node }: { node: IToolApprovalActivity }) {
     const respond = (approved: boolean) => {
         if (responded) return;
         setResponded(true);
-        ToolApproval.respond(node.requestId, approved, { always: approved && alwaysApprove });
+        ToolApproval.respond(node.requestId, approved, { always: approved && allowAlwaysApprove && alwaysApprove });
     };
 
     return (
@@ -101,37 +103,45 @@ function ToolApprovalCard({ node }: { node: IToolApprovalActivity }) {
                         </View>
                     </Pressable>
                     {isExpanded && (
-                        <View style={{ backgroundColor: COLORS.payload, borderRadius: 8, padding: 12 }}>
-                            <Text style={{ color: COLORS.payloadText, fontSize: 12, lineHeight: 16, fontFamily: 'monospace' }}>{formatPayload(node.payload)}</Text>
-                        </View>
+                        script === undefined ? (
+                            <View style={{ backgroundColor: COLORS.payload, borderRadius: 8, padding: 12 }}>
+                                <Text style={{ color: COLORS.payloadText, fontSize: 12, lineHeight: 16, fontFamily: 'monospace' }}>{formatPayload(node.payload)}</Text>
+                            </View>
+                        ) : (
+                            <ScrollView nestedScrollEnabled style={{ backgroundColor: COLORS.payload, borderRadius: 8, maxHeight: 220 }} contentContainerStyle={{ padding: 12 }}>
+                                <Text selectable style={{ color: COLORS.payloadText, fontSize: 12, lineHeight: 16, fontFamily: 'monospace' }}>{formatScript(script)}</Text>
+                            </ScrollView>
+                        )
                     )}
                 </View>
             )}
 
-            <Pressable
-                onPress={() => setAlwaysApprove((v) => !v)}
-                disabled={responded}
-                hitSlop={6}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: alwaysApprove, disabled: responded }}
-                className="flex flex-row items-center self-start"
-                style={{ gap: 8 }}
-            >
-                <View
-                    style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: 5,
-                        borderWidth: alwaysApprove ? 0 : 1.5,
-                        borderColor: COLORS.checkboxBorder,
-                        backgroundColor: alwaysApprove ? COLORS.accent : 'transparent',
-                    }}
-                    className="flex items-center justify-center"
+            {allowAlwaysApprove && (
+                <Pressable
+                    onPress={() => setAlwaysApprove((v) => !v)}
+                    disabled={responded}
+                    hitSlop={6}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: alwaysApprove, disabled: responded }}
+                    className="flex flex-row items-center self-start"
+                    style={{ gap: 8 }}
                 >
-                    {alwaysApprove && <Check size={12} color="#000000" weight="bold" />}
-                </View>
-                <Text style={{ color: COLORS.text }} className="text-sm">{t('chat.tool_approval.always_approve')}</Text>
-            </Pressable>
+                    <View
+                        style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: 5,
+                            borderWidth: alwaysApprove ? 0 : 1.5,
+                            borderColor: COLORS.checkboxBorder,
+                            backgroundColor: alwaysApprove ? COLORS.accent : 'transparent',
+                        }}
+                        className="flex items-center justify-center"
+                    >
+                        {alwaysApprove && <Check size={12} color="#000000" weight="bold" />}
+                    </View>
+                    <Text style={{ color: COLORS.text }} className="text-sm">{t('chat.tool_approval.always_approve')}</Text>
+                </Pressable>
+            )}
 
             <View className="flex flex-row" style={{ gap: 8, marginBottom: 4 }}>
                 <TouchableOpacity
@@ -208,4 +218,10 @@ function formatPayload(payload: IToolApprovalActivity['payload']): string {
     } catch {
         return String(payload);
     }
+}
+
+/** Keep whitespace layout while exposing control characters that can disguise shell source. */
+function formatScript(script: string): string {
+    // eslint-disable-next-line no-control-regex
+    return script.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/gu, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
 }

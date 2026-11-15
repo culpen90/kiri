@@ -690,6 +690,15 @@
       "status_expired": "Reminder time passed before it was approved",
       "status_set": "Set reminder \"{{label}}\""
     },
+    "stowlark": {
+      "name": "Linux (Stowlark)",
+      "description": "Run shell and Python scripts in a temporary Linux workspace on your phone. Requires Termux setup and your approval for each script.",
+      "approval_description": "Review this script before running it in a temporary Linux workspace on your phone.",
+      "status_running": "Running the script in Linux",
+      "setup_title": "Set up Stowlark",
+      "setup_message": "Install and open Termux, install QEMU and the Stowlark Android bundle, then set allow-external-apps=true in ~/.termux/termux.properties. Allow AnythingLLM to run commands in Termux, then try enabling the tool again.",
+      "open_app_settings": "App settings"
+    },
     "draft_email": {
       "name": "Draft Email",
       "description": "Draft an email and open it in your mail app (Gmail, Outlook and more) to send.",

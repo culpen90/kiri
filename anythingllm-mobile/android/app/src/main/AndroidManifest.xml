@@ -19,6 +19,8 @@
         <package android:name="com.viber.voip" />
         <package android:name="jp.naver.line.android" />
         <package android:name="com.discord" />
+        <!-- Optional on-device Linux runtime runs in Termux. -->
+        <package android:name="com.termux" />
         <!-- Mail apps a drafted email can be opened in (MessagingModule) -->
         <intent>
             <action android:name="android.intent.action.SENDTO" />
@@ -62,6 +64,7 @@
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
 
     <!-- Local notifications (chat reply finished while the phone is locked, model download progress) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -93,6 +96,9 @@
       android:roundIcon="@mipmap/ic_launcher"
       android:supportsRtl="true"
       android:theme="@style/AppTheme">
+      <receiver
+        android:name=".stowlark.StowlarkResultReceiver"
+        android:exported="false" />
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"

@@ -662,6 +662,15 @@
       "status_expired": "提醒时间已过，尚未批准",
       "status_set": "设置提醒 \"{{label}}\""
     },
+    "stowlark": {
+      "name": null,
+      "description": null,
+      "approval_description": null,
+      "status_running": null,
+      "setup_title": null,
+      "setup_message": null,
+      "open_app_settings": null
+    },
     "draft_email": {
       "name": "起草电子邮件",
       "description": "使用助手为您起草电子邮件。",

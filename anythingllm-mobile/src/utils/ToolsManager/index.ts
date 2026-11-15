@@ -11,6 +11,7 @@ import { truncateMiddle } from "../chat/contextCompaction";
 import { isOnDeviceProvider, toolSupportsProvider } from "./providerGuards";
 import i18n from "@/i18n";
 import { Platform } from "react-native";
+import { isStowlarkSupported } from "@/utils/stowlark";
 
 export { isOnDeviceProvider, isOnDeviceProviderName, toolSupportsProvider } from "./providerGuards";
 
@@ -76,6 +77,8 @@ export type ToolManagerTool = {
      * scheduled job). They are left out of the per-job tool picker and never handed to a job run.
      */
     hiddenFromScheduledJobs?: boolean;
+    /** Keep long arguments in the approval details instead of repeating them in activity and logs. */
+    omitArgumentsFromSignature?: boolean;
     definition: {
         type: 'function';
         function: {
@@ -152,6 +155,7 @@ class ToolsManager {
         Tools.default.getCurrentTime,
         Tools.default.summarize,
         Tools.default.createScheduledJob,
+        ...(isStowlarkSupported() ? [Tools.default.stowlark] : []),
         Tools.createFiles.createTextFile,
         Tools.createFiles.createPdfFile,
         Tools.createFiles.createDocxFile,
@@ -265,7 +269,10 @@ class ToolsManager {
         if (!toolCalls || toolCalls.length === 0) return nextMessages;
         streamEmitter('will_call_tools', '');
         for (const toolCall of toolCalls) {
-            const toolCallName = this._generateToolCallSignature(toolCall);
+            const knownToolConfig = knownTools?.find(tool => tool.definition.function.name === toolCall.function.name);
+            const toolCallName = knownToolConfig?.omitArgumentsFromSignature
+                ? `${toolCall.function.name}()`
+                : this._generateToolCallSignature(toolCall);
             const humanReadableToolCall = {
                 uuid: generateUUID(),
                 signature: toolCallName,
@@ -273,7 +280,6 @@ class ToolsManager {
             }
             streamEmitter('report_tool_call', humanReadableToolCall);
 
-            const knownToolConfig = knownTools?.find(tool => tool.definition.function.name === toolCall.function.name);
             if (!knownToolConfig) {
                 this.log(`ToolsManager::manageToolCallExecutions: Tool not found or available: ${toolCallName}`);
                 streamEmitter('report_tool_call_result', {

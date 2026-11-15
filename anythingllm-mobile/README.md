@@ -123,6 +123,7 @@ Basically imagine Openclaw or Heremes agent, but fully on-device first, with all
 - 🎙️ **Voice input** - Tap the mic and talk. Speech-to-text uses your phone's native recognition and keeps up with natural pauses.
 - 🧠 **Memory** - A basic manually managed memory system, globally or per workspace, and recalls it when relevant.
 - 🛠️ **Built-in tools** - Web search, web page reading, summarization, location, time, calendar reading and creation, drafting emails or texts, creating files and scheduling jobs. Smart tool selection picks the right one so small models keep a workable context window.
+- 🐧 **Linux on Android** - Let the assistant run shell and Python scripts in a temporary Stowlark Linux VM through Termux. [Setup](./docs/stowlark-android.md)
 - 📎 **Documents** - Attach PDFs, Word, Excel, PowerPoint, text and more. On-device models retrieve the relevant passages with on device embedding and reranking for a local vector database.
 - 📄 **Create documents** - Generate Word, PDF, PowerPoint and text files from a conversation.
 - 💾 **Chat export** - PDF (images included), Markdown, JSON, or plain text.

@@ -690,6 +690,15 @@
       "status_expired": "अलार्म का समय निर्धारित होने से पहले, इसे स्वीकृत नहीं किया गया।",
       "status_set": "अलार्म सेट करें \"{{label}}\""
     },
+    "stowlark": {
+      "name": null,
+      "description": null,
+      "approval_description": null,
+      "status_running": null,
+      "setup_title": null,
+      "setup_message": null,
+      "open_app_settings": null
+    },
     "draft_email": {
       "name": "ईमेल का मसौदा",
       "description": "सहायक को आपके लिए एक ईमेल का मसौदा तैयार करने के लिए उपयोग करें।",

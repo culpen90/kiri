@@ -718,6 +718,15 @@
       "status_expired": "Il tempo di promemoria è scaduto prima dell'approvazione.",
       "status_set": "Imposta promemoria \"{{label}}\""
     },
+    "stowlark": {
+      "name": null,
+      "description": null,
+      "approval_description": null,
+      "status_running": null,
+      "setup_title": null,
+      "setup_message": null,
+      "open_app_settings": null
+    },
     "draft_email": {
       "name": "Bozza email",
       "description": "Usa l'assistente per scrivere un'email per te.",

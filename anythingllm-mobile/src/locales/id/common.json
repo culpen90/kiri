@@ -662,6 +662,15 @@
       "status_expired": "Waktu pengingat telah habis sebelum disetujui.",
       "status_set": "Atur pengingat {{label}}"
     },
+    "stowlark": {
+      "name": null,
+      "description": null,
+      "approval_description": null,
+      "status_running": null,
+      "setup_title": null,
+      "setup_message": null,
+      "open_app_settings": null
+    },
     "draft_email": {
       "name": "Konsep Email",
       "description": "Gunakan asisten untuk membuat konsep email untuk Anda.",

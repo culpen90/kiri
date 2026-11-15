@@ -662,6 +662,15 @@
       "status_expired": "提醒時間已過，尚未通過",
       "status_set": "設定提醒 \"{{label}}\""
     },
+    "stowlark": {
+      "name": null,
+      "description": null,
+      "approval_description": null,
+      "status_running": null,
+      "setup_title": null,
+      "setup_message": null,
+      "open_app_settings": null
+    },
     "draft_email": {
       "name": "草擬電子郵件",
       "description": "使用助手為您草擬電子郵件。",

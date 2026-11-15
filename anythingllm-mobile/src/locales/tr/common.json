@@ -690,6 +690,15 @@
       "status_expired": "Hatırlatma süresi doldu, onaylanmadı.",
       "status_set": "Hatırlatıcı ayarla: {{label}}"
     },
+    "stowlark": {
+      "name": null,
+      "description": null,
+      "approval_description": null,
+      "status_running": null,
+      "setup_title": null,
+      "setup_message": null,
+      "open_app_settings": null
+    },
     "draft_email": {
       "name": "E-posta Taslağı",
       "description": "Asistan'ı kullanarak sizin için bir e-posta taslağı oluşturun.",

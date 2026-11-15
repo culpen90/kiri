@@ -746,6 +746,15 @@
       "status_expired": "Срок напоминания истек до одобрения",
       "status_set": "Установить напоминание: {{label}}"
     },
+    "stowlark": {
+      "name": null,
+      "description": null,
+      "approval_description": null,
+      "status_running": null,
+      "setup_title": null,
+      "setup_message": null,
+      "open_app_settings": null
+    },
     "draft_email": {
       "name": "Черновик письма",
       "description": "Используйте помощника для составления письма.",

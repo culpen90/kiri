@@ -10,6 +10,7 @@ import summarize from './summarize';
 import createFiles from './createFiles';
 import createScheduledJob from './createScheduledJob';
 import setReminder from './setReminder';
+import stowlark from './stowlark';
 
 export default {
     default: {
@@ -19,6 +20,7 @@ export default {
         getCurrentTime,
         summarize,
         createScheduledJob,
+        stowlark,
     },
     createFiles,
     appConnections: {

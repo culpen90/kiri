@@ -718,6 +718,15 @@
       "status_expired": "La date de rappel est passée avant l'approbation.",
       "status_set": "Définir une alerte \"{{label}}\""
     },
+    "stowlark": {
+      "name": null,
+      "description": null,
+      "approval_description": null,
+      "status_running": null,
+      "setup_title": null,
+      "setup_message": null,
+      "open_app_settings": null
+    },
     "draft_email": {
       "name": "Rédiger un e-mail",
       "description": "Utilisez l'assistant pour rédiger un e-mail pour vous.",

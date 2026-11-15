@@ -662,6 +662,15 @@
       "status_expired": "알림 시간 만료 전에 승인",
       "status_set": "알림 설정: {{label}}"
     },
+    "stowlark": {
+      "name": null,
+      "description": null,
+      "approval_description": null,
+      "status_running": null,
+      "setup_title": null,
+      "setup_message": null,
+      "open_app_settings": null
+    },
     "draft_email": {
       "name": "이메일 초안",
       "description": "어시스턴트를 사용하여 이메일 초안을 작성합니다.",
