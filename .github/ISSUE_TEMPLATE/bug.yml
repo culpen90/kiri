@@ -1,41 +1,46 @@
 name: Bug report
-description: Something in Stowlark doesn't work as it should.
+description: Report a problem with AnythingLLM Mobile or the Stowlark runtime.
 labels: ["bug"]
 body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Where did the problem happen?
+      options:
+        - AnythingLLM Mobile
+        - Linux (Stowlark) tool on Android
+        - Stowlark desktop runtime
+    validations:
+      required: true
   - type: input
     id: version
     attributes:
-      label: Stowlark version and system
-      description: From Stowlark's About window, or `stowlark version`.
-      placeholder: "0.2.0 on macOS 26.1 (Apple silicon)"
+      label: Version and device
+      description: Include the app or runtime version, device model, and operating system version.
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: What you did
-      description: The exact commands you ran, or the clicks in the window, so we can do the same.
-      placeholder: |
-        stowlark run --rm -p 8080:80 nginx
+      label: Steps to reproduce
+      description: List the screens, settings, or commands needed to see the problem.
     validations:
       required: true
   - type: textarea
     id: output
     attributes:
-      label: What happened
-      description: The full output or error, pasted as text. For a problem in the window, add a screenshot.
-      render: text
+      label: What happened?
+      description: Include relevant errors or screenshots. Remove credentials and personal information.
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: What you expected instead
-      description: For a Docker difference, what Docker does with the same command.
+      label: What did you expect to happen?
     validations:
       required: true
   - type: textarea
     id: notes
     attributes:
-      label: Anything else
-      description: How often it happens, a workaround you found, Stowlark's logs if they show the problem.
+      label: Additional details
+      description: Include any relevant model, provider, or Termux setup details.

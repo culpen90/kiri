@@ -54,14 +54,17 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, { error
   }
 }
 
-/** The error, its stack and app/device info - what a bug report needs to be traced. */
-function errorDetails(error: Error, stackLines = 40) {
+function errorTrace(error: Error, stackLines: number) {
   const header = `${error.name}: ${error.message}`;
   // Hermes stacks already start with the "Name: message" line - don't print it twice.
   const stack = (error.stack ?? '').split('\n').filter((line, i) => !(i === 0 && line === header));
+  return [header, ...stack.slice(0, stackLines)].join('\n');
+}
+
+/** The error, its stack and app/device info - what a bug report needs to be traced. */
+function errorDetails(error: Error, stackLines = 40) {
   return [
-    header,
-    stack.slice(0, stackLines).join('\n'),
+    errorTrace(error, stackLines),
     '',
     `App version: ${DeviceInfo.getVersion()} (${DeviceInfo.getBuildNumber()})`,
     `OS: ${Platform.OS} ${Platform.Version}`,
@@ -71,19 +74,16 @@ function errorDetails(error: Error, stackLines = 40) {
 
 /** A pre-filled GitHub issue for users who have telemetry off, so the report still reaches us. */
 function githubIssueUrl(error: Error) {
-  const body = [
-    '**What were you doing when this happened?**',
-    '',
-    '<!-- Describe what you tapped or did right before the error screen appeared -->',
-    '',
-    '**Error**',
-    '```',
+  const query = new URLSearchParams({
+    template: 'bug.yml',
+    title: `[Crash] ${error.message}`.slice(0, 120),
+    component: 'AnythingLLM Mobile',
+    version: `${DeviceInfo.getVersion()} (${DeviceInfo.getBuildNumber()}), ${Platform.OS} ${Platform.Version}, ${DeviceInfo.getBrand()} ${DeviceInfo.getModel()}`,
     // Fewer stack lines than the copy button - GitHub rejects very long prefilled URLs.
-    errorDetails(error, 15),
-    '```',
-  ].join('\n');
-  const title = `[Crash] ${error.message}`.slice(0, 120);
-  return `${PATHS.github_new_issue}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+    output: ['```text', errorTrace(error, 15), '```'].join('\n'),
+    expected: 'The app continues without crashing.',
+  });
+  return `${PATHS.github_new_issue}?${query.toString()}`;
 }
 
 /** Whether anonymous telemetry is on. null until the stored setting is read, so we never show the wrong message. */

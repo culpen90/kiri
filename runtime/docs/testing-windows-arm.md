@@ -124,7 +124,7 @@ Windows PC, or real Arm hardware), **not** inside a Mac VM. You need:
    and none of this applies.
 3. `git` and a Go of 1.21 or later on PATH, for docker.exe (below). Go
    fetches the pinned toolchain (go1.26.10) by itself.
-4. Then:
+4. From `runtime/` in the checkout, run:
 
        cargo xtask msi --arch arm64
 

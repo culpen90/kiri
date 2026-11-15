@@ -1,7 +1,7 @@
 # Developing AnythingLLM Mobile
 
 Everything you need to build, run and release the app locally. For what the app does, see the [README](./README.md).
-Run the commands below from `anythingllm-mobile/` in the Stowlark checkout.
+Run the mobile app commands below from the repository root. The optional [Stowlark runtime](./runtime/README.md) is built separately from `runtime/`.
 
 ## Prerequisites
 

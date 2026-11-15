@@ -5,7 +5,7 @@ set -eu
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 if [ "${1:-}" = "--help" ]; then
     printf 'Usage: ANDROID_NDK_HOME=/path/to/ndk %s [output-directory]\n' "$0"
-    printf 'Default output directory: target/android-dist in the repository.\n'
+    printf 'Default output directory: target/android-dist in the Stowlark runtime.\n'
     exit 0
 fi
 if [ "$#" -gt 1 ]; then

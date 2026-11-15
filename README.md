@@ -1,172 +1,168 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="brand/logo/stowlark-horizontal-dark.svg">
-    <img src="brand/logo/stowlark-horizontal-light.svg" alt="Stowlark" width="280">
-  </picture>
-</p>
+<a name="readme-top"></a>
+
+# AnythingLLM Mobile
 
 <p align="center">
-  <b>A tiny, fast container runtime for macOS, Windows and Linux.</b><br>
-  Runs your Docker images and works with the <code>docker</code> CLI, Compose and buildx you already use.
+  <img src="images/gh-header.png" alt="AnythingLLM Mobile">
 </p>
 
-<p align="center">
-  <a href="#install">Install</a> ·
-  <a href="docs/features.md">Features</a> ·
-  <a href="docs/android.md">Android workspaces</a> ·
-  <a href="anythingllm-mobile/">AnythingLLM Mobile</a> ·
-  <a href="docs/development.md">Build from source</a> ·
-  <a href="https://github.com/stowlark/stowlark/releases">Releases</a>
-</p>
+AnythingLLM Mobile is a local-first AI chat app for Android. Chat offline with a model on your phone, connect to a model you host, or choose a cloud provider. Use images, voice and documents in a chat, and save conversations in workspaces.
 
-<p align="center">
-  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-555"></a>
-  <a href="#in-your-language"><img alt="38 languages" src="https://img.shields.io/badge/languages-38-2ea043"></a>
-</p>
+## Get started
 
-<p align="center">
-  🇬🇧 🇮🇩 🇩🇪 🇪🇸 🇫🇷 🇮🇹 🇵🇱 🇧🇷 🇻🇳 🇹🇷 🇷🇺 🇸🇦 🇯🇵 🇰🇷 🇨🇳 🇹🇼<br>
-  <sub>Stowlark speaks 38 languages. <a href="#in-your-language">Is yours one?</a></sub>
-</p>
+1. [Build and run the app on Android](./DEVELOPMENT.md#getting-started).
+2. During setup, download a recommended on-device model or connect an external provider.
+3. Start a chat. You can also share a photo or document to AnythingLLM from another app.
+
+This edition is based on [Mintplex Labs' AnythingLLM Mobile](https://github.com/Mintplex-Labs/anythingllm-mobile). See the [upstream mobile docs](https://docs.anythingllm.com/mobile/overview) and the [upstream app on Google Play](https://play.google.com/store/apps/details?id=com.anythingllm).
+
+### See it in action
+
+<table>
+  <tr>
+    <td width="33%" align="center" valign="top">
+      <video src="https://github.com/user-attachments/assets/8ce6794f-0d4e-4bba-b854-83f10159dfc8" width="100%" muted loop playsinline></video>
+      <br /><b>Default Assistant</b><br />
+      <sub>Set AnythingLLM as your phone's assistant and ask about whatever is on screen, by voice or text.</sub>
+    </td>
+    <td width="33%" align="center" valign="top">
+      <video src="https://github.com/user-attachments/assets/2529a9ea-1be6-4ef4-9195-6f8bfffeddf2" width="100%" muted loop playsinline></video>
+      <br /><b>Ask with AnythingLLM</b><br />
+      <sub>Select text in any app and polish, summarize or explain it from the selection toolbar.</sub>
+    </td>
+    <td width="33%" align="center" valign="top">
+      <video src="https://github.com/user-attachments/assets/025ef147-083d-4d05-9737-80b2d968065e" width="100%" muted loop playsinline></video>
+      <br /><b>Background jobs</b><br />
+      <sub>Recurring tasks that run on schedule, even with the app closed, and notify you when done.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" align="center" valign="top">
+      <video src="https://github.com/user-attachments/assets/a8cdb6fa-bcc5-4b5b-8223-d28c2f5d865b" width="100%" muted loop playsinline></video>
+      <br /><b>Chat with your documents</b><br />
+      <sub>On-device RAG over PDFs, Word, Excel and more. Embedding, vector db, and reranking all fully on device.</sub>
+    </td>
+    <td width="33%" align="center" valign="top">
+      <video src="https://github.com/user-attachments/assets/d8fb22c9-3fe8-40e8-ba3c-43bcd06e98af" width="100%" muted loop playsinline></video>
+      <br /><b>Agentic web search</b><br />
+      <sub>Search, open and read pages, then answer with citations.</sub>
+    </td>
+    <td width="33%" align="center" valign="top">
+      <video src="https://github.com/user-attachments/assets/ffd523eb-5954-4414-881e-b6b6e1f91e1d" width="100%" muted loop playsinline></video>
+      <br /><b>Document generation</b><br />
+      <sub>Turn a conversation into a Word, PDF, PowerPoint or text file.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" align="center" valign="top">
+      <img src="images/demos/memories.png" width="100%" alt="Memory system" />
+      <br /><b>Memory</b><br />
+      <sub>Remembers what you tell it, globally or per workspace, and recalls it when relevant.</sub>
+    </td>
+    <td width="33%" align="center" valign="top">
+      <img src="images/demos/hf-browser.png" width="100%" alt="Browse Huggingface directly" />
+      <br /><b>Hugging Face model browser</b><br />
+      <sub>Find, download and manage GGUF models, with a fit badge for your phone.</sub>
+    </td>
+    <td width="33%" align="center" valign="top">
+      <img src="images/demos/export-chats.png" width="100%" alt="Export Chats" />
+      <br /><b>Export chats</b><br />
+      <sub>PDF with images, Markdown, JSON or plain text.</sub>
+    </td>
+  </tr>
+</table>
+
+### Features
+
+**Models**
+
+- **On-device LLM inference** - Run GGUF models locally with [llama.rn](https://github.com/mybigday/llama.rn) (llama.cpp for React Native). Works with no signal at all.
+- **On-device vision** - Attach images and chat about them using multimodal models, fully offline.
+- **Hugging Face model browser** - Discover, download, and manage models without leaving the app, with a fit badge that tells you whether a model will run well on your phone.
+- **Tuned to your device** - Context windows and capabilities scale to your phone's RAM; prompts are laid out to preserve the KV cache between turns so on-device replies start fast.
+- **Connect to AnythingLLM** - Pair with your desktop or server instance for full workspace and document chat.
+- **Bring your own provider** - Ollama, LM Studio, OpenRouter, Anthropic, OpenAI, or any OpenAI-compatible API, with automatic model discovery and prompt caching where the provider supports it.
+
+**Everywhere on your phone**
+
+- 🤖 **Default Assistant** - Make AnythingLLM your phone's default digital assistant and invoke it from any app. A translucent overlay opens over what you're doing so you can talk or type, optionally share a screenshot of the screen with vision models, and save the conversation as a thread. Set it up under Settings › Special tools › Device Assistant.
+- 📝 **Ask with AnythingLLM** - Select text in any app and it appears in the selection toolbar. Polish, shorten, fix grammar or make it formal, or summarize, pull key points, explain and research what you're reading - with the model you chose, not the OEM assistant. Edits are ephemeral; summaries are saved as threads. Switch it off under Settings › Special tools.
+- 📤 **Share to AnythingLLM** - Send photos, documents and links from any app straight into a chat. Links are scraped, documents are parsed, and the empty thread suggests what to do with them.
+- ⏰ **Scheduled jobs** - Ask for a recurring task (a morning news digest, a weekly check-in) and the assistant runs it on schedule, even in the background.
+- 🔔 **Lock-screen notifications** - Get notified when a reply finishes while your phone is locked.
+
+**Chat**
+
+- 🎙️ **Voice input** - Tap the mic and talk. Speech-to-text uses your phone's native recognition and keeps up with natural pauses.
+- 🧠 **Memory** - A basic manually managed memory system, globally or per workspace, and recalls it when relevant.
+- 🛠️ **Built-in tools** - Web search, web page reading, summarization, location, time, calendar reading and creation, drafting emails or texts, creating files and scheduling jobs. Smart tool selection picks the right one so small models keep a workable context window.
+- 📎 **Documents** - Attach PDFs, Word, Excel, PowerPoint, text and more. On-device models retrieve the relevant passages with on device embedding and reranking for a local vector database.
+- 📄 **Create documents** - Generate Word, PDF, PowerPoint and text files from a conversation.
+- 💾 **Chat export** - PDF (images included), Markdown, JSON, or plain text.
+- ✨ **Familiar UX** - Chain-of-thought display, citations, fork and retry, auto-named threads, and more.
+- 🔒 **Local storage** - Chats and documents are stored on your device. When you choose a remote model, the app sends the conversation context needed for the request to that provider.
+
+### Supported Providers
+
+| Provider | Type |
+|----------|------|
+| On-device (GGUF via [llama.rn](https://github.com/mybigday/llama.rn)) | Local inference, works offline |
+| [AnythingLLM Instance](https://github.com/Mintplex-Labs/anything-llm) | Your own desktop or server (LAN/remote) |
+| [Ollama](https://github.com/ollama/ollama) | Local/remote |
+| [LM Studio](https://lmstudio.ai) | Local/remote |
+| [LocalAI](https://github.com/mudler/LocalAI) | Local/remote |
+| [Lemonade](https://github.com/lemonade-sdk/lemonade) | Local/remote |
+| [llmman](https://github.com/llmmanorg/llmman) | Local/remote |
+| [LiteLLM](https://github.com/BerriAI/litellm) | Local/remote |
+| ChatGPT ([Sign in with ChatGPT](https://learn.chatgpt.com/docs/sign-in-with-chatgpt)) | Subscription - uses your ChatGPT Plus or Pro plan (experimental) |
+| Anthropic | Cloud |
+| AWS Bedrock | Cloud |
+| DeepSeek | Cloud |
+| Fireworks AI | Cloud |
+| Gemini | Cloud |
+| MiniMax | Cloud |
+| Moonshot AI | Cloud |
+| Novita AI | Cloud |
+| OpenAI | Cloud |
+| OpenRouter | Cloud |
+| Together AI | Cloud |
+| xAI | Cloud |
+| Any OpenAI-compatible API | Cloud/local |
+
+## Optional Linux tool on Android
+
+Build the app from this repository and [set up Stowlark in Termux](./docs/stowlark-android.md) to add **Linux (Stowlark)** to chat. The tool runs shell and Python scripts in a temporary Alpine Linux VM on your phone. You review and approve each script before it runs. Everyday chat works without this setup.
+
+## Development
+
+The [mobile development guide](./DEVELOPMENT.md) covers setup, release builds and the app layout. Android is supported and iOS support is planned. The [Stowlark runtime](./runtime/README.md) lives in `runtime/` with its own build instructions.
+
+## 👋 Contributing
+
+- Create issues for bugs or feature requests
+- PRs are welcome - please follow existing code style and run `yarn lint` before submitting
+
+## 🔗 Related Projects
+
+- **[AnythingLLM Server](https://github.com/Mintplex-Labs/anything-llm):** The all-in-one self-hostable image to bring AI to your organization.
+- **[AnythingLLM](https://github.com/Mintplex-Labs/anything-llm):** A powerful on-device desktop app for making AI private and productive.
+- **[llama.rn](https://github.com/mybigday/llama.rn):** For running models on mobile platforms - we use this & it is great!
+
+<div align="right">
+
+[![][back-to-top]](#readme-top)
+
+</div>
 
 ---
 
-Stowlark is a lightweight container runtime written in Rust and forked from
-[Kiri](https://github.com/libracoder/kiri). On desktop it speaks the Docker
-Engine API and runs containers in a small Linux VM, or directly on the host
-kernel on Linux. On Android it runs local, offline Linux workspaces in Termux.
+Copyright © 2025 [Mintplex Labs][profile-link]. <br />
+The mobile app is licensed under the [GNU General Public License v3.0 or later](./LICENSE). <br />
+_Releases prior to 1.2.0 were published under the MIT License and remain available under those terms._ <br />
+Contributions directed to upstream Mintplex Labs are subject to [its Contributor License Agreement](./CLA.md). <br />
+The Stowlark runtime has its own [Apache 2.0 license](./runtime/LICENSE) and [notices](./runtime/NOTICE).
 
-This repository also contains a fork of Mintplex Labs’ AnythingLLM Mobile. On
-ARM64 Android, the chat assistant can run reviewed shell and Python scripts in
-a temporary Stowlark workspace through Termux.
-[Mobile app](anythingllm-mobile/) ·
-[Android setup](anythingllm-mobile/docs/stowlark-android.md)
+<!-- LINK GROUP -->
 
-## Why Stowlark
-
-- **Fast**: the guest starts containers directly in Linux namespaces.
-- **Light**: the VM sleeps after 60 seconds idle.
-- **Compatible**: `docker`, Compose, buildx, `docker login` and amd64 images through Rosetta.
-- **Local domains**: `http://<name>.stowlark.local`, with HTTPS from Stowlark's own certificate authority.
-- **More than containers**: a one-command Kubernetes cluster and Linux machines.
-- **A native window** for containers, images, volumes and networks, plus a menu bar item.
-- **Android workspaces**: run shell and Python scripts in an ARM64 Linux VM from Termux, without root.
-- **In your language**: 38 languages, on macOS, Windows and Linux alike.
-
-### In your language
-
-Stowlark's window and setup come in these languages. It follows your system's language, and you can change it in Settings → Appearance. In Arabic, Persian and Central Kurdish the whole window reads right to left.
-
-| | Language | | Language | | Language | | Language |
-|---|---|---|---|---|---|---|---|
-| 🇬🇧 | English | 🇳🇴 | Norsk bokmål | 🇧🇬 | Български | 🇮🇳 | తెలుగు |
-| 🇮🇩 | Bahasa Indonesia | 🇵🇱 | Polski | 🇷🇺 | Русский | 🇹🇭 | ไทย |
-| 🇦🇩 | Català | 🇧🇷 | Português (Brasil) | 🇺🇦 | Українська | 🇱🇦 | ລາວ |
-| 🇨🇿 | Čeština | 🇷🇴 | Română | 🇰🇿 | Қазақша | 🇯🇵 | 日本語 |
-| 🇩🇪 | Deutsch | 🇦🇱 | Shqip | 🇸🇦 | العربية | 🇰🇷 | 한국어 |
-| 🇪🇸 | Español | 🇸🇮 | Slovenščina | 🇮🇷 | فارسی | 🇨🇳 | 简体中文 |
-| 🇫🇷 | Français | 🇫🇮 | Suomi | 🇮🇶 | کوردیی ناوەندی | 🇹🇼 | 繁體中文 |
-| 🇮🇹 | Italiano | 🇻🇳 | Tiếng Việt | 🇮🇳 | हिन्दी | 🇪🇹 | አማርኛ |
-| 🇱🇹 | Lietuvių | 🇹🇷 | Türkçe | 🇧🇩 | বাংলা |  |  |
-| 🇭🇺 | Magyar | 🇬🇷 | Ελληνικά | 🇮🇳 | தமிழ் |  |  |
-
-Missing yours? Translations live in [`crates/kiri/src/ui/lang`](crates/kiri/src/ui/lang); see [Contributing](#contributing).
-
-## Install
-
-See [GitHub Releases](https://github.com/stowlark/stowlark/releases) for
-published builds, or use the source build instructions below.
-
-| Platform | Build |
-|----------|--------|
-| macOS 14+ (Apple silicon or Intel) | [Build the app](docs/development.md#build) |
-| Windows 10 and 11 (x86-64 or Arm, through WSL 2) | [Build the Windows installer](docs/development.md#build) |
-| Linux (Ubuntu, Fedora and others) | [Build a `.deb` or `.rpm`](packaging/README.md) |
-| ARM64 Android with Termux | [Build and install the launcher](docs/android.md#build-from-source) |
-
-The first time you open the desktop app, it sets up a `stowlark` Docker context.
-
-## Quick start
-
-```sh
-docker --context stowlark run --rm alpine echo hello
-docker --context stowlark compose up -d
-stowlark k8s start                      # single-node Kubernetes as the `stowlark` kubectl context
-stowlark machine create dev --distro ubuntu && stowlark machine shell dev
-stowlark import                         # bring images, volumes and containers over from OrbStack or Docker Desktop
-```
-
-Docker's commands also work as `stowlark` commands (`stowlark run`, `stowlark ps`,
-`stowlark compose up`, and so on), and always target Stowlark.
-
-## Linux workspaces on Android
-
-`stowlark-android` runs a small ARM64 Linux VM from Termux on Android without
-root. It gives scripts and on-device agents a shell, Python, and optional
-persistent workspace files. Each run returns JSON with stdout, stderr and the
-exit status, and starts with networking and host file sharing disabled.
-
-```sh
-stowlark-android create project
-printf 'python3 -c "print(6 * 7)"\n' | stowlark-android run project
-stowlark-android delete project
-```
-
-See [Android setup and agent integration](docs/android.md) for installation,
-limits, and what the QEMU software emulator can safely be used for.
-
-## Upstream benchmarks
-
-The inherited benchmark data measures upstream Kiri. It ran `true` in
-`alpine` and removed the container, taking the median of 30 runs with the
-same `docker` CLI for all three engines.
-
-|                | Docker Engine API | `docker` CLI |
-|----------------|------------------:|-------------:|
-| **Kiri (upstream)** | **2.55 ms**      | **14.2 ms**  |
-| Docker Desktop | 213 ms            | 243 ms       |
-| OrbStack       | 380 ms            | 442 ms       |
-
-See [`bench/results.json`](bench/results.json) for the upstream methodology.
-Run `stowlark bench` to measure your own build.
-
-## How it works
-
-```
-docker CLI ─┐
-compose ────┼─ Docker Engine API ─► stowlark daemon ── vsock ──► guest agent (PID 1)
-buildx ─────┤                         owns the VM           clone3 → container
-stowlark UI ────┘
-```
-
-The VM uses a custom 10 MB kernel, and its PID 1 is a ~900 KB Rust agent.
-That agent starts containers with a single `clone3` into namespaces and a
-cgroup. There's no runc, no shim and no dockerd. More detail is in
-[docs/development.md](docs/development.md#architecture).
-
-## Documentation
-
-- [Features](docs/features.md): supported desktop features, build outputs and known issues
-- [Android workspaces](docs/android.md): Termux setup, JSON CLI and build instructions
-- [Development](docs/development.md): building, running from source, architecture and repository layout
-- [Upstream Kiri release notes](docs/releases)
-
-## Contributing
-
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md)
-and the [Code of Conduct](CODE_OF_CONDUCT.md). To report a vulnerability
-privately, see [SECURITY.md](SECURITY.md).
-
-## License
-
-The Stowlark runtime is licensed under [Apache-2.0](LICENSE). Third-party
-licences are in [NOTICE](NOTICE). The guest kernel is Linux (GPL-2.0). See the
-[kernel config and patches](guest/kernel) and the
-[source offer](guest/kernel/SOURCE_OFFER.md).
-
-AnythingLLM Mobile is licensed under GPL-3.0-or-later and retains Mintplex Labs’
-copyright and attribution. [Mobile license](anythingllm-mobile/LICENSE) ·
-[Mobile README](anythingllm-mobile/README.md)
-
-Stowlark uses its own name and logo. See [Kiri's README](https://github.com/libracoder/kiri#license)
-for the upstream project's branding terms.
+[back-to-top]: https://img.shields.io/badge/-BACK_TO_TOP-222628?style=flat-square
+[profile-link]: https://github.com/mintplex-labs

@@ -1,7 +1,8 @@
 # Packaging
 
 How Stowlark reaches people on each platform, and what each piece of this
-directory (and `installer/windows`) does.
+directory (and `installer/windows`) does. Run these commands from `runtime/`
+in the checkout.
 
 | Platform | Package | Built by | Contents |
 | --- | --- | --- | --- |

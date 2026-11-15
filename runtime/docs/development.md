@@ -1,6 +1,7 @@
 # Development
 
-Building Stowlark from source, running it, and how it fits together.
+Building Stowlark from source, running it, and how it fits together. Run these
+commands from `runtime/` in the checkout.
 
 ## Build
 
@@ -124,5 +125,5 @@ stowlark UI ────┘
 | `brand/` | logos, app icons and Windows installer artwork |
 
 To regenerate the vector assets, run `python3 brand/generate.py brand` from
-the repository root. Install CairoSVG (with Cairo available to Python) and
+`runtime/`. Install CairoSVG (with Cairo available to Python) and
 Pillow, then add `--rasters` to regenerate the PNG, ICO and BMP assets.

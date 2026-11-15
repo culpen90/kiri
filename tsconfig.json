@@ -14,5 +14,6 @@
         "src/types/intent-launcher.d.ts"
       ]
     }
-  }
+  },
+  "exclude": ["node_modules", "**/Pods/**", "runtime"]
 }

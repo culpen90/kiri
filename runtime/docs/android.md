@@ -6,7 +6,7 @@ ARM64 Android device in [Termux](https://github.com/termux/termux-app#installati
 without root or a desktop daemon. An agent that can start processes in Termux
 can call the CLI directly. AnythingLLM Mobile calls the CLI through the Termux
 command API and asks for approval before each script.
-[Set up AnythingLLM Mobile](../anythingllm-mobile/docs/stowlark-android.md).
+[Set up AnythingLLM Mobile](../../docs/stowlark-android.md).
 
 ## Set up in Termux
 
@@ -138,14 +138,15 @@ with the pinned Alpine kernel, initramfs, and source notices. It verifies the
 guest inputs against `guest/android/alpine.sha256` before using them.
 
 ```sh
+cd runtime
 rustup target add aarch64-linux-android aarch64-unknown-linux-musl
 ANDROID_NDK_HOME=/path/to/android/ndk scripts/build-android.sh
 ```
 
-The bundle and checksum land in `target/android-dist`. The Android launcher
-targets API 26 or newer and was exercised with Termux on an ARM64 Android 16
-emulator. To run the same smoke test on a development host with
-`qemu-system-aarch64` on `PATH`:
+The bundle and checksum land in `runtime/target/android-dist` in the checkout.
+The Android launcher targets API 26 or newer and was exercised with Termux on
+an ARM64 Android 16 emulator. To run the same smoke test from `runtime/` on a
+development host, put `qemu-system-aarch64` on `PATH` and run:
 
 ```sh
 python3 guest/android/build.py --output-dir target/android-guest
