@@ -71,6 +71,11 @@ package-lock.json
 /coverage
 .env
 
+# Runtime build output from checkouts created before the move to runtime/
+/target/
+/guest/out/
+/bench/results/
+
 # Environment files
 .env
 .env.*
