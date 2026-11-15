@@ -4,13 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/android-vm.yml'
-      - '.cargo/**'
-      - 'Cargo.*'
-      - 'crates/kiri-android/**'
-      - 'crates/kiri-init/**'
-      - 'guest/android/**'
-      - 'scripts/build-android.sh'
-      - 'tests/android-vm.py'
+      - 'runtime/**'
   workflow_dispatch:
 
 permissions:
@@ -24,6 +18,9 @@ jobs:
   arm64-vm:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: runtime
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

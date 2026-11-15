@@ -1,19 +1,19 @@
 name: Feature request
-description: Something Stowlark should do, or a change you'd like to make.
+description: Suggest an improvement to AnythingLLM Mobile or its Linux tools.
 labels: ["enhancement"]
 body:
   - type: textarea
     id: need
     attributes:
       label: What you're trying to do
-      description: The task, not the solution. What are you working on, and where does Stowlark get in the way?
+      description: Describe your task and where you get stuck.
     validations:
       required: true
   - type: textarea
     id: idea
     attributes:
-      label: What you'd like Stowlark to do
-      description: If Docker or another tool already does this, say how.
+      label: What would help?
+      description: Describe the feature you would like to use.
     validations:
       required: true
   - type: dropdown
