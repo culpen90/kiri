@@ -14,6 +14,7 @@
   <a href="#install">Install</a> ·
   <a href="docs/features.md">Features</a> ·
   <a href="docs/android.md">Android workspaces</a> ·
+  <a href="anythingllm-mobile/">AnythingLLM Mobile</a> ·
   <a href="docs/development.md">Build from source</a> ·
   <a href="https://github.com/stowlark/stowlark/releases">Releases</a>
 </p>
@@ -34,6 +35,12 @@ Stowlark is a lightweight container runtime written in Rust and forked from
 [Kiri](https://github.com/libracoder/kiri). On desktop it speaks the Docker
 Engine API and runs containers in a small Linux VM, or directly on the host
 kernel on Linux. On Android it runs local, offline Linux workspaces in Termux.
+
+This repository also contains a fork of Mintplex Labs’ AnythingLLM Mobile. On
+ARM64 Android, the chat assistant can run reviewed shell and Python scripts in
+a temporary Stowlark workspace through Termux.
+[Mobile app](anythingllm-mobile/) ·
+[Android setup](anythingllm-mobile/docs/stowlark-android.md)
 
 ## Why Stowlark
 
@@ -152,9 +159,14 @@ privately, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-[Apache-2.0](LICENSE). Third-party licences are in [NOTICE](NOTICE). The guest
-kernel is Linux (GPL-2.0). See the [kernel config and patches](guest/kernel)
-and the [source offer](guest/kernel/SOURCE_OFFER.md).
+The Stowlark runtime is licensed under [Apache-2.0](LICENSE). Third-party
+licences are in [NOTICE](NOTICE). The guest kernel is Linux (GPL-2.0). See the
+[kernel config and patches](guest/kernel) and the
+[source offer](guest/kernel/SOURCE_OFFER.md).
+
+AnythingLLM Mobile is licensed under GPL-3.0-or-later and retains Mintplex Labs’
+copyright and attribution. [Mobile license](anythingllm-mobile/LICENSE) ·
+[Mobile README](anythingllm-mobile/README.md)
 
 Stowlark uses its own name and logo. See [Kiri's README](https://github.com/libracoder/kiri#license)
 for the upstream project's branding terms.

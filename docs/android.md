@@ -4,7 +4,9 @@
 POSIX shell and common command-line tools) and Python 3. It runs locally on an
 ARM64 Android device in [Termux](https://github.com/termux/termux-app#installation),
 without root or a desktop daemon. An agent that can start processes in Termux
-can call the CLI directly. There is no public API for other Android apps.
+can call the CLI directly. AnythingLLM Mobile calls the CLI through the Termux
+command API and asks for approval before each script.
+[Set up AnythingLLM Mobile](../anythingllm-mobile/docs/stowlark-android.md).
 
 ## Set up in Termux
 
